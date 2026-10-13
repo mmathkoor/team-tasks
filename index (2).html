@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مهام الفريق</title>
+<link rel="preconnect" href="https://wrmpyywosathqxrjuicx.supabase.co" crossorigin>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#27408b">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#1c2433;--mute:#6b7280;--line:#e2e5ea;--acc:#27408b;--late:#b42318;--soon:#b7791f;--ok:#2f7d4f}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2a313d;--acc:#8fa8f0;--late:#f08a80;--soon:#e6b85c;--ok:#6cc58f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'Segoe UI',Tahoma,system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:860px;margin:auto;padding:16px}
+h1{font-size:20px;margin:8px 0}h2{font-size:15px;margin:0 0 8px;color:var(--mute);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+button{cursor:pointer}button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){button.p{color:#12151c}}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}.row .s{flex:0 0 auto}
+.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.t{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.t:first-child{border-top:0}.t b{font-weight:600}.t.done b{text-decoration:line-through;color:var(--mute)}
+.m{font-size:13px;color:var(--mute)}.late{color:var(--late)}.soon{color:var(--soon)}.ok{color:var(--ok)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+@media (prefers-color-scheme:dark){.tabs button.on{color:#12151c}}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#login{max-width:360px;margin:20vh auto}
+</style>
+</head>
+<body>
+<main id="app"><p style="padding:24px;color:#6b7280;font:15px sans-serif" dir="rtl">جارٍ التحميل...</p></main>
+<script>
+window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && a.textContent.includes('جارٍ التحميل')) a.innerHTML = '<div style="padding:24px;font:15px sans-serif" dir="rtl">حدث خطأ في تحميل التطبيق: ' + e.message + '<br>أغلق التطبيق وافتحه من جديد.</div>'; });
+// ====== ضع بيانات مشروعك من Supabase > Project Settings > API ======
+const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
+const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
+// ====================================================================
+// عميل خفيف مباشر لـ Supabase بدون مكتبات خارجية (أسرع وبلا اعتماد على أي CDN)
+const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
+const AUTH = { s: JSON.parse(localStorage.getItem('sbs') || 'null') };
+const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); };
+async function tok() {
+  const s = AUTH.s;
+  if (!s) return KEY;
+  if (s.expires_at - 60 > Date.now() / 1000) return s.access_token;
+  try {
+    const r = await fetch(API + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
+    const j = await r.json();
+    if (!r.ok) { saveS(null); return KEY; }
+    j.expires_at = j.expires_at || Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); return j.access_token;
+  } catch (e) { return s.access_token; }
+}
+class Q {
+  constructor(t) { this.t = t; this.m = 'GET'; this.p = new URLSearchParams(); this.b = null; this.pf = ''; }
+  select(c) { this.p.set('select', c || '*'); return this; }
+  order(c, o = {}) { this.p.set('order', c + (o.ascending === false ? '.desc' : '.asc') + (o.nullsFirst ? '.nullsfirst' : '.nullslast')); return this; }
+  eq(c, v) { this.p.append(c, 'eq.' + v); return this; }
+  insert(o) { this.m = 'POST'; this.b = o; return this; }
+  upsert(o) { this.m = 'POST'; this.b = o; this.pf = 'resolution=merge-duplicates'; return this; }
+  update(o) { this.m = 'PATCH'; this.b = o; return this; }
+  delete() { this.m = 'DELETE'; return this; }
+  then(res, rej) { return this.run().then(res, rej); }
+  async run() {
+    try {
+      const mut = this.m !== 'GET', h = { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' };
+      const pf = [this.pf, mut ? 'return=minimal' : ''].filter(Boolean).join(','); if (pf) h.Prefer = pf;
+      const r = await fetch(API + '/rest/v1/' + this.t + '?' + this.p, { method: this.m, headers: h, body: this.b ? JSON.stringify(this.b) : undefined });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || r.statusText } }; }
+      return { data: mut ? null : await r.json(), error: null };
+    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بالإنترنت' } }; }
+  }
+}
+const sb = {
+  from: t => new Q(t),
+  auth: {
+    getSession: async () => ({ data: { session: AUTH.s } }),
+    signInWithPassword: async ({ email, password }) => {
+      try {
+        const r = await fetch(API + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+        const j = await r.json();
+        if (!r.ok) return { error: { message: j.error_description || j.msg || 'بيانات الدخول غير صحيحة' } };
+        j.expires_at = j.expires_at || Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); init(); return { error: null };
+      } catch (e) { return { error: { message: 'تعذّر الاتصال بالإنترنت' } }; }
+    },
+    signOut: async () => saveS(null),
+    updateUser: async ({ password }) => {
+      try {
+        const r = await fetch(API + '/auth/v1/user', { method: 'PUT', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+        const j = await r.json().catch(() => ({}));
+        return { error: r.ok ? null : { message: j.msg || j.message || 'تعذّر التحديث' } };
+      } catch (e) { return { error: { message: 'تعذّر الاتصال بالإنترنت' } }; }
+    }
+  }
+};
+const $app = document.getElementById('app');
+const S = { me: null, members: [], meetings: [], tasks: [], filter: 'mine' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => new Date().toISOString().slice(0, 10);
+const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجزة' };
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return loginView();
+  const email = session.user.email;
+  try { const c = JSON.parse(localStorage.getItem('cache') || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
+  const { data: members, error } = await sb.from('members').select('*');
+  if (error) { if (!S.me) { $app.innerHTML = '<div class="card" id="login">تعذّر تحميل البيانات، تحقق من الإنترنت.<br><button id="again">إعادة المحاولة</button> <button id="out">خروج</button></div>'; again.onclick = init; out.onclick = logout; } return; }
+  if (!members.length) { $app.innerHTML = '<div class="card" id="login">هذا الإيميل غير مضاف لأعضاء الفريق.<br><button id="out">تسجيل خروج</button></div>'; out.onclick = logout; return; }
+  S.members = members; S.me = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+  await load();
+}
+async function load() {
+  const bz = document.getElementById('busy'); if (bz) bz.textContent = 'جارٍ التحديث...';
+  const [m, t, mm] = await Promise.all([
+    sb.from('meetings').select('*').order('held_on', { ascending: false }),
+    sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
+    sb.from('members').select('*')
+  ]);
+  if (!m.error) S.meetings = m.data || []; if (!t.error) S.tasks = t.data || [];
+  if (mm.data?.length) { S.members = mm.data; S.me = mm.data.find(x => x.email === S.me.email) || S.me; }
+  if (!m.error && !t.error) try { localStorage.setItem('cache', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks } })); } catch (e) {}
+  render();
+}
+function loginView() {
+  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول بإيميلك وكلمة المرور.</p>
+  <div class="row"><input id="em" type="email" placeholder="you@example.com" dir="ltr"></div>
+  <div class="row" style="margin-top:8px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr"><button class="p s" id="go">دخول</button></div><p class="m" id="msg"></p></div>`;
+  const doLogin = async () => {
+    msg.textContent = 'جارٍ الدخول...';
+    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value });
+    msg.textContent = error ? 'تعذّر الدخول: ' + error.message : '';
+  };
+  go.onclick = doLogin;
+  pw.onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+}
+const logout = async () => { await sb.auth.signOut(); localStorage.removeItem('cache'); location.reload(); };
+const isAdmin = () => S.me.role === 'admin';
+const canEdit = () => true;
+const editForm = t => `<div class="t" style="grid-template-columns:1fr"><div class="row"><input id="e_t" value="${esc(t.title)}"><select id="e_a"><option value="">غير مُسند</option>${S.members.map(m => `<option value="${esc(m.email)}" ${m.email === t.assignee_email ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div><div class="row"><input id="e_d" type="date" value="${t.due_on || ''}"><select id="e_m"><option value="">بدون اجتماع</option>${S.meetings.map(m => `<option value="${m.id}" ${m.id === t.meeting_id ? 'selected' : ''}>${esc(m.title)} · ${m.held_on}</option>`).join('')}</select></div><div class="row"><button class="p s" id="e_save">حفظ التعديل</button><button class="s" id="e_cancel">إلغاء</button></div></div>`;
+const canDel = t => isAdmin() || t.created_by === S.me.email;
+const run = async p => { const { error } = await p; if (error) alert('تعذّر التنفيذ: ' + error.message); load(); };
+const who = e => S.members.find(m => m.email === e)?.name || 'غير مُسند';
+function due(t) {
+  if (!t.due_on || t.status === 'done') return t.due_on ? `<span class="m">${t.due_on}</span>` : '';
+  if (t.due_on < today()) return `<span class="late">متأخرة · ${t.due_on}</span>`;
+  const d = Math.round((new Date(t.due_on) - new Date(today())) / 864e5);
+  return d <= 1 ? `<span class="soon">${d ? 'غداً' : 'اليوم'}</span>` : `<span class="m">${t.due_on}</span>`;
+}
+function render() {
+  const list = S.tasks.filter(t => S.filter === 'all' ? true : S.filter === 'open' ? t.status !== 'done' : t.assignee_email === S.me.email && t.status !== 'done');
+  const opts = S.members.map(m => `<option value="${esc(m.email)}">${esc(m.name)}</option>`).join('');
+  $app.innerHTML = `
+  <div class="bar"><h1>مهام الفريق</h1><div class="row s"><span class="m" id="busy"></span><span class="m">${esc(S.me.name)}</span><button id="rf">تحديث</button><button id="out">خروج</button></div></div>
+  <div class="card"><h2>مهمة جديدة</h2>
+    <div class="row"><input id="ti" placeholder="عنوان المهمة"><select id="as">${opts}</select></div>
+    <div class="row" style="margin-top:8px"><input id="du" type="date"><select id="mt"><option value="">بدون اجتماع</option>${S.meetings.map(m => `<option value="${m.id}">${esc(m.title)} · ${m.held_on}</option>`).join('')}</select><button class="p s" id="add">إضافة</button></div></div>
+  <div class="tabs">${[['mine','مهامي'],['open','كل المفتوحة'],['all','الكل']].map(([k, l]) => `<button data-f="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}${isAdmin() ? '<button id="nmeet" class="s" style="margin-inline-start:auto">+ اجتماع</button>' : ''}</div>
+  <div class="card">${list.length ? list.map(t => S.editing === t.id ? editForm(t) : `<div class="t ${t.status}"><b>${esc(t.title)}</b>
+    <select data-id="${t.id}" class="st" ${canEdit(t) ? '' : 'disabled'}>${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <span class="m">${esc(who(t.assignee_email))} · ${esc(S.meetings.find(m => m.id === t.meeting_id)?.title || 'بدون اجتماع')} · ${due(t)}</span>
+    <span style="display:flex;gap:6px"><button data-edit="${t.id}">تعديل</button>${canDel(t) ? `<button data-del="${t.id}" aria-label="حذف">حذف</button>` : ''}</span></div>`).join('') : '<p class="m">لا توجد مهام هنا.</p>'}</div>
+  <div class="card"><h2>إشعارات الجوال</h2><div class="row"><button class="p s" id="push">تفعيل الإشعارات على هذا الجهاز</button></div><p class="m" id="pm">على الآيفون: افتح الموقع في سفاري ← مشاركة ← «إضافة إلى الشاشة الرئيسية»، ثم افتح التطبيق من الأيقونة وفعّل الإشعارات.</p></div>
+  ${isAdmin() ? `<div class="card"><h2>الأعضاء (للأدمن)</h2>${S.members.map(m => `<div class="row" style="align-items:center;margin-bottom:6px"><span>${esc(m.name)} <span class="m" dir="ltr">${esc(m.email)}${m.role === 'admin' ? ' · أدمن' : ''}</span></span>${m.email === S.me.email ? '' : `<button class="s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}<div class="row"><input id="ne" dir="ltr" placeholder="إيميل العضو الجديد"><input id="nn" placeholder="الاسم"><button class="p s" id="addm">إضافة</button></div></div>` : ''}
+  <div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="كلمة مرور جديدة (6 أحرف على الأقل)"><button class="s" id="svp">حفظ</button></div></div>
+  <div class="card"><h2>تنبيهات تيليجرام (اختياري)</h2><div class="row"><input id="tg" dir="ltr" placeholder="Chat ID" value="${esc(S.me.telegram_chat_id || '')}"><button class="s" id="svtg">حفظ</button></div></div>`;
+  out.onclick = logout;
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+  document.querySelectorAll('.st').forEach(s => s.onchange = () => run(sb.from('tasks').update({ status: s.value }).eq('id', s.dataset.id)));
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (confirm('حذف المهمة؟')) run(sb.from('tasks').delete().eq('id', b.dataset.del)); });
+  as.value = S.me.email;
+  document.getElementById('rf').onclick = load;
+  document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { S.editing = b.dataset.edit; render(); });
+  const sv = document.getElementById('e_save');
+  if (sv) {
+    sv.onclick = () => {
+      const id = S.editing, title = document.getElementById('e_t').value.trim();
+      if (!title) return;
+      S.editing = null;
+      run(sb.from('tasks').update({ title, assignee_email: document.getElementById('e_a').value || null, due_on: document.getElementById('e_d').value || null, meeting_id: document.getElementById('e_m').value || null }).eq('id', id));
+    };
+    document.getElementById('e_cancel').onclick = () => { S.editing = null; render(); };
+  }
+  push.onclick = enablePush;
+  add.onclick = async () => {
+    if (!ti.value.trim()) return ti.focus();
+    run(sb.from('tasks').insert({ title: ti.value.trim(), assignee_email: as.value, due_on: du.value || null, meeting_id: mt.value || null, created_by: S.me.email }));
+  };
+  const nb = document.getElementById('nmeet');
+  if (nb) nb.onclick = () => { const t = prompt('اسم الاجتماع (مثلاً: اجتماع الأسبوع 12)'); if (t) run(sb.from('meetings').insert({ title: t })); };
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة هذا العضو؟ ستبقى مهامه بدون مسؤول.')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+  const am = document.getElementById('addm');
+  if (am) am.onclick = () => { const e = document.getElementById('ne').value.trim(), n = document.getElementById('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
+  svp.onclick = async () => { if (np.value.length < 6) return alert('6 أحرف على الأقل'); const { error } = await sb.auth.updateUser({ password: np.value }); alert(error ? error.message : 'تم تغيير كلمة المرور'); np.value = ''; };
+  svtg.onclick = async () => { await sb.from('members').update({ telegram_chat_id: tg.value.trim() || null }).eq('email', S.me.email); S.me.telegram_chat_id = tg.value.trim(); svtg.textContent = 'تم'; };
+}
+async function enablePush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'هذا المتصفح لا يدعم الإشعارات. على الآيفون أضف الموقع للشاشة الرئيسية أولاً.';
+    if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح صلاحية الإشعارات. فعّلها من إعدادات المتصفح.';
+    const reg = await navigator.serviceWorker.ready;
+    const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subs').upsert({ endpoint: j.endpoint, email: S.me.email, sub: j });
+    pm.textContent = error ? 'تعذّر الحفظ: ' + error.message : 'تم تفعيل الإشعارات على هذا الجهاز.';
+  } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !S.editing) load(); });
+init();
+</script>
+</body>
+</html>

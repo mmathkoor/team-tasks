@@ -1,10 +1,10 @@
-const C = 'tasks-v1';
-const FILES = ['/', '/supabase.js', '/icon-192.png', '/manifest.json'];
+const C = 'tasks-v2';
+const FILES = ['/', '/icon-192.png', '/manifest.json'];
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(C).then(c => Promise.allSettled(FILES.map(f => c.add(f)))));
 });
-self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => clients.claim())));
 // عرض النسخة المحفوظة فوراً ثم تحديثها في الخلفية (يسرّع الفتح على الشبكات الضعيفة)
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
