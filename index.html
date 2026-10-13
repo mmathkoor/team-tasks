@@ -156,20 +156,18 @@ dialog .dact button { min-width: 100px; padding: 10px; }
 <main id="app"><p style="padding:40px;text-align:center;color:var(--mute);font-weight:500;">جارٍ تهيئة مساحة العمل...</p></main>
 <dialog id="dlg"></dialog>
 <script>
-// === أنظمة الحماية من تجمد الشاشة ===
-async function hardReset() {
-  localStorage.clear();
-  if ('serviceWorker' in navigator) {
-    try { const regs = await navigator.serviceWorker.getRegistrations(); for (let r of regs) await r.unregister(); } catch(e){}
+// === نظام الإنقاذ الآلي (Watchdog) ===
+// إذا بقيت الشاشة معلقة لأكثر من 3 ثوانٍ، سيتم عرض زر لمسح الذاكرة المؤقتة التالفة.
+setTimeout(() => {
+  const app = document.getElementById('app');
+  if (app && app.innerHTML.includes('جارٍ تهيئة')) {
+    app.innerHTML = `<div class="card" style="text-align:center;max-width:400px;margin:40px auto;border-color:var(--late)">
+      <h2 style="color:var(--late);margin-bottom:10px">النظام معلق بسبب الذاكرة المؤقتة</h2>
+      <p style="margin-bottom:20px;color:var(--mute)">يبدو أن متصفحك يحتفظ ببيانات قديمة تتعارض مع التحديث الجديد.</p>
+      <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="background:var(--acc);color:#fff;padding:12px 20px;border:none;border-radius:8px;font-size:16px;width:100%">إصلاح وتحديث الواجهة الآن 🔄</button>
+    </div>`;
   }
-  location.reload();
-}
-function showCriticalError(errStr) {
-  const a = document.getElementById('app');
-  if (a) a.innerHTML = `<div class="card" style="text-align:center;color:var(--late);margin:40px auto;max-width:400px;border-color:var(--late)"><h3>حدث خطأ غير متوقع</h3><p>${errStr}</p><button class="p" onclick="hardReset()" style="margin-top:16px;width:100%;padding:12px">إصلاح وإعادة تحميل النظام</button></div>`;
-}
-window.addEventListener('error', e => showCriticalError(e.message));
-window.addEventListener('unhandledrejection', e => showCriticalError(e.reason?.message || 'تعذر جلب البيانات.'));
+}, 3000);
 
 // ====== بيانات مشروعك من Supabase ======
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
@@ -178,8 +176,8 @@ const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAj
 
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
 let AUTH = { s: null };
-try { AUTH.s = JSON.parse(localStorage.getItem('sbs') || 'null'); } catch(e){}
-const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); };
+try { AUTH.s = JSON.parse(localStorage.getItem('sbs_v2') || 'null'); } catch(e){}
+const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs_v2', JSON.stringify(s)) : localStorage.removeItem('sbs_v2'); };
 
 async function tok() {
   const s = AUTH.s;
@@ -250,49 +248,36 @@ const ACT_ALL = { todo: [['done', 'إنجاز ✓']], done: [['todo', 'إعاد�
 const PST = { open: 'قيد التصويت', accepted: 'مُعتمد', rejected: 'مرفوض', closed: 'مغلق' };
 const nm = e => S.members.find(m => same(m.email, e))?.name || 'غير محدد';
 const isAdmin = () => S.me?.role === 'admin';
-const canDel = t => isAdmin() || same(t.created_by, S.me.email);
-const mine = t => t.for_all || same(t.assignee_email, S.me.email);
+const canDel = t => isAdmin() || (S.me && same(t.created_by, S.me.email));
+const mine = t => t.for_all || (S.me && same(t.assignee_email, S.me.email));
 const doneBy = t => S.done.filter(d => d.task_id === t.id);
-const eff = t => t.for_all ? (doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
+const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
 async function init() {
   try {
-    const { data: { session }, error: authErr } = await sb.auth.getSession();
-    if (authErr || !session || !session.user || !session.user.email) {
-      saveS(null);
-      return loginView();
-    }
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session || !session.user || !session.user.email) { saveS(null); return loginView(); }
     const email = session.user.email;
     
-    // تحميل سريع وآمن من الذاكرة
-    let cached = false;
+    // محاولة تحميل من الكاش الجديد فقط
     try { 
-      const c = JSON.parse(localStorage.getItem('cache3')); 
+      const c = JSON.parse(localStorage.getItem('cache_v4')); 
       if (c && c.email === email && c.s) { 
-        S.me = c.s.me || S.me;
-        S.members = Array.isArray(c.s.members) ? c.s.members : S.members;
-        S.meetings = Array.isArray(c.s.meetings) ? c.s.meetings : S.meetings;
-        S.tasks = Array.isArray(c.s.tasks) ? c.s.tasks : S.tasks;
-        S.done = Array.isArray(c.s.done) ? c.s.done : S.done;
-        S.props = Array.isArray(c.s.props) ? c.s.props : S.props;
-        S.votes = Array.isArray(c.s.votes) ? c.s.votes : S.votes;
-        if (S.me && S.members.length > 0) { render(); cached = true; }
+        S.me = c.s.me; S.members = c.s.members || []; S.meetings = c.s.meetings || []; S.tasks = c.s.tasks || []; S.done = c.s.done || []; S.props = c.s.props || []; S.votes = c.s.votes || [];
+        if (S.me && S.members.length > 0) render(); 
       } 
-    } catch (e) { localStorage.removeItem('cache3'); }
+    } catch (e) { localStorage.removeItem('cache_v4'); }
     
-    // جلب البيانات من الخادم
     const { data: members, error } = await sb.from('members').select('*');
-    if (error) { 
-      if (!cached) showCriticalError('فشل الاتصال بقاعدة البيانات. تأكد من الإنترنت.'); 
-      return; 
-    }
+    if (error) { if (!S.me) alert('فشل الاتصال بقاعدة البيانات. تأكد من الإنترنت.'); return; }
+    
     const me = members.find(m => same(m.email, email));
-    if (!me) { saveS(null); showCriticalError('حسابك غير مسجل كعضو في الفريق.'); return; }
+    if (!me) { saveS(null); alert('حسابك غير مسجل كعضو في الفريق.'); return loginView(); }
     
     S.members = members; S.me = me;
     await load();
-  } catch (err) { showCriticalError(err.message); }
+  } catch (err) { console.error(err); }
 }
 
 async function load() {
@@ -311,7 +296,7 @@ async function load() {
   if (!p.error) S.props = p.data || [];
   if (!v.error) S.votes = v.data || [];
   
-  if (!m.error && !t.error) try { localStorage.setItem('cache3', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
+  if (!m.error && !t.error) try { localStorage.setItem('cache_v4', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
 }
 
@@ -335,9 +320,10 @@ function loginView() {
   $('go').onclick = doLogin;
   $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
 }
-const logout = () => { hardReset(); };
 
+const logout = () => { localStorage.clear(); sessionStorage.clear(); location.reload(true); };
 const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
+
 function render() {
   try {
     const openProps = S.props.filter(p => !isClosed(p)).length;
@@ -345,7 +331,7 @@ function render() {
     <div class="top">
       <h1>مهام الفريق</h1>
       <div class="row s" style="align-items:center;gap:16px">
-        <span class="m" style="font-weight:600">👤 ${esc(S.me.name)}</span>
+        <span class="m" style="font-weight:600">👤 ${esc(S.me?.name || '')}</span>
         <button id="rf" class="s">🔄 تحديث</button>
       </div>
     </div>
@@ -359,7 +345,7 @@ function render() {
     $('rf').onclick = () => {$('rf').textContent = '⏳'; load(); };
     document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
     if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
-  } catch (err) { showCriticalError("خطأ في رسم الواجهة: " + err.message); }
+  } catch (err) { console.error("Error rendering view:", err); }
 }
 
 function dueInfo(t) {
@@ -375,11 +361,9 @@ function card(t) {
   const acts = (t.for_all ? ACT_ALL : ACT)[st];
   const dn = doneBy(t);
   
-  // زر مشاركة الواتساب (يظهر إذا كانت المهمة مسندة لشخص معين ولم يتم إنجازها)
   let waBtn = '';
-  if (!t.for_all && t.assignee_email && !same(t.assignee_email, S.me.email) && st !== 'done') {
-    const assigneeName = nm(t.assignee_email);
-    const msg = `مرحباً ${assigneeName}،\nتم إسناد مهمة جديدة إليك:\n*${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nالرجاء متابعتها والتحديث عند الإنجاز.`;
+  if (!t.for_all && t.assignee_email && S.me && !same(t.assignee_email, S.me.email) && st !== 'done') {
+    const msg = `مرحباً ${nm(t.assignee_email)}،\nتم إسناد مهمة جديدة إليك:\n*${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nالرجاء متابعتها عبر التطبيق.`;
     waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="chip" style="background:#25d366;color:#fff;text-decoration:none;border:none">💬 إشعار واتساب</a>`;
   }
 
@@ -423,7 +407,7 @@ function boardView() {
       <button data-f="mine" class="${S.filter === 'mine' ? 'on' : ''}">مهامي</button>
       <button data-f="all" class="${S.filter === 'all' ? 'on' : ''}">الكل</button>
     </div>
-    <select id="fm"><option value="">كل الاجتماعات/المهام</option>${S.meetings.map(m => `<option value="${m.id}" ${S.meeting === m.id ? 'selected' : ''}>${esc(m.title)} (${m.held_on})</option>`).join('')}</select>
+    <select id="fm"><option value="">كل الاجتماعات/المهام</option>${S.meetings.map(m => `<option value="${m.id}" ${S.meeting === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select>
     <span class="sp"></span>
     ${isAdmin() ? '<button class="s" id="nmt">+ اجتماع</button>' : ''}
     <button class="p s" id="nt">➕ إضافة مهمة</button>
@@ -436,7 +420,7 @@ function bindBoard() {
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
   document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.col = b.dataset.c; render(); });
   $('fm').onchange = e => { S.meeting = e.target.value; render(); };$('nt').onclick = () => taskDialog(null);
-  if ($('nmt'))$('nmt').onclick = () => { const t = prompt('اسم الاجتماع (مثال: اجتماع الإدارة)'); if (t?.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
+  if ($('nmt'))$('nmt').onclick = () => { const t = prompt('اسم الاجتماع'); if (t?.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
   
   document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
   document.querySelectorAll('.tk').forEach(el => {
@@ -453,7 +437,7 @@ function bindBoard() {
 
 async function moveTask(id, to) {
   const t = S.tasks.find(x => x.id === id);
-  if (!t || eff(t) === to) return;
+  if (!t || eff(t) === to || !S.me) return;
   S.col = to;
   
   if (t.for_all) {
@@ -474,20 +458,20 @@ async function moveTask(id, to) {
 
 function taskDialog(t, pre = {}) {
   const x = t || pre, edit = !!t;
-  const asVal = x.for_all ? '__all' : (x.assignee_email || S.me.email);
+  const asVal = x.for_all ? '__all' : (x.assignee_email || (S.me ? S.me.email : ''));
   dlg.innerHTML = `
   <h2>${edit ? 'تعديل المهمة' : 'إضافة مهمة جديدة'}</h2>
   <label>عنوان المهمة<input id="f_ti" value="${esc(x.title || '')}" placeholder="ما الذي يجب إنجازه؟"></label>
-  <label>التفاصيل (اختياري)<textarea id="f_no" rows="3" placeholder="ملاحظات أو روابط هامة...">${esc(x.notes || '')}</textarea></label>
+  <label>التفاصيل (اختياري)<textarea id="f_no" rows="3" placeholder="ملاحظات أو روابط...">${esc(x.notes || '')}</textarea></label>
   <div class="row">
     <label>المسؤول<select id="f_as"><option value="__all" ${asVal === '__all' ? 'selected' : ''}>👥 كل أعضاء الفريق</option><option value="" ${asVal === '' ? 'selected' : ''}>غير محدد</option>${S.members.map(m => `<option value="${esc(m.email)}" ${same(m.email, asVal) ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
     <label>تاريخ الاستحقاق<input id="f_du" type="date" value="${esc(x.due_on || '')}"></label>
   </div>
   <div class="row" style="margin-top:16px">
-    <label>الاجتماع المرتبط<select id="f_mt"><option value="">بدون ارتباط</option>${S.meetings.map(m => `<option value="${m.id}" ${x.meeting_id === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select></label>
+    <label>الاجتماع<select id="f_mt"><option value="">بدون ارتباط</option>${S.meetings.map(m => `<option value="${m.id}" ${x.meeting_id === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select></label>
     <label id="f_stw">حالة المهمة<select id="f_st">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${(x.status \vert{}\vert{} 'todo') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
   </div>
-  <p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);border-radius:8px;color:var(--acc)">ℹ️ <b>مهمة للفريق:</b> ستظهر هذه المهمة لدى جميع الأعضاء، ويجب على كل شخص النقر على "إنجاز" بشكل مستقل.</p>
+  <p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);border-radius:8px;color:var(--acc)">ℹ️ <b>مهمة للفريق:</b> ستظهر هذه المهمة لدى جميع الأعضاء.</p>
   <div class="row dact">
     ${edit && canDel(t) ? `<button class="dng s" id="f_dl" style="margin-inline-end:auto">حذف المهمة</button>` : '<span></span>'}
     <button class="s" id="f_cx">إلغاء</button>
@@ -497,8 +481,7 @@ function taskDialog(t, pre = {}) {
   const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; };
   $('f_as').onchange = sync; sync();
   $('f_cx').onclick = () => dlg.close();$('f_sv').onclick = async () => {
-    const title = $('f_ti').value.trim();
-    if (!title) return $('f_ti').focus();
+    const title = $('f_ti').value.trim(); if (!title) return$('f_ti').focus();
     const all = $('f_as').value === '__all';
     const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value \vert{}\vert{} null), due_on:$('f_du').value || null, meeting_id: $('f_mt').value \vert{}\vert{} null, status: all ? 'todo' : $('f_st').value };
     if (!edit) row.created_by = S.me.email;
@@ -514,18 +497,19 @@ function taskDialog(t, pre = {}) {
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
 function parseOptions(p) {
+  if (!p || !p.options) return ['موافق', 'معارض'];
   if (Array.isArray(p.options)) return p.options;
   try { const arr = JSON.parse(p.options); if (Array.isArray(arr)) return arr; } catch(e) {}
   if (typeof p.options === 'string' && p.options.includes(',')) return p.options.split(',').map(s => s.trim()).filter(Boolean);
-  return ['موافق', 'غير موافق'];
+  return ['موافق', 'معارض'];
 }
 
 function propCard(p) {
   const opts = parseOptions(p);
   const pVotes = S.votes.filter(x => x.proposal_id === p.id);
-  const myVote = pVotes.find(x => same(x.email, S.me.email));
+  const myVote = S.me ? pVotes.find(x => same(x.email, S.me.email)) : null;
   const total = pVotes.length;
-  const can = same(p.author_email, S.me.email) || isAdmin();
+  const can = S.me && (same(p.author_email, S.me.email) || isAdmin());
   const open = !isClosed(p);
 
   let resultsUI = opts.map((optName, index) => {
@@ -540,7 +524,7 @@ function propCard(p) {
   return `
   <div class="card pr">
     <div class="bar"><span class="ttl">${esc(p.title)}</span><span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span></div>
-    <div class="m" style="margin-top:4px">بواسطة ${esc(nm(p.author_email))} في ${esc((p.created_at || '').slice(0, 10))}</div>
+    <div class="m" style="margin-top:4px">بواسطة ${esc(nm(p.author_email))}</div>
     ${p.details ? `<div class="det">${esc(p.details)}</div>` : ''}
     <div class="vote-panel"><h3>النتائج الحالية (${total} مشارك)</h3>${resultsUI}${actionUI}</div>
     <div class="pa"><button class="s" data-totask="${p.id}">➡️ تحويل لمهمة</button><span style="flex:1"></span>${can ? (open ? `<button class="s" data-ps="${p.id}" data-to="accepted">اعتماد</button><button class="s" data-ps="${p.id}" data-to="rejected">رفض</button>` : `<button class="s" data-ps="${p.id}" data-to="open">إعادة الفتح</button>`) + `<button class="dng s" data-pdel="${p.id}">حذف</button>` : ''}</div>
@@ -557,13 +541,16 @@ function bindProps() {
   if (S.propsErr) return;
   document.querySelectorAll('[data-pf]').forEach(b => b.onclick = () => { S.pf = b.dataset.pf; render(); });
   $('np').onclick = propDialog;
+  
   document.querySelectorAll('[data-cast]').forEach(btn => {
     btn.onclick = async () => {
-      const pid = btn.dataset.cast, optVal = $(`v_opt_${pid}`).value;
-      if (optVal === '') return alert('الرجاء اختيار أحد الخيارات أولاً.');
-      const note = $(`v_not_${pid}`).value.trim();
+      const pid = btn.dataset.cast;
+      const optSelect = document.getElementById(`v_opt_${pid}`);
+      if (!optSelect || optSelect.value === '') return alert('الرجاء اختيار أحد الخيارات أولاً.');
+      const noteField = document.getElementById(`v_not_${pid}`);
+      const note = noteField ? noteField.value.trim() : '';
       btn.textContent = 'جاري الإرسال...'; btn.disabled = true;
-      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optVal), note: note || null });
+      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optSelect.value), note: note || null });
       if (error) alert('فشل الإرسال: ' + error.message);
       load();
     };
@@ -574,14 +561,14 @@ function bindProps() {
 }
 
 function propDialog() {
-  dlg.innerHTML = `<h2>طرح مقترح جديد</h2><label>عنوان المقترح<input id="p_ti" placeholder="مثال: تغيير موعد الاجتماع الأسبوعي"></label><label>تفاصيل ومبررات المقترح (اختياري)<textarea id="p_de" rows="3"></textarea></label><label>الخيارات المتاحة للتصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_opts" rows="4" placeholder="الخيار الأول&#10;الخيار الثاني&#10;الخيار الثالث"></textarea></label><div class="row dact"><button class="s" id="p_cx">إلغاء</button><button class="p s" id="p_sv">نشر المقترح</button></div>`;
+  dlg.innerHTML = `<h2>طرح مقترح جديد</h2><label>عنوان المقترح<input id="p_ti"></label><label>تفاصيل (اختياري)<textarea id="p_de" rows="2"></textarea></label><label>الخيارات المتاحة (خيار في كل سطر)<textarea id="p_opts" rows="3" placeholder="الخيار الأول&#10;الخيار الثاني"></textarea></label><div class="row dact"><button class="s" id="p_cx">إلغاء</button><button class="p s" id="p_sv">نشر المقترح</button></div>`;
   $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
     const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
     let rawOpts = $('p_opts').value.split('\n').map(x => x.trim()).filter(Boolean);
     if (rawOpts.length === 0) rawOpts = ['موافق', 'معارض'];
     $('p_sv').disabled = true; $('p_sv').textContent = 'جاري النشر...';
     const { error } = await sb.from('proposals').insert({ title, details: $('p_de').value.trim() || null, author_email: S.me.email, status: 'open', options: JSON.stringify(rawOpts) });
-    if (error) { alert('خطأ: ' + error.message); $('p_sv').disabled = false; $('p_sv').textContent = 'نشر المقترح'; return; }
+    if (error) { alert('خطأ: ' + error.message); $('p_sv').disabled = false; $('p_sv').textContent = 'نشر'; return; }
     dlg.close(); load();
   };
   dlg.showModal(); $('p_ti').focus();
@@ -591,18 +578,16 @@ function settingsView() {
   return `
   <div class="card">
     <h2>🔔 إشعارات النظام (Push Notifications)</h2>
-    <p class="m" style="margin-bottom:16px">تلقي التنبيهات على هذا الجهاز عند إضافة مهام جديدة أو قرب موعد التسليم.</p>
     <div class="row"><button class="p" id="push">تفعيل التنبيهات</button></div>
-    <p class="m" id="pm" style="margin-top:12px;background:var(--col);padding:10px;border-radius:8px">💡 <b>لمستخدمي الآيفون (iOS):</b> يجب أولاً الضغط على زر المشاركة في متصفح سفاري واختيار «إضافة إلى الشاشة الرئيسية»، ثم فتح التطبيق من الأيقونة الجديدة لتتمكن من تفعيل الإشعارات.</p>
+    <p class="m" id="pm" style="margin-top:12px;background:var(--col);padding:10px;border-radius:8px">💡 <b>للآيفون (iOS):</b> أضف الموقع إلى الشاشة الرئيسية (Add to Home Screen) لتفعيل الإشعارات.</p>
   </div>
   <div class="card">
-    <h2>🛡️ الأمان والحساب</h2>
-    <label class="m" style="display:block;margin-bottom:6px">تغيير كلمة المرور:</label>
-    <div class="row" style="align-items:center"><input id="np" type="password" dir="ltr" placeholder="كلمة المرور الجديدة (6 أحرف كحد أدنى)" style="flex:2"><button class="s" id="svp" style="flex:1">تحديث الرمز</button></div>
+    <h2>🛡️ تغيير كلمة المرور</h2>
+    <div class="row" style="align-items:center"><input id="np" type="password" dir="ltr" placeholder="6 أحرف كحد أدنى" style="flex:2"><button class="s" id="svp" style="flex:1">تحديث</button></div>
   </div>
-  ${isAdmin() ? `<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الفريق (صلاحية المدير)</h2><div style="margin-bottom:20px">${S.members.map(m => `<div class="bar" style="background:var(--col);padding:10px 14px;border-radius:8px;margin-bottom:8px"><div><strong>${esc(m.name)}</strong><div class="m" dir="ltr">${esc(m.email)} ${m.role === 'admin' ? '⭐' : ''}</div></div>${same(m.email, S.me.email) ? '<i>(أنت)</i>' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}</div><h3 style="font-size:14px;margin-bottom:8px">إضافة عضو جديد:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>` : ''}
+  ${isAdmin() ? `<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الفريق</h2><div style="margin-bottom:20px">${S.members.map(m => `<div class="bar" style="background:var(--col);padding:10px 14px;border-radius:8px;margin-bottom:8px"><div><strong>${esc(m.name)}</strong><div class="m" dir="ltr">${esc(m.email)}</div></div>${S.me && same(m.email, S.me.email) ? '<i>(أنت)</i>' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}</div><h3 style="font-size:14px;margin-bottom:8px">إضافة عضو جديد:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة</button></div></div>` : ''}
   <div class="card" style="text-align:center;background:var(--latesoft);border-color:var(--latesoft)">
-    <button class="dng" id="out" style="width:100%;padding:12px;background:transparent">تسجيل الخروج من الحساب ومسح الذاكرة</button>
+    <button class="dng" id="out" style="width:100%;padding:12px;background:transparent">تسجيل الخروج ومسح الذاكرة</button>
   </div>`;
 }
 
@@ -611,23 +596,23 @@ function bindSettings() {
   $('push').onclick = async () => {
     const pm = $('pm');
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'متصفحك الحالي لا يدعم الإشعارات.';
-      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تقم بمنح صلاحية الإشعارات. يرجى تفعيلها من إعدادات المتصفح/الجهاز.';
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'متصفحك لا يدعم الإشعارات.';
+      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح صلاحية الإشعارات.';
       const reg = await navigator.serviceWorker.ready;
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? '<b>خطأ في الحفظ:</b> ' + error.message : '<b style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح على هذا الجهاز.</b>';
-    } catch (e) { pm.textContent = 'حدث خطأ: ' + e.message; }
+      pm.innerHTML = error ? '<b>خطأ:</b> ' + error.message : '<b style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح.</b>';
+    } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
   };
   $('svp').onclick = async () => { 
-    const v = $('np').value; if (v.length < 6) return alert('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.'); 
-    $('svp').textContent = 'جاري التحديث...';
+    const v = $('np').value; if (v.length < 6) return alert('6 أحرف كحد أدنى.'); 
+    $('svp').textContent = 'تحديث...';
     const { error } = await sb.auth.updateUser({ password: v }); 
-    alert(error ? error.message : 'تم تغيير كلمة المرور بنجاح.'); 
-    $('np').value = '';$('svp').textContent = 'تحديث الرمز';
+    alert(error ? error.message : 'تم التغيير بنجاح.'); 
+    $('np').value = '';$('svp').textContent = 'تحديث';
   };
-  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('هل أنت متأكد من إزالة هذا العضو؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
   if ($('addm'))$('addm').onclick = () => { const e = $('ne').value.trim(), n =$('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
 }
 
