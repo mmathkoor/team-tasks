@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مهام الفريق</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#27408b">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#1c2433;--mute:#6b7280;--line:#e2e5ea;--acc:#27408b;--late:#b42318;--soon:#b7791f;--ok:#2f7d4f}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2a313d;--acc:#8fa8f0;--late:#f08a80;--soon:#e6b85c;--ok:#6cc58f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'IBM Plex Sans Arabic',system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:860px;margin:auto;padding:16px}
+h1{font-size:20px;margin:8px 0}h2{font-size:15px;margin:0 0 8px;color:var(--mute);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+button{cursor:pointer}button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){button.p{color:#12151c}}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}.row .s{flex:0 0 auto}
+.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.t{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.t:first-child{border-top:0}.t b{font-weight:600}.t.done b{text-decoration:line-through;color:var(--mute)}
+.m{font-size:13px;color:var(--mute)}.late{color:var(--late)}.soon{color:var(--soon)}.ok{color:var(--ok)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+@media (prefers-color-scheme:dark){.tabs button.on{color:#12151c}}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#login{max-width:360px;margin:20vh auto}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+// ====== ضع بيانات مشروعك من Supabase > Project Settings > API ======
+const SUPABASE_URL = 'PUT_YOUR_PROJECT_URL';
+const SUPABASE_ANON_KEY = 'PUT_YOUR_ANON_KEY';
+const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
+// ====================================================================
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $app = document.getElementById('app');
+const S = { me: null, members: [], meetings: [], tasks: [], filter: 'mine' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => new Date().toISOString().slice(0, 10);
+const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجزة' };
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return loginView();
+  const email = session.user.email;
+  const { data: members, error } = await sb.from('members').select('*');
+  if (error || !members?.length) { $app.innerHTML = '<div class="card" id="login">هذا الإيميل غير مضاف لأعضاء الفريق.<br><button id="out">تسجيل خروج</button></div>'; out.onclick = logout; return; }
+  S.members = members; S.me = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+  await load();
+}
+async function load() {
+  const [m, t] = await Promise.all([
+    sb.from('meetings').select('*').order('held_on', { ascending: false }),
+    sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false })
+  ]);
+  S.meetings = m.data || []; S.tasks = t.data || []; render();
+}
+function loginView() {
+  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">أدخل إيميلك وسيصلك رابط دخول.</p>
+  <div class="row"><input id="em" type="email" placeholder="you@example.com" dir="ltr"><button class="p s" id="go">إرسال الرابط</button></div><p class="m" id="msg"></p></div>`;
+  go.onclick = async () => {
+    const { error } = await sb.auth.signInWithOtp({ email: em.value.trim(), options: { emailRedirectTo: location.origin, shouldCreateUser: true } });
+    msg.textContent = error ? 'تعذّر الإرسال: ' + error.message : 'تم الإرسال، افتح بريدك.';
+  };
+}
+const logout = async () => { await sb.auth.signOut(); location.reload(); };
+const nm = e => S.members.find(m => m.email === e)?.name || 'غير مُسند';
+function due(t) {
+  if (!t.due_on || t.status === 'done') return t.due_on ? `<span class="m">${t.due_on}</span>` : '';
+  if (t.due_on < today()) return `<span class="late">متأخرة · ${t.due_on}</span>`;
+  const d = Math.round((new Date(t.due_on) - new Date(today())) / 864e5);
+  return d <= 1 ? `<span class="soon">${d ? 'غداً' : 'اليوم'}</span>` : `<span class="m">${t.due_on}</span>`;
+}
+function render() {
+  const list = S.tasks.filter(t => S.filter === 'all' ? true : S.filter === 'open' ? t.status !== 'done' : t.assignee_email === S.me.email && t.status !== 'done');
+  const opts = S.members.map(m => `<option value="${esc(m.email)}">${esc(m.name)}</option>`).join('');
+  $app.innerHTML = `
+  <div class="bar"><h1>مهام الفريق</h1><div class="row s"><span class="m">${esc(S.me.name)}</span><button id="out">خروج</button></div></div>
+  <div class="card"><h2>مهمة جديدة</h2>
+    <div class="row"><input id="ti" placeholder="عنوان المهمة"><select id="as">${opts}</select></div>
+    <div class="row" style="margin-top:8px"><input id="du" type="date"><select id="mt"><option value="">بدون اجتماع</option>${S.meetings.map(m => `<option value="${m.id}">${esc(m.title)} · ${m.held_on}</option>`).join('')}</select><button class="p s" id="add">إضافة</button></div></div>
+  <div class="tabs">${[['mine','مهامي'],['open','كل المفتوحة'],['all','الكل']].map(([k, l]) => `<button data-f="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}<button id="nm" class="s" style="margin-inline-start:auto">+ اجتماع</button></div>
+  <div class="card">${list.length ? list.map(t => `<div class="t ${t.status}"><b>${esc(t.title)}</b>
+    <select data-id="${t.id}" class="st">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <span class="m">${esc(nm(t.assignee_email))} · ${esc(S.meetings.find(m => m.id === t.meeting_id)?.title || 'بدون اجتماع')} · ${due(t)}</span>
+    <button data-del="${t.id}" aria-label="حذف">حذف</button></div>`).join('') : '<p class="m">لا توجد مهام هنا.</p>'}</div>
+  <div class="card"><h2>إشعارات الجوال</h2><div class="row"><button class="p s" id="push">تفعيل الإشعارات على هذا الجهاز</button></div><p class="m" id="pm">على الآيفون: افتح الموقع في سفاري ← مشاركة ← «إضافة إلى الشاشة الرئيسية»، ثم افتح التطبيق من الأيقونة وفعّل الإشعارات.</p></div>
+  <div class="card"><h2>تنبيهات تيليجرام (اختياري)</h2><div class="row"><input id="tg" dir="ltr" placeholder="Chat ID" value="${esc(S.me.telegram_chat_id || '')}"><button class="s" id="svtg">حفظ</button></div></div>`;
+  out.onclick = logout;
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+  document.querySelectorAll('.st').forEach(s => s.onchange = async () => { await sb.from('tasks').update({ status: s.value }).eq('id', s.dataset.id); load(); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (confirm('حذف المهمة؟')) { await sb.from('tasks').delete().eq('id', b.dataset.del); load(); } });
+  as.value = S.me.email;
+  push.onclick = enablePush;
+  add.onclick = async () => {
+    if (!ti.value.trim()) return ti.focus();
+    await sb.from('tasks').insert({ title: ti.value.trim(), assignee_email: as.value, due_on: du.value || null, meeting_id: mt.value || null });
+    load();
+  };
+  nm.onclick = async () => { const t = prompt('اسم الاجتماع (مثلاً: اجتماع الأسبوع 12)'); if (t) { await sb.from('meetings').insert({ title: t }); load(); } };
+  svtg.onclick = async () => { await sb.from('members').update({ telegram_chat_id: tg.value.trim() || null }).eq('email', S.me.email); S.me.telegram_chat_id = tg.value.trim(); svtg.textContent = 'تم'; };
+}
+async function enablePush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'هذا المتصفح لا يدعم الإشعارات. على الآيفون أضف الموقع للشاشة الرئيسية أولاً.';
+    if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح صلاحية الإشعارات. فعّلها من إعدادات المتصفح.';
+    const reg = await navigator.serviceWorker.ready;
+    const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subs').upsert({ endpoint: j.endpoint, email: S.me.email, sub: j });
+    pm.textContent = error ? 'تعذّر الحفظ: ' + error.message : 'تم تفعيل الإشعارات على هذا الجهاز.';
+  } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+sb.auth.onAuthStateChange((e) => { if (e === 'SIGNED_IN') init(); });
+init();
+</script>
+</body>
+</html>
