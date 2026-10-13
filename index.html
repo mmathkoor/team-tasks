@@ -55,11 +55,14 @@ async function init() {
   await load();
 }
 async function load() {
-  const [m, t] = await Promise.all([
+  const [m, t, mm] = await Promise.all([
     sb.from('meetings').select('*').order('held_on', { ascending: false }),
-    sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false })
+    sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
+    sb.from('members').select('*')
   ]);
-  S.meetings = m.data || []; S.tasks = t.data || []; render();
+  S.meetings = m.data || []; S.tasks = t.data || [];
+  if (mm.data?.length) { S.members = mm.data; S.me = mm.data.find(x => x.email === S.me.email) || S.me; }
+  render();
 }
 function loginView() {
   $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">أدخل إيميلك وسيصلك رابط دخول.</p>
@@ -70,7 +73,11 @@ function loginView() {
   };
 }
 const logout = async () => { await sb.auth.signOut(); location.reload(); };
-const nm = e => S.members.find(m => m.email === e)?.name || 'غير مُسند';
+const isAdmin = () => S.me.role === 'admin';
+const canEdit = t => isAdmin() || t.assignee_email === S.me.email || t.created_by === S.me.email;
+const canDel = t => isAdmin() || t.created_by === S.me.email;
+const run = async p => { const { error } = await p; if (error) alert('تعذّر التنفيذ: ' + error.message); load(); };
+const who = e => S.members.find(m => m.email === e)?.name || 'غير مُسند';
 function due(t) {
   if (!t.due_on || t.status === 'done') return t.due_on ? `<span class="m">${t.due_on}</span>` : '';
   if (t.due_on < today()) return `<span class="late">متأخرة · ${t.due_on}</span>`;
@@ -85,25 +92,29 @@ function render() {
   <div class="card"><h2>مهمة جديدة</h2>
     <div class="row"><input id="ti" placeholder="عنوان المهمة"><select id="as">${opts}</select></div>
     <div class="row" style="margin-top:8px"><input id="du" type="date"><select id="mt"><option value="">بدون اجتماع</option>${S.meetings.map(m => `<option value="${m.id}">${esc(m.title)} · ${m.held_on}</option>`).join('')}</select><button class="p s" id="add">إضافة</button></div></div>
-  <div class="tabs">${[['mine','مهامي'],['open','كل المفتوحة'],['all','الكل']].map(([k, l]) => `<button data-f="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}<button id="nm" class="s" style="margin-inline-start:auto">+ اجتماع</button></div>
+  <div class="tabs">${[['mine','مهامي'],['open','كل المفتوحة'],['all','الكل']].map(([k, l]) => `<button data-f="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}${isAdmin() ? '<button id="nmeet" class="s" style="margin-inline-start:auto">+ اجتماع</button>' : ''}</div>
   <div class="card">${list.length ? list.map(t => `<div class="t ${t.status}"><b>${esc(t.title)}</b>
-    <select data-id="${t.id}" class="st">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-    <span class="m">${esc(nm(t.assignee_email))} · ${esc(S.meetings.find(m => m.id === t.meeting_id)?.title || 'بدون اجتماع')} · ${due(t)}</span>
-    <button data-del="${t.id}" aria-label="حذف">حذف</button></div>`).join('') : '<p class="m">لا توجد مهام هنا.</p>'}</div>
+    <select data-id="${t.id}" class="st" ${canEdit(t) ? '' : 'disabled'}>${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <span class="m">${esc(who(t.assignee_email))} · ${esc(S.meetings.find(m => m.id === t.meeting_id)?.title || 'بدون اجتماع')} · ${due(t)}</span>
+    ${canDel(t) ? `<button data-del="${t.id}" aria-label="حذف">حذف</button>` : ''}</div>`).join('') : '<p class="m">لا توجد مهام هنا.</p>'}</div>
   <div class="card"><h2>إشعارات الجوال</h2><div class="row"><button class="p s" id="push">تفعيل الإشعارات على هذا الجهاز</button></div><p class="m" id="pm">على الآيفون: افتح الموقع في سفاري ← مشاركة ← «إضافة إلى الشاشة الرئيسية»، ثم افتح التطبيق من الأيقونة وفعّل الإشعارات.</p></div>
+  ${isAdmin() ? `<div class="card"><h2>الأعضاء (للأدمن)</h2>${S.members.map(m => `<div class="row" style="align-items:center;margin-bottom:6px"><span>${esc(m.name)} <span class="m" dir="ltr">${esc(m.email)}${m.role === 'admin' ? ' · أدمن' : ''}</span></span>${m.email === S.me.email ? '' : `<button class="s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}<div class="row"><input id="ne" dir="ltr" placeholder="إيميل العضو الجديد"><input id="nn" placeholder="الاسم"><button class="p s" id="addm">إضافة</button></div></div>` : ''}
   <div class="card"><h2>تنبيهات تيليجرام (اختياري)</h2><div class="row"><input id="tg" dir="ltr" placeholder="Chat ID" value="${esc(S.me.telegram_chat_id || '')}"><button class="s" id="svtg">حفظ</button></div></div>`;
   out.onclick = logout;
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
-  document.querySelectorAll('.st').forEach(s => s.onchange = async () => { await sb.from('tasks').update({ status: s.value }).eq('id', s.dataset.id); load(); });
-  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (confirm('حذف المهمة؟')) { await sb.from('tasks').delete().eq('id', b.dataset.del); load(); } });
+  document.querySelectorAll('.st').forEach(s => s.onchange = () => run(sb.from('tasks').update({ status: s.value }).eq('id', s.dataset.id)));
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (confirm('حذف المهمة؟')) run(sb.from('tasks').delete().eq('id', b.dataset.del)); });
   as.value = S.me.email;
   push.onclick = enablePush;
   add.onclick = async () => {
     if (!ti.value.trim()) return ti.focus();
-    await sb.from('tasks').insert({ title: ti.value.trim(), assignee_email: as.value, due_on: du.value || null, meeting_id: mt.value || null });
-    load();
+    run(sb.from('tasks').insert({ title: ti.value.trim(), assignee_email: as.value, due_on: du.value || null, meeting_id: mt.value || null, created_by: S.me.email }));
   };
-  nm.onclick = async () => { const t = prompt('اسم الاجتماع (مثلاً: اجتماع الأسبوع 12)'); if (t) { await sb.from('meetings').insert({ title: t }); load(); } };
+  const nb = document.getElementById('nmeet');
+  if (nb) nb.onclick = () => { const t = prompt('اسم الاجتماع (مثلاً: اجتماع الأسبوع 12)'); if (t) run(sb.from('meetings').insert({ title: t })); };
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة هذا العضو؟ ستبقى مهامه بدون مسؤول.')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+  const am = document.getElementById('addm');
+  if (am) am.onclick = () => { const e = document.getElementById('ne').value.trim(), n = document.getElementById('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
   svtg.onclick = async () => { await sb.from('members').update({ telegram_chat_id: tg.value.trim() || null }).eq('email', S.me.email); S.me.telegram_chat_id = tg.value.trim(); svtg.textContent = 'تم'; };
 }
 async function enablePush() {
