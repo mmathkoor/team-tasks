@@ -14,12 +14,16 @@ module.exports = async (req, res) => {
   const isMeetingDay = String(new Date().getUTCDay()) === (MEETING_DAY ?? '');
   const members = await get('members?select=*');
   const open = await get('tasks?status=neq.done&select=*&order=due_on');
+  const doneRows = await get('task_done?select=*');
+  const doneSet = new Set((Array.isArray(doneRows) ? doneRows : []).map(d => d.task_id + '|' + String(d.email).toLowerCase()));
   let sent = 0;
   for (const m of members) {
-    const mine = open.filter(t => t.assignee_email === m.email);
+    // مهام "الكل" تصل لكل عضو لم يُنجز حصته بعد
+    const mine = open.filter(t => t.for_all ? !doneSet.has(t.id + '|' + m.email.toLowerCase()) : t.assignee_email === m.email);
+    // اليوم المحدد للاجتماع: ملخص بكل المهام المفتوحة، وغيره: فقط المتأخر وما يستحق اليوم/غداً
     const list = isMeetingDay ? open : mine.filter(t => t.due_on && t.due_on <= tomorrow);
     if (!list.length) continue;
-    const line = t => `${t.due_on && t.due_on < today ? '🔴' : '🟡'} ${t.title}${t.due_on ? ' (' + t.due_on + ')' : ''}${isMeetingDay ? ' — ' + (members.find(x => x.email === t.assignee_email)?.name || '') : ''}`;
+    const line = t => `${t.due_on && t.due_on < today ? '🔴' : '🟡'} ${t.title}${t.due_on ? ' (' + t.due_on + ')' : ''}${isMeetingDay ? ' — ' + (t.for_all ? 'الكل' : (members.find(x => x.email === t.assignee_email)?.name || '')) : ''}`;
     const text = `مرحباً ${m.name}\n${isMeetingDay ? 'ملخص المهام المفتوحة قبل الاجتماع:' : 'مهامك القادمة والمتأخرة:'}\n` + list.map(line).join('\n');
     if (TELEGRAM_BOT_TOKEN && m.telegram_chat_id)
       await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: m.telegram_chat_id, text }) });
