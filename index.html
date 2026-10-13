@@ -4,620 +4,122 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>مهام الفريق</title>
-<link rel="preconnect" href="https://wrmpyywosathqxrjuicx.supabase.co" crossorigin>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#27408b">
 <link rel="apple-touch-icon" href="/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
-/* === متغيرات الألوان والتصميم الحديث === */
-:root {
-  --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --mute: #64748b; --line: #e2e8f0;
-  --acc: #2563eb; --acc-hover: #1d4ed8; --accsoft: #dbeafe;
-  --late: #ef4444; --latesoft: #fee2e2; --soon: #f59e0b; --soonsoft: #fef3c7;
-  --ok: #10b981; --oksoft: #d1fae5; --col: #f1f5f9;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --radius: 16px; --radius-sm: 10px;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f172a; --card: #1e293b; --ink: #f8fafc; --mute: #94a3b8; --line: #334155;
-    --acc: #3b82f6; --acc-hover: #60a5fa; --accsoft: #1e3a8a;
-    --late: #f87171; --latesoft: #7f1d1d; --soon: #fbbf24; --soonsoft: #78350f;
-    --ok: #34d399; --oksoft: #064e3b; --col: #111827;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-  }
-}
-
-* { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; padding-bottom: env(safe-area-inset-bottom); transition: background 0.3s, color 0.3s; }
-main { max-width: 1140px; margin: auto; padding: 20px 16px 60px; }
-h1 { font-size: 24px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
-h2 { font-size: 16px; margin: 0 0 12px; color: var(--ink); font-weight: 600; }
-
-input, select, textarea, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px; min-width: 0; transition: all 0.2s ease; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--accsoft); }
-button { cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-button:hover:not(:disabled) { border-color: var(--acc); transform: translateY(-1px); }
-button:active:not(:disabled) { transform: translateY(0); }
-button:disabled { opacity: 0.6; cursor: not-allowed; }
-button.p { background: var(--acc); border-color: var(--acc); color: #fff; }
-button.p:hover { background: var(--acc-hover); border-color: var(--acc-hover); }
-@media (prefers-color-scheme: dark) { button.p { color: #fff; } }
-button.dng { color: var(--late); border-color: var(--line); }
-button.dng:hover { background: var(--latesoft); border-color: var(--late); }
-
-.m { font-size: 13.5px; color: var(--mute); }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); transition: box-shadow 0.3s; }
-.card:hover { box-shadow: var(--shadow-hover); }
-.bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-.row { display: flex; gap: 12px; flex-wrap: wrap; }
-.row > * { flex: 1 1 150px; }
-.row .s { flex: 0 0 auto; }
-
-.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0 20px; }
-.nav { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; background: rgba(var(--bg-rgb), 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
-.nav button { flex: 1; border: none; background: transparent; color: var(--mute); padding: 12px 8px; border-radius: var(--radius-sm); font-weight: 600; font-size: 15px; }
-.nav button:hover { background: var(--col); color: var(--ink); }
-.nav button.on { background: var(--accsoft); color: var(--acc); box-shadow: inset 0 -3px 0 var(--acc); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
-.nav .n { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; margin-inline-start: 6px; border-radius: 11px; background: var(--late); color: #fff; font-size: 12px; font-weight: bold; }
-
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); text-align: center; }
-.stat b { display: block; font-size: 28px; line-height: 1.2; font-weight: 700; margin-bottom: 4px; }
-.stat span { font-size: 13px; color: var(--mute); font-weight: 500; }
-.stat.late b { color: var(--late); } .stat.soon b { color: var(--soon); }
-
-.tools { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
-.seg { display: flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--card); padding: 2px; }
-.seg button { border: none; border-radius: calc(var(--radius-sm) - 2px); background: transparent; padding: 8px 16px; color: var(--mute); margin: 0; }
-.seg button.on { background: var(--acc); color: #fff; box-shadow: var(--shadow); }
-.tools .sp { flex: 1; }
-
-.ctabs { display: none; }
-.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
-.col { background: var(--col); border-radius: var(--radius); padding: 14px; min-height: 200px; border: 2px dashed transparent; transition: border-color 0.2s, background 0.2s; }
-.col.over { border-color: var(--acc); background: var(--accsoft); }
-.col > .ch { display: flex; justify-content: space-between; align-items: center; margin: 0 4px 16px; font-weight: 700; font-size: 15px; }
-.col > .ch i { font-style: normal; font-weight: 600; font-size: 12px; background: var(--card); border-radius: 12px; padding: 2px 10px; color: var(--mute); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.col[data-st=todo] > .ch { color: var(--mute); }
-.col[data-st=doing] > .ch { color: var(--acc); }
-.col[data-st=done] > .ch { color: var(--ok); }
-
-.tk { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 12px; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; }
-.tk:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); border-color: var(--accsoft); }
-.tk:active { cursor: grabbing; transform: translateY(0); }
-.tk.drag { opacity: 0.5; transform: scale(0.98); }
-.tk .tt { font-weight: 600; font-size: 15px; line-height: 1.4; margin-bottom: 6px; }
-.tk.done .tt { text-decoration: line-through; color: var(--mute); }
-.tk .nt { font-size: 13.5px; color: var(--mute); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; }
-.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.chip { font-size: 12px; border-radius: 20px; padding: 4px 10px; background: var(--line); color: var(--ink); font-weight: 500; display: inline-flex; align-items: center; }
-.chip.all { background: var(--accsoft); color: var(--acc); }
-.chip.late { background: var(--latesoft); color: var(--late); }
-.chip.soon { background: var(--soonsoft); color: var(--soon); }
-.chip.ok { background: var(--oksoft); color: var(--ok); }
-.acts { display: flex; gap: 8px; margin-top: 14px; border-top: 1px solid var(--col); padding-top: 12px; }
-.acts button { flex: 1; font-size: 13px; padding: 6px; background: var(--col); border: none; }
-.acts button:hover { background: var(--accsoft); color: var(--acc); }
-.empty { font-size: 14px; color: var(--mute); text-align: center; padding: 30px 0; font-weight: 500; }
-
-.pr .ttl { font-weight: 700; font-size: 18px; line-height: 1.3; }
-.pr .det { white-space: pre-wrap; margin: 12px 0; font-size: 15px; color: var(--mute); background: var(--col); padding: 12px; border-radius: var(--radius-sm); }
-.vote-panel { background: var(--col); border-radius: var(--radius-sm); padding: 16px; margin: 16px 0; border: 1px solid var(--line); }
-.vote-panel h3 { font-size: 14px; margin: 0 0 12px; color: var(--ink); }
-.v-option { margin-bottom: 12px; }
-.v-option:last-child { margin-bottom: 0; }
-.v-bar-bg { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 6px 0; }
-.v-bar-fill { height: 100%; background: var(--acc); transition: width 0.5s ease-out; }
-.v-stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--mute); margin-bottom: 4px; font-weight: 500; }
-.voters-list { font-size: 13px; margin-top: 6px; padding: 8px; background: var(--card); border-radius: 8px; border: 1px solid var(--line); }
-.voter-item { margin-bottom: 4px; display: flex; flex-direction: column; }
-.voter-item:last-child { margin-bottom: 0; }
-.voter-name { font-weight: 600; color: var(--ink); }
-.voter-note { color: var(--mute); padding-inline-start: 8px; border-inline-start: 2px solid var(--line); margin-top: 2px; }
-
-.vote-action { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line); }
-.vote-action select, .vote-action input { width: 100%; }
-
-.pa { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.pa button { font-size: 13.5px; padding: 6px 12px; }
-
-dialog { border: none; border-radius: var(--radius); background: var(--card); color: var(--ink); padding: 24px; width: min(540px, 92vw); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); font: inherit; }
-dialog::backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
-dialog h2 { font-size: 20px; margin-bottom: 20px; font-weight: 700; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
-dialog label { display: block; font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 16px; }
-dialog label > * { display: block; width: 100%; margin-top: 6px; font-weight: 400; }
-dialog .row label { margin-bottom: 0; }
-dialog .dact { margin-top: 24px; gap: 12px; justify-content: flex-end; }
-dialog .dact button { min-width: 100px; padding: 10px; }
-
-#login { max-width: 400px; margin: 15vh auto; text-align: center; }
-#login h1 { margin-bottom: 8px; font-size: 28px; }
-#login .m { margin-bottom: 24px; }
-
-@media (max-width: 768px) {
-  .board { display: block; }
-  .ctabs { display: flex; gap: 8px; margin-bottom: 16px; background: var(--card); padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--line); }
-  .ctabs button { flex: 1; padding: 10px 4px; font-size: 14px; border: none; }
-  .ctabs button.on { background: var(--acc); color: #fff; box-shadow: var(--shadow); border-radius: calc(var(--radius-sm) - 4px); }
-  .col { display: none; padding: 0; background: transparent; border: none; min-height: auto; }
-  .col.on { display: block; }
-  .col > .ch { display: none; }
-  .stats { grid-template-columns: 1fr; }
-  .tools { flex-direction: column; align-items: stretch; }
-  .tools .sp { display: none; }
-  .row { flex-direction: column; gap: 16px; }
-  .vote-action { grid-template-columns: 1fr; }
-}
+:root{--bg:#f3f4f6;--card:#fff;--ink:#1c2433;--mute:#6b7280;--line:#e2e5ea;--acc:#27408b;--late:#b42318;--soon:#b7791f;--ok:#2f7d4f}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2a313d;--acc:#8fa8f0;--late:#f08a80;--soon:#e6b85c;--ok:#6cc58f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'IBM Plex Sans Arabic',system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:860px;margin:auto;padding:16px}
+h1{font-size:20px;margin:8px 0}h2{font-size:15px;margin:0 0 8px;color:var(--mute);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+button{cursor:pointer}button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){button.p{color:#12151c}}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}.row .s{flex:0 0 auto}
+.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.t{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.t:first-child{border-top:0}.t b{font-weight:600}.t.done b{text-decoration:line-through;color:var(--mute)}
+.m{font-size:13px;color:var(--mute)}.late{color:var(--late)}.soon{color:var(--soon)}.ok{color:var(--ok)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+@media (prefers-color-scheme:dark){.tabs button.on{color:#12151c}}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#login{max-width:360px;margin:20vh auto}
 </style>
 </head>
 <body>
-<main id="app"><p style="padding:40px;text-align:center;color:var(--mute);font-weight:500;">جارٍ تهيئة مساحة العمل...</p></main>
-<dialog id="dlg"></dialog>
+<main id="app"></main>
 <script>
-// === نظام الإنقاذ الآلي (Watchdog) ===
-// إذا بقيت الشاشة معلقة لأكثر من 3 ثوانٍ، سيتم عرض زر لمسح الذاكرة المؤقتة التالفة.
-setTimeout(() => {
-  const app = document.getElementById('app');
-  if (app && app.innerHTML.includes('جارٍ تهيئة')) {
-    app.innerHTML = `<div class="card" style="text-align:center;max-width:400px;margin:40px auto;border-color:var(--late)">
-      <h2 style="color:var(--late);margin-bottom:10px">النظام معلق بسبب الذاكرة المؤقتة</h2>
-      <p style="margin-bottom:20px;color:var(--mute)">يبدو أن متصفحك يحتفظ ببيانات قديمة تتعارض مع التحديث الجديد.</p>
-      <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="background:var(--acc);color:#fff;padding:12px 20px;border:none;border-radius:8px;font-size:16px;width:100%">إصلاح وتحديث الواجهة الآن 🔄</button>
-    </div>`;
-  }
-}, 3000);
-
-// ====== بيانات مشروعك من Supabase ======
-const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
+// ====== ضع بيانات مشروعك من Supabase > Project Settings > API ======
+const SUPABASE_URL = 'PUT_YOUR_PROJECT_URL';
+const SUPABASE_ANON_KEY = 'PUT_YOUR_ANON_KEY';
 const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
-
-const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
-let AUTH = { s: null };
-try { AUTH.s = JSON.parse(localStorage.getItem('sbs_v2') || 'null'); } catch(e){}
-const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs_v2', JSON.stringify(s)) : localStorage.removeItem('sbs_v2'); };
-
-async function tok() {
-  const s = AUTH.s;
-  if (!s) return KEY;
-  if (s.expires_at && (s.expires_at - 60 > Date.now() / 1000)) return s.access_token;
-  try {
-    const r = await fetch(API + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
-    const j = await r.json();
-    if (!r.ok) { saveS(null); return KEY; }
-    j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); return j.access_token;
-  } catch (e) { return s.access_token; }
-}
-
-class Q {
-  constructor(t) { this.t = t; this.m = 'GET'; this.p = new URLSearchParams(); this.b = null; this.pf = ''; }
-  select(c) { this.p.set('select', c || '*'); return this; }
-  order(c, o = {}) { this.p.set('order', c + (o.ascending === false ? '.desc' : '.asc') + (o.nullsFirst ? '.nullsfirst' : '.nullslast')); return this; }
-  eq(c, v) { this.p.append(c, 'eq.' + v); return this; }
-  insert(o) { this.m = 'POST'; this.b = o; return this; }
-  upsert(o) { this.m = 'POST'; this.b = o; this.pf = 'resolution=merge-duplicates'; return this; }
-  update(o) { this.m = 'PATCH'; this.b = o; return this; }
-  delete() { this.m = 'DELETE'; return this; }
-  then(res, rej) { return this.run().then(res, rej); }
-  async run() {
-    try {
-      const mut = this.m !== 'GET', h = { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' };
-      const pf = [this.pf, mut ? 'return=minimal' : ''].filter(Boolean).join(','); if (pf) h.Prefer = pf;
-      const r = await fetch(API + '/rest/v1/' + this.t + '?' + this.p, { method: this.m, headers: h, body: this.b ? JSON.stringify(this.b) : undefined });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || r.statusText } }; }
-      return { data: mut ? null : await r.json(), error: null };
-    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بالخادم.' } }; }
-  }
-}
-
-const sb = {
-  from: t => new Q(t),
-  auth: {
-    getSession: async () => ({ data: { session: AUTH.s }, error: null }),
-    signInWithPassword: async ({ email, password }) => {
-      try {
-        const r = await fetch(API + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-        const j = await r.json();
-        if (!r.ok) return { error: { message: j.error_description || 'بيانات الدخول غير صحيحة' } };
-        j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); init(); return { error: null };
-      } catch (e) { return { error: { message: 'خطأ في الاتصال' } }; }
-    },
-    signOut: async () => saveS(null),
-    updateUser: async ({ password }) => {
-      try {
-        const r = await fetch(API + '/auth/v1/user', { method: 'PUT', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
-        const j = await r.json().catch(() => ({}));
-        return { error: r.ok ? null : { message: j.msg || 'تعذّر التحديث' } };
-      } catch (e) { return { error: { message: 'خطأ في الاتصال' } }; }
-    }
-  }
-};
-
-const $ = id => document.getElementById(id);
-const $app = $('app'), dlg =$('dlg');
-const S = { me: null, members: [], meetings: [], tasks: [], done: [], props: [], votes: [], propsErr: false, view: 'board', filter: 'mine', meeting: '', col: 'todo', pf: 'open' };
+// ====================================================================
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $app = document.getElementById('app');
+const S = { me: null, members: [], meetings: [], tasks: [], filter: 'mine' };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toISOString().slice(0, 10);
-const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
-const daysTo = d => Math.round((new Date(d) - new Date(today())) / 864e5);
 const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجزة' };
-const ACT = { todo: [['doing', 'بدء'], ['done', 'إنجاز ✓']], doing: [['done', 'إنجاز ✓'], ['todo', 'إرجاع']], done: [['doing', 'إعادة فتح']] };
-const ACT_ALL = { todo: [['done', 'إنجاز ✓']], done: [['todo', 'إعادة فتح']] };
-const PST = { open: 'قيد التصويت', accepted: 'مُعتمد', rejected: 'مرفوض', closed: 'مغلق' };
-const nm = e => S.members.find(m => same(m.email, e))?.name || 'غير محدد';
-const isAdmin = () => S.me?.role === 'admin';
-const canDel = t => isAdmin() || (S.me && same(t.created_by, S.me.email));
-const mine = t => t.for_all || (S.me && same(t.assignee_email, S.me.email));
-const doneBy = t => S.done.filter(d => d.task_id === t.id);
-const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
-const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
 async function init() {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session || !session.user || !session.user.email) { saveS(null); return loginView(); }
-    const email = session.user.email;
-    
-    // محاولة تحميل من الكاش الجديد فقط
-    try { 
-      const c = JSON.parse(localStorage.getItem('cache_v4')); 
-      if (c && c.email === email && c.s) { 
-        S.me = c.s.me; S.members = c.s.members || []; S.meetings = c.s.meetings || []; S.tasks = c.s.tasks || []; S.done = c.s.done || []; S.props = c.s.props || []; S.votes = c.s.votes || [];
-        if (S.me && S.members.length > 0) render(); 
-      } 
-    } catch (e) { localStorage.removeItem('cache_v4'); }
-    
-    const { data: members, error } = await sb.from('members').select('*');
-    if (error) { if (!S.me) alert('فشل الاتصال بقاعدة البيانات. تأكد من الإنترنت.'); return; }
-    
-    const me = members.find(m => same(m.email, email));
-    if (!me) { saveS(null); alert('حسابك غير مسجل كعضو في الفريق.'); return loginView(); }
-    
-    S.members = members; S.me = me;
-    await load();
-  } catch (err) { console.error(err); }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return loginView();
+  const email = session.user.email;
+  const { data: members, error } = await sb.from('members').select('*');
+  if (error || !members?.length) { $app.innerHTML = '<div class="card" id="login">هذا الإيميل غير مضاف لأعضاء الفريق.<br><button id="out">تسجيل خروج</button></div>'; out.onclick = logout; return; }
+  S.members = members; S.me = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+  await load();
 }
-
 async function load() {
-  const [m, t, p, v, d] = await Promise.all([
+  const [m, t] = await Promise.all([
     sb.from('meetings').select('*').order('held_on', { ascending: false }),
-    sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
-    sb.from('proposals').select('*').order('created_at', { ascending: false }),
-    sb.from('votes').select('*'),
-    sb.from('task_done').select('*')
+    sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false })
   ]);
-  
-  if (!m.error) S.meetings = m.data || [];
-  if (!t.error) S.tasks = t.data || [];
-  if (!d.error) S.done = d.data || [];
-  S.propsErr = !!(p.error || v.error);
-  if (!p.error) S.props = p.data || [];
-  if (!v.error) S.votes = v.data || [];
-  
-  if (!m.error && !t.error) try { localStorage.setItem('cache_v4', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
-  render();
+  S.meetings = m.data || []; S.tasks = t.data || []; render();
 }
-
 function loginView() {
-  $app.innerHTML = `
-  <div class="card" id="login">
-    <h1>مهام الفريق</h1>
-    <p class="m">مرحباً بك، يرجى تسجيل الدخول.</p>
-    <div style="text-align:right">
-      <input id="em" type="email" placeholder="البريد الإلكتروني" dir="ltr" style="width:100%;margin-bottom:12px">
-      <input id="pw" type="password" placeholder="كلمة المرور" dir="ltr" style="width:100%;margin-bottom:16px">
-      <button class="p" id="go" style="width:100%;padding:12px">تسجيل الدخول</button>
-    </div>
-    <p class="m" id="msg" style="margin-top:16px;color:var(--late)"></p>
-  </div>`;
-  const doLogin = async () => {
-    $('msg').textContent = 'جارٍ الدخول...'; $('msg').style.color = 'inherit';
-    const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password:$('pw').value });
-    if (error) { $('msg').textContent = error.message; $('msg').style.color = 'var(--late)'; }
+  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">أدخل إيميلك وسيصلك رابط دخول.</p>
+  <div class="row"><input id="em" type="email" placeholder="you@example.com" dir="ltr"><button class="p s" id="go">إرسال الرابط</button></div><p class="m" id="msg"></p></div>`;
+  go.onclick = async () => {
+    const { error } = await sb.auth.signInWithOtp({ email: em.value.trim(), options: { emailRedirectTo: location.origin, shouldCreateUser: true } });
+    msg.textContent = error ? 'تعذّر الإرسال: ' + error.message : 'تم الإرسال، افتح بريدك.';
   };
-  $('go').onclick = doLogin;
-  $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
 }
-
-const logout = () => { localStorage.clear(); sessionStorage.clear(); location.reload(true); };
-const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
-
+const logout = async () => { await sb.auth.signOut(); location.reload(); };
+const nm = e => S.members.find(m => m.email === e)?.name || 'غير مُسند';
+function due(t) {
+  if (!t.due_on || t.status === 'done') return t.due_on ? `<span class="m">${t.due_on}</span>` : '';
+  if (t.due_on < today()) return `<span class="late">متأخرة · ${t.due_on}</span>`;
+  const d = Math.round((new Date(t.due_on) - new Date(today())) / 864e5);
+  return d <= 1 ? `<span class="soon">${d ? 'غداً' : 'اليوم'}</span>` : `<span class="m">${t.due_on}</span>`;
+}
 function render() {
-  try {
-    const openProps = S.props.filter(p => !isClosed(p)).length;
-    $app.innerHTML = `
-    <div class="top">
-      <h1>مهام الفريق</h1>
-      <div class="row s" style="align-items:center;gap:16px">
-        <span class="m" style="font-weight:600">👤 ${esc(S.me?.name || '')}</span>
-        <button id="rf" class="s">🔄 تحديث</button>
-      </div>
-    </div>
-    <div class="nav">
-      <button data-nv="board" class="${S.view === 'board' ? 'on' : ''}">المهام</button>
-      <button data-nv="props" class="${S.view === 'props' ? 'on' : ''}">المقترحات${openProps ? `<span class="n">${openProps}</span>` : ''}</button>
-      <button data-nv="set" class="${S.view === 'set' ? 'on' : ''}">الإعدادات</button>
-    </div>
-    ${S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView()}`;
-    
-    $('rf').onclick = () => {$('rf').textContent = '⏳'; load(); };
-    document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
-    if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
-  } catch (err) { console.error("Error rendering view:", err); }
-}
-
-function dueInfo(t) {
-  if (!t.due_on) return null;
-  if (eff(t) === 'done') return { c: '', t: t.due_on };
-  if (t.due_on < today()) return { c: 'late', t: '⚠️ متأخرة (' + t.due_on + ')' };
-  const d = daysTo(t.due_on);
-  return d <= 1 ? { c: 'soon', t: d ? '⏱️ غداً' : '🔥 اليوم' } : { c: '', t: '📅 ' + t.due_on };
-}
-
-function card(t) {
-  const st = eff(t), d = dueInfo(t), mt = S.meetings.find(m => m.id === t.meeting_id);
-  const acts = (t.for_all ? ACT_ALL : ACT)[st];
-  const dn = doneBy(t);
-  
-  let waBtn = '';
-  if (!t.for_all && t.assignee_email && S.me && !same(t.assignee_email, S.me.email) && st !== 'done') {
-    const msg = `مرحباً ${nm(t.assignee_email)}،\nتم إسناد مهمة جديدة إليك:\n*${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nالرجاء متابعتها عبر التطبيق.`;
-    waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="chip" style="background:#25d366;color:#fff;text-decoration:none;border:none">💬 إشعار واتساب</a>`;
-  }
-
-  return `
-  <div class="tk ${st}" draggable="true" data-id="${t.id}">
-    <div class="tt">${esc(t.title)}</div>
-    ${t.notes ? `<div class="nt">${esc(t.notes)}</div>` : ''}
-    <div class="meta">
-      ${t.for_all ? `<span class="chip all" title="${esc(dn.map(x => nm(x.email)).join('\n'))}">👥 فريق (${dn.length}/${S.members.length})</span>` : `<span class="chip">👤 ${esc(nm(t.assignee_email))}</span>`}
-      ${d ? `<span class="chip ${d.c}">${esc(d.t)}</span>` : ''}
-      ${mt ? `<span class="chip">📌 ${esc(mt.title)}</span>` : ''}
-      ${waBtn}
-    </div>
-    <div class="acts">${acts.map(([k, l]) => `<button data-mv="${t.id}" data-to="${k}">${l}</button>`).join('')}</div>
-  </div>`;
-}
-
-function boardView() {
-  const all = S.tasks.filter(t => (!S.meeting || t.meeting_id === S.meeting) && (S.filter === 'all' || mine(t)));
-  const open = all.filter(t => eff(t) !== 'done');
-  const late = open.filter(t => t.due_on && t.due_on < today()).length;
-  const soon = open.filter(t => t.due_on && t.due_on >= today() && daysTo(t.due_on) <= 1).length;
-  
-  const cols = Object.keys(ST).map(k => {
-    const items = all.filter(t => eff(t) === k);
-    return `
-    <div class="col ${S.col === k ? 'on' : ''}" data-st="${k}">
-      <div class="ch"><span>${ST[k]}</span><i>${items.length}</i></div>
-      ${items.length ? items.map(card).join('') : `<div class="empty">لا توجد مهام ${ST[k]}</div>`}
-    </div>`;
-  }).join('');
-  
-  return `
-  <div class="stats">
-    <div class="stat"><b>${open.length}</b><span>قيد الانتظار</span></div>
-    <div class="stat soon"><b>${soon}</b><span>اليوم أو غداً</span></div>
-    <div class="stat late"><b>${late}</b><span>متأخرة</span></div>
-  </div>
-  <div class="tools">
-    <div class="seg">
-      <button data-f="mine" class="${S.filter === 'mine' ? 'on' : ''}">مهامي</button>
-      <button data-f="all" class="${S.filter === 'all' ? 'on' : ''}">الكل</button>
-    </div>
-    <select id="fm"><option value="">كل الاجتماعات/المهام</option>${S.meetings.map(m => `<option value="${m.id}" ${S.meeting === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select>
-    <span class="sp"></span>
-    ${isAdmin() ? '<button class="s" id="nmt">+ اجتماع</button>' : ''}
-    <button class="p s" id="nt">➕ إضافة مهمة</button>
-  </div>
-  <div class="ctabs">${Object.keys(ST).map(k => `<button data-c="${k}" class="${S.col === k ? 'on' : ''}">${ST[k]} (${all.filter(t => eff(t) === k).length})</button>`).join('')}</div>
-  <div class="board">${cols}</div>`;
-}
-
-function bindBoard() {
+  const list = S.tasks.filter(t => S.filter === 'all' ? true : S.filter === 'open' ? t.status !== 'done' : t.assignee_email === S.me.email && t.status !== 'done');
+  const opts = S.members.map(m => `<option value="${esc(m.email)}">${esc(m.name)}</option>`).join('');
+  $app.innerHTML = `
+  <div class="bar"><h1>مهام الفريق</h1><div class="row s"><span class="m">${esc(S.me.name)}</span><button id="out">خروج</button></div></div>
+  <div class="card"><h2>مهمة جديدة</h2>
+    <div class="row"><input id="ti" placeholder="عنوان المهمة"><select id="as">${opts}</select></div>
+    <div class="row" style="margin-top:8px"><input id="du" type="date"><select id="mt"><option value="">بدون اجتماع</option>${S.meetings.map(m => `<option value="${m.id}">${esc(m.title)} · ${m.held_on}</option>`).join('')}</select><button class="p s" id="add">إضافة</button></div></div>
+  <div class="tabs">${[['mine','مهامي'],['open','كل المفتوحة'],['all','الكل']].map(([k, l]) => `<button data-f="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}<button id="nm" class="s" style="margin-inline-start:auto">+ اجتماع</button></div>
+  <div class="card">${list.length ? list.map(t => `<div class="t ${t.status}"><b>${esc(t.title)}</b>
+    <select data-id="${t.id}" class="st">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <span class="m">${esc(nm(t.assignee_email))} · ${esc(S.meetings.find(m => m.id === t.meeting_id)?.title || 'بدون اجتماع')} · ${due(t)}</span>
+    <button data-del="${t.id}" aria-label="حذف">حذف</button></div>`).join('') : '<p class="m">لا توجد مهام هنا.</p>'}</div>
+  <div class="card"><h2>إشعارات الجوال</h2><div class="row"><button class="p s" id="push">تفعيل الإشعارات على هذا الجهاز</button></div><p class="m" id="pm">على الآيفون: افتح الموقع في سفاري ← مشاركة ← «إضافة إلى الشاشة الرئيسية»، ثم افتح التطبيق من الأيقونة وفعّل الإشعارات.</p></div>
+  <div class="card"><h2>تنبيهات تيليجرام (اختياري)</h2><div class="row"><input id="tg" dir="ltr" placeholder="Chat ID" value="${esc(S.me.telegram_chat_id || '')}"><button class="s" id="svtg">حفظ</button></div></div>`;
+  out.onclick = logout;
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
-  document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.col = b.dataset.c; render(); });
-  $('fm').onchange = e => { S.meeting = e.target.value; render(); };$('nt').onclick = () => taskDialog(null);
-  if ($('nmt'))$('nmt').onclick = () => { const t = prompt('اسم الاجتماع'); if (t?.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
-  
-  document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
-  document.querySelectorAll('.tk').forEach(el => {
-    el.onclick = () => taskDialog(S.tasks.find(t => t.id === el.dataset.id));
-    el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => el.classList.add('drag'), 0); };
-    el.ondragend = () => el.classList.remove('drag');
-  });
-  document.querySelectorAll('.col').forEach(c => {
-    c.ondragover = e => { e.preventDefault(); c.classList.add('over'); };
-    c.ondragleave = () => c.classList.remove('over');
-    c.ondrop = e => { e.preventDefault(); c.classList.remove('over'); const id = e.dataTransfer.getData('text/plain'); if (id) moveTask(id, c.dataset.st); };
-  });
-}
-
-async function moveTask(id, to) {
-  const t = S.tasks.find(x => x.id === id);
-  if (!t || eff(t) === to || !S.me) return;
-  S.col = to;
-  
-  if (t.for_all) {
-    if (to === 'doing') return; 
-    if (to === 'done') {
-      S.done.push({ task_id: id, email: S.me.email }); render();
-      run(sb.from('task_done').upsert({ task_id: id, email: S.me.email }));
-    } else {
-      S.done = S.done.filter(d => !(d.task_id === id && same(d.email, S.me.email))); render();
-      run(sb.from('task_done').delete().eq('task_id', id).eq('email', S.me.email));
-    }
-    return;
-  }
-  const prev = t.status; t.status = to; render();
-  const { error } = await sb.from('tasks').update({ status: to }).eq('id', id);
-  if (error) { t.status = prev; alert('فشل التحديث: ' + error.message); load(); }
-}
-
-function taskDialog(t, pre = {}) {
-  const x = t || pre, edit = !!t;
-  const asVal = x.for_all ? '__all' : (x.assignee_email || (S.me ? S.me.email : ''));
-  dlg.innerHTML = `
-  <h2>${edit ? 'تعديل المهمة' : 'إضافة مهمة جديدة'}</h2>
-  <label>عنوان المهمة<input id="f_ti" value="${esc(x.title || '')}" placeholder="ما الذي يجب إنجازه؟"></label>
-  <label>التفاصيل (اختياري)<textarea id="f_no" rows="3" placeholder="ملاحظات أو روابط...">${esc(x.notes || '')}</textarea></label>
-  <div class="row">
-    <label>المسؤول<select id="f_as"><option value="__all" ${asVal === '__all' ? 'selected' : ''}>👥 كل أعضاء الفريق</option><option value="" ${asVal === '' ? 'selected' : ''}>غير محدد</option>${S.members.map(m => `<option value="${esc(m.email)}" ${same(m.email, asVal) ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
-    <label>تاريخ الاستحقاق<input id="f_du" type="date" value="${esc(x.due_on || '')}"></label>
-  </div>
-  <div class="row" style="margin-top:16px">
-    <label>الاجتماع<select id="f_mt"><option value="">بدون ارتباط</option>${S.meetings.map(m => `<option value="${m.id}" ${x.meeting_id === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select></label>
-    <label id="f_stw">حالة المهمة<select id="f_st">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${(x.status \vert{}\vert{} 'todo') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-  </div>
-  <p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);border-radius:8px;color:var(--acc)">ℹ️ <b>مهمة للفريق:</b> ستظهر هذه المهمة لدى جميع الأعضاء.</p>
-  <div class="row dact">
-    ${edit && canDel(t) ? `<button class="dng s" id="f_dl" style="margin-inline-end:auto">حذف المهمة</button>` : '<span></span>'}
-    <button class="s" id="f_cx">إلغاء</button>
-    <button class="p s" id="f_sv">حفظ التغييرات</button>
-  </div>`;
-  
-  const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; };
-  $('f_as').onchange = sync; sync();
-  $('f_cx').onclick = () => dlg.close();$('f_sv').onclick = async () => {
-    const title = $('f_ti').value.trim(); if (!title) return$('f_ti').focus();
-    const all = $('f_as').value === '__all';
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value \vert{}\vert{} null), due_on:$('f_du').value || null, meeting_id: $('f_mt').value \vert{}\vert{} null, status: all ? 'todo' : $('f_st').value };
-    if (!edit) row.created_by = S.me.email;
-    
-    $('f_sv').disabled = true; $('f_sv').textContent = 'جاري الحفظ...';
-    const { error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row);
-    if (error) { alert('خطأ: ' + error.message); $('f_sv').disabled = false; $('f_sv').textContent = 'حفظ'; return; }
-    dlg.close(); load();
+  document.querySelectorAll('.st').forEach(s => s.onchange = async () => { await sb.from('tasks').update({ status: s.value }).eq('id', s.dataset.id); load(); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (confirm('حذف المهمة؟')) { await sb.from('tasks').delete().eq('id', b.dataset.del); load(); } });
+  as.value = S.me.email;
+  push.onclick = enablePush;
+  add.onclick = async () => {
+    if (!ti.value.trim()) return ti.focus();
+    await sb.from('tasks').insert({ title: ti.value.trim(), assignee_email: as.value, due_on: du.value || null, meeting_id: mt.value || null });
+    load();
   };
-  if (edit && canDel(t)) $('f_dl').onclick = () => { if (confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) { dlg.close(); run(sb.from('tasks').delete().eq('id', t.id)); } };
-  dlg.showModal(); if (!edit) $('f_ti').focus();
+  nm.onclick = async () => { const t = prompt('اسم الاجتماع (مثلاً: اجتماع الأسبوع 12)'); if (t) { await sb.from('meetings').insert({ title: t }); load(); } };
+  svtg.onclick = async () => { await sb.from('members').update({ telegram_chat_id: tg.value.trim() || null }).eq('email', S.me.email); S.me.telegram_chat_id = tg.value.trim(); svtg.textContent = 'تم'; };
 }
-dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
-
-function parseOptions(p) {
-  if (!p || !p.options) return ['موافق', 'معارض'];
-  if (Array.isArray(p.options)) return p.options;
-  try { const arr = JSON.parse(p.options); if (Array.isArray(arr)) return arr; } catch(e) {}
-  if (typeof p.options === 'string' && p.options.includes(',')) return p.options.split(',').map(s => s.trim()).filter(Boolean);
-  return ['موافق', 'معارض'];
+async function enablePush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'هذا المتصفح لا يدعم الإشعارات. على الآيفون أضف الموقع للشاشة الرئيسية أولاً.';
+    if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح صلاحية الإشعارات. فعّلها من إعدادات المتصفح.';
+    const reg = await navigator.serviceWorker.ready;
+    const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subs').upsert({ endpoint: j.endpoint, email: S.me.email, sub: j });
+    pm.textContent = error ? 'تعذّر الحفظ: ' + error.message : 'تم تفعيل الإشعارات على هذا الجهاز.';
+  } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
 }
-
-function propCard(p) {
-  const opts = parseOptions(p);
-  const pVotes = S.votes.filter(x => x.proposal_id === p.id);
-  const myVote = S.me ? pVotes.find(x => same(x.email, S.me.email)) : null;
-  const total = pVotes.length;
-  const can = S.me && (same(p.author_email, S.me.email) || isAdmin());
-  const open = !isClosed(p);
-
-  let resultsUI = opts.map((optName, index) => {
-    const optVotes = pVotes.filter(v => v.option_idx == index);
-    const w = total ? ((optVotes.length / total) * 100).toFixed(0) : 0;
-    let votersListHTML = optVotes.length > 0 ? `<div class="voters-list">` + optVotes.map(v => `<div class="voter-item"><span class="voter-name">${esc(nm(v.email))}</span>${v.note ? `<span class="voter-note">${esc(v.note)}</span>` : ''}</div>`).join('') + `</div>` : '';
-    return `<div class="v-option"><div class="v-stats"><span>${esc(optName)}</span><span>${optVotes.length} صوت (${w}%)</span></div><div class="v-bar-bg"><div class="v-bar-fill" style="width:${w}%"></div></div>${votersListHTML}</div>`;
-  }).join('');
-
-  let actionUI = open ? `<div class="vote-action"><select id="v_opt_${p.id}"><option value="">-- اختر أحد الخيارات --</option>${opts.map((optName, idx) => `<option value="${idx}" ${myVote && myVote.option_idx == idx ? 'selected' : ''}>${esc(optName)}</option>`).join('')}</select><input id="v_not_${p.id}" placeholder="اكتب ملاحظاتك (اختياري)..." value="${myVote && myVote.note ? esc(myVote.note) : ''}"><button class="p" data-cast="${p.id}">${myVote ? 'تحديث التصويت' : 'إرسال التصويت'}</button></div>` : '';
-
-  return `
-  <div class="card pr">
-    <div class="bar"><span class="ttl">${esc(p.title)}</span><span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span></div>
-    <div class="m" style="margin-top:4px">بواسطة ${esc(nm(p.author_email))}</div>
-    ${p.details ? `<div class="det">${esc(p.details)}</div>` : ''}
-    <div class="vote-panel"><h3>النتائج الحالية (${total} مشارك)</h3>${resultsUI}${actionUI}</div>
-    <div class="pa"><button class="s" data-totask="${p.id}">➡️ تحويل لمهمة</button><span style="flex:1"></span>${can ? (open ? `<button class="s" data-ps="${p.id}" data-to="accepted">اعتماد</button><button class="s" data-ps="${p.id}" data-to="rejected">رفض</button>` : `<button class="s" data-ps="${p.id}" data-to="open">إعادة الفتح</button>`) + `<button class="dng s" data-pdel="${p.id}">حذف</button>` : ''}</div>
-  </div>`;
-}
-
-function propsView() {
-  if (S.propsErr) return '<div class="card"><b>حدث خطأ في جلب المقترحات.</b><p class="m">تأكد من تحديث قاعدة البيانات.</p></div>';
-  const list = S.props.filter(p => S.pf === 'open' ? !isClosed(p) : isClosed(p));
-  return `<div class="tools"><div class="seg"><button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">قيد التصويت</button><button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button></div><span class="sp"></span><button class="p" id="np">➕ طرح مقترح جديد</button></div>${list.length ? list.map(propCard).join('') : `<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>`}`;
-}
-
-function bindProps() {
-  if (S.propsErr) return;
-  document.querySelectorAll('[data-pf]').forEach(b => b.onclick = () => { S.pf = b.dataset.pf; render(); });
-  $('np').onclick = propDialog;
-  
-  document.querySelectorAll('[data-cast]').forEach(btn => {
-    btn.onclick = async () => {
-      const pid = btn.dataset.cast;
-      const optSelect = document.getElementById(`v_opt_${pid}`);
-      if (!optSelect || optSelect.value === '') return alert('الرجاء اختيار أحد الخيارات أولاً.');
-      const noteField = document.getElementById(`v_not_${pid}`);
-      const note = noteField ? noteField.value.trim() : '';
-      btn.textContent = 'جاري الإرسال...'; btn.disabled = true;
-      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optSelect.value), note: note || null });
-      if (error) alert('فشل الإرسال: ' + error.message);
-      load();
-    };
-  });
-  document.querySelectorAll('[data-ps]').forEach(b => b.onclick = () => run(sb.from('proposals').update({ status: b.dataset.to }).eq('id', b.dataset.ps)));
-  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('حذف المقترح بالكامل مع أصواته؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
-  document.querySelectorAll('[data-totask]').forEach(b => b.onclick = () => { const p = S.props.find(x => x.id === b.dataset.totask); taskDialog(null, { title: p.title, notes: p.details || '', for_all: true }); });
-}
-
-function propDialog() {
-  dlg.innerHTML = `<h2>طرح مقترح جديد</h2><label>عنوان المقترح<input id="p_ti"></label><label>تفاصيل (اختياري)<textarea id="p_de" rows="2"></textarea></label><label>الخيارات المتاحة (خيار في كل سطر)<textarea id="p_opts" rows="3" placeholder="الخيار الأول&#10;الخيار الثاني"></textarea></label><div class="row dact"><button class="s" id="p_cx">إلغاء</button><button class="p s" id="p_sv">نشر المقترح</button></div>`;
-  $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
-    const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
-    let rawOpts = $('p_opts').value.split('\n').map(x => x.trim()).filter(Boolean);
-    if (rawOpts.length === 0) rawOpts = ['موافق', 'معارض'];
-    $('p_sv').disabled = true; $('p_sv').textContent = 'جاري النشر...';
-    const { error } = await sb.from('proposals').insert({ title, details: $('p_de').value.trim() || null, author_email: S.me.email, status: 'open', options: JSON.stringify(rawOpts) });
-    if (error) { alert('خطأ: ' + error.message); $('p_sv').disabled = false; $('p_sv').textContent = 'نشر'; return; }
-    dlg.close(); load();
-  };
-  dlg.showModal(); $('p_ti').focus();
-}
-
-function settingsView() {
-  return `
-  <div class="card">
-    <h2>🔔 إشعارات النظام (Push Notifications)</h2>
-    <div class="row"><button class="p" id="push">تفعيل التنبيهات</button></div>
-    <p class="m" id="pm" style="margin-top:12px;background:var(--col);padding:10px;border-radius:8px">💡 <b>للآيفون (iOS):</b> أضف الموقع إلى الشاشة الرئيسية (Add to Home Screen) لتفعيل الإشعارات.</p>
-  </div>
-  <div class="card">
-    <h2>🛡️ تغيير كلمة المرور</h2>
-    <div class="row" style="align-items:center"><input id="np" type="password" dir="ltr" placeholder="6 أحرف كحد أدنى" style="flex:2"><button class="s" id="svp" style="flex:1">تحديث</button></div>
-  </div>
-  ${isAdmin() ? `<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الفريق</h2><div style="margin-bottom:20px">${S.members.map(m => `<div class="bar" style="background:var(--col);padding:10px 14px;border-radius:8px;margin-bottom:8px"><div><strong>${esc(m.name)}</strong><div class="m" dir="ltr">${esc(m.email)}</div></div>${S.me && same(m.email, S.me.email) ? '<i>(أنت)</i>' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}</div><h3 style="font-size:14px;margin-bottom:8px">إضافة عضو جديد:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة</button></div></div>` : ''}
-  <div class="card" style="text-align:center;background:var(--latesoft);border-color:var(--latesoft)">
-    <button class="dng" id="out" style="width:100%;padding:12px;background:transparent">تسجيل الخروج ومسح الذاكرة</button>
-  </div>`;
-}
-
-function bindSettings() {
-  $('out').onclick = logout;
-  $('push').onclick = async () => {
-    const pm = $('pm');
-    try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'متصفحك لا يدعم الإشعارات.';
-      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح صلاحية الإشعارات.';
-      const reg = await navigator.serviceWorker.ready;
-      const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-      const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? '<b>خطأ:</b> ' + error.message : '<b style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح.</b>';
-    } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
-  };
-  $('svp').onclick = async () => { 
-    const v = $('np').value; if (v.length < 6) return alert('6 أحرف كحد أدنى.'); 
-    $('svp').textContent = 'تحديث...';
-    const { error } = await sb.auth.updateUser({ password: v }); 
-    alert(error ? error.message : 'تم التغيير بنجاح.'); 
-    $('np').value = '';$('svp').textContent = 'تحديث';
-  };
-  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
-  if ($('addm'))$('addm').onclick = () => { const e = $('ne').value.trim(), n =$('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
-}
-
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
-document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !dlg.open) load(); });
+sb.auth.onAuthStateChange((e) => { if (e === 'SIGNED_IN') init(); });
 init();
 </script>
 </body>
