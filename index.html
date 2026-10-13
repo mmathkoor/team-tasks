@@ -7,14 +7,10 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#27408b">
 <link rel="apple-touch-icon" href="/icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
-<script src="/supabase.js"></script>
-<script>if(!window.supabase)document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"><\/script>');</script>
-<script>if(!window.supabase)document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"><\/script>');</script>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#1c2433;--mute:#6b7280;--line:#e2e5ea;--acc:#27408b;--late:#b42318;--soon:#b7791f;--ok:#2f7d4f}
 @media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2a313d;--acc:#8fa8f0;--late:#f08a80;--soon:#e6b85c;--ok:#6cc58f}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'IBM Plex Sans Arabic',system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'Segoe UI',Tahoma,system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 main{max-width:860px;margin:auto;padding:16px}
 h1{font-size:20px;margin:8px 0}h2{font-size:15px;margin:0 0 8px;color:var(--mute);font-weight:600}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
@@ -33,9 +29,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 </style>
 </head>
 <body>
-<main id="app"></main>
+<main id="app"><p style="padding:24px;color:#6b7280;font:15px sans-serif" dir="rtl">جارٍ التحميل...</p></main>
+<script src="/supabase.js"></script>
+<script>if(!window.supabase)document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"><\/script>');</script>
+<script>if(!window.supabase)document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"><\/script>');</script>
 <script>
-window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && !a.innerHTML.trim()) a.innerHTML = '<div style="padding:24px;font:15px sans-serif" dir="rtl">حدث خطأ في تحميل التطبيق: ' + e.message + '<br>أغلق التطبيق وافتحه من جديد.</div>'; });
+window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && a.textContent.includes('جارٍ التحميل')) a.innerHTML = '<div style="padding:24px;font:15px sans-serif" dir="rtl">حدث خطأ في تحميل التطبيق: ' + e.message + '<br>أغلق التطبيق وافتحه من جديد.</div>'; });
 // ====== ضع بيانات مشروعك من Supabase > Project Settings > API ======
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
