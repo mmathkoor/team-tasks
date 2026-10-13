@@ -11,56 +11,30 @@
 <style>
 /* === متغيرات الألوان والتصميم الحديث === */
 :root {
-  --bg: #f8fafc;
-  --card: #ffffff;
-  --ink: #0f172a;
-  --mute: #64748b;
-  --line: #e2e8f0;
-  --acc: #2563eb;
-  --acc-hover: #1d4ed8;
-  --accsoft: #dbeafe;
-  --late: #ef4444;
-  --latesoft: #fee2e2;
-  --soon: #f59e0b;
-  --soonsoft: #fef3c7;
-  --ok: #10b981;
-  --oksoft: #d1fae5;
-  --col: #f1f5f9;
+  --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --mute: #64748b; --line: #e2e8f0;
+  --acc: #2563eb; --acc-hover: #1d4ed8; --accsoft: #dbeafe;
+  --late: #ef4444; --latesoft: #fee2e2; --soon: #f59e0b; --soonsoft: #fef3c7;
+  --ok: #10b981; --oksoft: #d1fae5; --col: #f1f5f9;
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --radius: 16px;
-  --radius-sm: 10px;
+  --radius: 16px; --radius-sm: 10px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f172a;
-    --card: #1e293b;
-    --ink: #f8fafc;
-    --mute: #94a3b8;
-    --line: #334155;
-    --acc: #3b82f6;
-    --acc-hover: #60a5fa;
-    --accsoft: #1e3a8a;
-    --late: #f87171;
-    --latesoft: #7f1d1d;
-    --soon: #fbbf24;
-    --soonsoft: #78350f;
-    --ok: #34d399;
-    --oksoft: #064e3b;
-    --col: #111827;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    --bg: #0f172a; --card: #1e293b; --ink: #f8fafc; --mute: #94a3b8; --line: #334155;
+    --acc: #3b82f6; --acc-hover: #60a5fa; --accsoft: #1e3a8a;
+    --late: #f87171; --latesoft: #7f1d1d; --soon: #fbbf24; --soonsoft: #78350f;
+    --ok: #34d399; --oksoft: #064e3b; --col: #111827;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
   }
 }
 
-/* === الأساسيات === */
 * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; padding-bottom: env(safe-area-inset-bottom); transition: background 0.3s, color 0.3s; }
 main { max-width: 1140px; margin: auto; padding: 20px 16px 60px; }
 h1 { font-size: 24px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
 h2 { font-size: 16px; margin: 0 0 12px; color: var(--ink); font-weight: 600; }
 
-/* === النماذج والأزرار === */
 input, select, textarea, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px; min-width: 0; transition: all 0.2s ease; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--accsoft); }
 button { cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -73,7 +47,6 @@ button.p:hover { background: var(--acc-hover); border-color: var(--acc-hover); }
 button.dng { color: var(--late); border-color: var(--line); }
 button.dng:hover { background: var(--latesoft); border-color: var(--late); }
 
-/* === التخطيط والبطاقات === */
 .m { font-size: 13.5px; color: var(--mute); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); transition: box-shadow 0.3s; }
 .card:hover { box-shadow: var(--shadow-hover); }
@@ -82,7 +55,6 @@ button.dng:hover { background: var(--latesoft); border-color: var(--late); }
 .row > * { flex: 1 1 150px; }
 .row .s { flex: 0 0 auto; }
 
-/* === الترويسة والتنقل === */
 .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0 20px; }
 .nav { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; background: rgba(var(--bg-rgb), 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
 .nav button { flex: 1; border: none; background: transparent; color: var(--mute); padding: 12px 8px; border-radius: var(--radius-sm); font-weight: 600; font-size: 15px; }
@@ -90,7 +62,6 @@ button.dng:hover { background: var(--latesoft); border-color: var(--late); }
 .nav button.on { background: var(--accsoft); color: var(--acc); box-shadow: inset 0 -3px 0 var(--acc); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .nav .n { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; margin-inline-start: 6px; border-radius: 11px; background: var(--late); color: #fff; font-size: 12px; font-weight: bold; }
 
-/* === لوحة المهام (Kanban) === */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); text-align: center; }
 .stat b { display: block; font-size: 28px; line-height: 1.2; font-weight: 700; margin-bottom: 4px; }
@@ -131,7 +102,6 @@ button.dng:hover { background: var(--latesoft); border-color: var(--late); }
 .acts button:hover { background: var(--accsoft); color: var(--acc); }
 .empty { font-size: 14px; color: var(--mute); text-align: center; padding: 30px 0; font-weight: 500; }
 
-/* === المقترحات والتصويت === */
 .pr .ttl { font-weight: 700; font-size: 18px; line-height: 1.3; }
 .pr .det { white-space: pre-wrap; margin: 12px 0; font-size: 15px; color: var(--mute); background: var(--col); padding: 12px; border-radius: var(--radius-sm); }
 .vote-panel { background: var(--col); border-radius: var(--radius-sm); padding: 16px; margin: 16px 0; border: 1px solid var(--line); }
@@ -153,7 +123,6 @@ button.dng:hover { background: var(--latesoft); border-color: var(--late); }
 .pa { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .pa button { font-size: 13.5px; padding: 6px 12px; }
 
-/* === النوافذ المنبثقة (Dialogs) === */
 dialog { border: none; border-radius: var(--radius); background: var(--card); color: var(--ink); padding: 24px; width: min(540px, 92vw); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); font: inherit; }
 dialog::backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
 dialog h2 { font-size: 20px; margin-bottom: 20px; font-weight: 700; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
@@ -167,7 +136,6 @@ dialog .dact button { min-width: 100px; padding: 10px; }
 #login h1 { margin-bottom: 8px; font-size: 28px; }
 #login .m { margin-bottom: 24px; }
 
-/* === استجابة الشاشات الصغيرة === */
 @media (max-width: 768px) {
   .board { display: block; }
   .ctabs { display: flex; gap: 8px; margin-bottom: 16px; background: var(--card); padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--line); }
@@ -175,7 +143,7 @@ dialog .dact button { min-width: 100px; padding: 10px; }
   .ctabs button.on { background: var(--acc); color: #fff; box-shadow: var(--shadow); border-radius: calc(var(--radius-sm) - 4px); }
   .col { display: none; padding: 0; background: transparent; border: none; min-height: auto; }
   .col.on { display: block; }
-  .col > .ch { display: none; } /* إخفاء العنوان في الجوال لوجود التبويبات */
+  .col > .ch { display: none; }
   .stats { grid-template-columns: 1fr; }
   .tools { flex-direction: column; align-items: stretch; }
   .tools .sp { display: none; }
@@ -188,22 +156,35 @@ dialog .dact button { min-width: 100px; padding: 10px; }
 <main id="app"><p style="padding:40px;text-align:center;color:var(--mute);font-weight:500;">جارٍ تهيئة مساحة العمل...</p></main>
 <dialog id="dlg"></dialog>
 <script>
-window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && a.textContent.includes('تهيئة')) a.innerHTML = '<div class="card" style="text-align:center;color:var(--late)">حدث خطأ في تحميل التطبيق.<br>يرجى تحديث الصفحة.</div>'; });
+// === أنظمة الحماية من تجمد الشاشة ===
+async function hardReset() {
+  localStorage.clear();
+  if ('serviceWorker' in navigator) {
+    try { const regs = await navigator.serviceWorker.getRegistrations(); for (let r of regs) await r.unregister(); } catch(e){}
+  }
+  location.reload();
+}
+function showCriticalError(errStr) {
+  const a = document.getElementById('app');
+  if (a) a.innerHTML = `<div class="card" style="text-align:center;color:var(--late);margin:40px auto;max-width:400px;border-color:var(--late)"><h3>حدث خطأ غير متوقع</h3><p>${errStr}</p><button class="p" onclick="hardReset()" style="margin-top:16px;width:100%;padding:12px">إصلاح وإعادة تحميل النظام</button></div>`;
+}
+window.addEventListener('error', e => showCriticalError(e.message));
+window.addEventListener('unhandledrejection', e => showCriticalError(e.reason?.message || 'تعذر جلب البيانات.'));
 
 // ====== بيانات مشروعك من Supabase ======
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
 const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
 
-// ====================================================================
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
-const AUTH = { s: JSON.parse(localStorage.getItem('sbs') || 'null') };
+let AUTH = { s: null };
+try { AUTH.s = JSON.parse(localStorage.getItem('sbs') || 'null'); } catch(e){}
 const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); };
 
 async function tok() {
   const s = AUTH.s;
   if (!s) return KEY;
-  if (s.expires_at - 60 > Date.now() / 1000) return s.access_token;
+  if (s.expires_at && (s.expires_at - 60 > Date.now() / 1000)) return s.access_token;
   try {
     const r = await fetch(API + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
     const j = await r.json();
@@ -229,14 +210,14 @@ class Q {
       const r = await fetch(API + '/rest/v1/' + this.t + '?' + this.p, { method: this.m, headers: h, body: this.b ? JSON.stringify(this.b) : undefined });
       if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || r.statusText } }; }
       return { data: mut ? null : await r.json(), error: null };
-    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال' } }; }
+    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بالخادم.' } }; }
   }
 }
 
 const sb = {
   from: t => new Q(t),
   auth: {
-    getSession: async () => ({ data: { session: AUTH.s } }),
+    getSession: async () => ({ data: { session: AUTH.s }, error: null }),
     signInWithPassword: async ({ email, password }) => {
       try {
         const r = await fetch(API + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
@@ -256,9 +237,8 @@ const sb = {
   }
 };
 
-/* ---------- الحالة والمساعدات ---------- */
 const $ = id => document.getElementById(id);
-const $app = $('app'), dlg = $('dlg');
+const $app = $('app'), dlg =$('dlg');
 const S = { me: null, members: [], meetings: [], tasks: [], done: [], props: [], votes: [], propsErr: false, view: 'board', filter: 'mine', meeting: '', col: 'todo', pf: 'open' };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toISOString().slice(0, 10);
@@ -276,26 +256,49 @@ const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
-/* ---------- الدخول والتحميل ---------- */
 async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return loginView();
-  const email = session.user.email;
-  try { const c = JSON.parse(localStorage.getItem('cache3') || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
-  
-  const { data: members, error } = await sb.from('members').select('*');
-  if (error) { if (!S.me) { $app.innerHTML = '<div class="card" id="login">فشل الاتصال بقاعدة البيانات.<br><br><button class="p" id="again">إعادة المحاولة</button> <button id="out">خروج</button></div>'; $('again').onclick = init; $('out').onclick = logout; } return; }
-  const me = members.find(m => same(m.email, email));
-  if (!members.length || !me) { $app.innerHTML = '<div class="card" id="login">حسابك غير مسجل كعضو في الفريق.<br><br><button id="out">تسجيل خروج</button></div>'; $('out').onclick = logout; return; }
-  S.members = members; S.me = me;
-  await load();
+  try {
+    const { data: { session }, error: authErr } = await sb.auth.getSession();
+    if (authErr || !session || !session.user || !session.user.email) {
+      saveS(null);
+      return loginView();
+    }
+    const email = session.user.email;
+    
+    // تحميل سريع وآمن من الذاكرة
+    let cached = false;
+    try { 
+      const c = JSON.parse(localStorage.getItem('cache3')); 
+      if (c && c.email === email && c.s) { 
+        S.me = c.s.me || S.me;
+        S.members = Array.isArray(c.s.members) ? c.s.members : S.members;
+        S.meetings = Array.isArray(c.s.meetings) ? c.s.meetings : S.meetings;
+        S.tasks = Array.isArray(c.s.tasks) ? c.s.tasks : S.tasks;
+        S.done = Array.isArray(c.s.done) ? c.s.done : S.done;
+        S.props = Array.isArray(c.s.props) ? c.s.props : S.props;
+        S.votes = Array.isArray(c.s.votes) ? c.s.votes : S.votes;
+        if (S.me && S.members.length > 0) { render(); cached = true; }
+      } 
+    } catch (e) { localStorage.removeItem('cache3'); }
+    
+    // جلب البيانات من الخادم
+    const { data: members, error } = await sb.from('members').select('*');
+    if (error) { 
+      if (!cached) showCriticalError('فشل الاتصال بقاعدة البيانات. تأكد من الإنترنت.'); 
+      return; 
+    }
+    const me = members.find(m => same(m.email, email));
+    if (!me) { saveS(null); showCriticalError('حسابك غير مسجل كعضو في الفريق.'); return; }
+    
+    S.members = members; S.me = me;
+    await load();
+  } catch (err) { showCriticalError(err.message); }
 }
 
 async function load() {
-  const [m, t, mm, p, v, d] = await Promise.all([
+  const [m, t, p, v, d] = await Promise.all([
     sb.from('meetings').select('*').order('held_on', { ascending: false }),
     sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
-    sb.from('members').select('*'),
     sb.from('proposals').select('*').order('created_at', { ascending: false }),
     sb.from('votes').select('*'),
     sb.from('task_done').select('*')
@@ -307,7 +310,6 @@ async function load() {
   S.propsErr = !!(p.error || v.error);
   if (!p.error) S.props = p.data || [];
   if (!v.error) S.votes = v.data || [];
-  if (mm.data?.length) { S.members = mm.data; S.me = mm.data.find(x => same(x.email, S.me.email)) || S.me; }
   
   if (!m.error && !t.error) try { localStorage.setItem('cache3', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
@@ -326,41 +328,40 @@ function loginView() {
     <p class="m" id="msg" style="margin-top:16px;color:var(--late)"></p>
   </div>`;
   const doLogin = async () => {
-    $('msg').textContent = 'جارٍ الدخول...';
-    $('msg').style.color = 'inherit';
+    $('msg').textContent = 'جارٍ الدخول...'; $('msg').style.color = 'inherit';
     const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password:$('pw').value });
     if (error) { $('msg').textContent = error.message; $('msg').style.color = 'var(--late)'; }
   };
   $('go').onclick = doLogin;
   $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
 }
-const logout = async () => { await sb.auth.signOut(); localStorage.removeItem('cache3'); location.reload(); };
+const logout = () => { hardReset(); };
 
-/* ---------- الإطار العام ---------- */
 const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
 function render() {
-  const openProps = S.props.filter(p => !isClosed(p)).length;
-  $app.innerHTML = `
-  <div class="top">
-    <h1>مهام الفريق</h1>
-    <div class="row s" style="align-items:center;gap:16px">
-      <span class="m" style="font-weight:600">👤 ${esc(S.me.name)}</span>
-      <button id="rf" class="s">🔄 تحديث</button>
+  try {
+    const openProps = S.props.filter(p => !isClosed(p)).length;
+    $app.innerHTML = `
+    <div class="top">
+      <h1>مهام الفريق</h1>
+      <div class="row s" style="align-items:center;gap:16px">
+        <span class="m" style="font-weight:600">👤 ${esc(S.me.name)}</span>
+        <button id="rf" class="s">🔄 تحديث</button>
+      </div>
     </div>
-  </div>
-  <div class="nav">
-    <button data-nv="board" class="${S.view === 'board' ? 'on' : ''}">المهام</button>
-    <button data-nv="props" class="${S.view === 'props' ? 'on' : ''}">المقترحات${openProps ? `<span class="n">${openProps}</span>` : ''}</button>
-    <button data-nv="set" class="${S.view === 'set' ? 'on' : ''}">الإعدادات</button>
-  </div>
-  ${S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView()}`;
-  
-  $('rf').onclick = () => {$('rf').textContent = '⏳'; load(); };
-  document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
-  if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
+    <div class="nav">
+      <button data-nv="board" class="${S.view === 'board' ? 'on' : ''}">المهام</button>
+      <button data-nv="props" class="${S.view === 'props' ? 'on' : ''}">المقترحات${openProps ? `<span class="n">${openProps}</span>` : ''}</button>
+      <button data-nv="set" class="${S.view === 'set' ? 'on' : ''}">الإعدادات</button>
+    </div>
+    ${S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView()}`;
+    
+    $('rf').onclick = () => {$('rf').textContent = '⏳'; load(); };
+    document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
+    if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
+  } catch (err) { showCriticalError("خطأ في رسم الواجهة: " + err.message); }
 }
 
-/* ---------- لوحة المهام ---------- */
 function dueInfo(t) {
   if (!t.due_on) return null;
   if (eff(t) === 'done') return { c: '', t: t.due_on };
@@ -373,6 +374,15 @@ function card(t) {
   const st = eff(t), d = dueInfo(t), mt = S.meetings.find(m => m.id === t.meeting_id);
   const acts = (t.for_all ? ACT_ALL : ACT)[st];
   const dn = doneBy(t);
+  
+  // زر مشاركة الواتساب (يظهر إذا كانت المهمة مسندة لشخص معين ولم يتم إنجازها)
+  let waBtn = '';
+  if (!t.for_all && t.assignee_email && !same(t.assignee_email, S.me.email) && st !== 'done') {
+    const assigneeName = nm(t.assignee_email);
+    const msg = `مرحباً ${assigneeName}،\nتم إسناد مهمة جديدة إليك:\n*${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nالرجاء متابعتها والتحديث عند الإنجاز.`;
+    waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="chip" style="background:#25d366;color:#fff;text-decoration:none;border:none">💬 إشعار واتساب</a>`;
+  }
+
   return `
   <div class="tk ${st}" draggable="true" data-id="${t.id}">
     <div class="tt">${esc(t.title)}</div>
@@ -381,6 +391,7 @@ function card(t) {
       ${t.for_all ? `<span class="chip all" title="${esc(dn.map(x => nm(x.email)).join('\n'))}">👥 فريق (${dn.length}/${S.members.length})</span>` : `<span class="chip">👤 ${esc(nm(t.assignee_email))}</span>`}
       ${d ? `<span class="chip ${d.c}">${esc(d.t)}</span>` : ''}
       ${mt ? `<span class="chip">📌 ${esc(mt.title)}</span>` : ''}
+      ${waBtn}
     </div>
     <div class="acts">${acts.map(([k, l]) => `<button data-mv="${t.id}" data-to="${k}">${l}</button>`).join('')}</div>
   </div>`;
@@ -443,7 +454,7 @@ function bindBoard() {
 async function moveTask(id, to) {
   const t = S.tasks.find(x => x.id === id);
   if (!t || eff(t) === to) return;
-  S.col = to; // للتبويبات في الجوال
+  S.col = to;
   
   if (t.for_all) {
     if (to === 'doing') return; 
@@ -456,7 +467,6 @@ async function moveTask(id, to) {
     }
     return;
   }
-  
   const prev = t.status; t.status = to; render();
   const { error } = await sb.from('tasks').update({ status: to }).eq('id', id);
   if (error) { t.status = prev; alert('فشل التحديث: ' + error.message); load(); }
@@ -499,19 +509,15 @@ function taskDialog(t, pre = {}) {
     dlg.close(); load();
   };
   if (edit && canDel(t)) $('f_dl').onclick = () => { if (confirm('هل أنت متأكد من حذف هذه المهمة نهائياً؟')) { dlg.close(); run(sb.from('tasks').delete().eq('id', t.id)); } };
-  
-  dlg.showModal();
-  if (!edit) $('f_ti').focus();
+  dlg.showModal(); if (!edit) $('f_ti').focus();
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
-/* ---------- المقترحات المتعددة الخيارات والتصويت ---------- */
 function parseOptions(p) {
-  // افتراض أن حقل options في الجدول إما JSON array أو نص مفصول بفواصل
   if (Array.isArray(p.options)) return p.options;
   try { const arr = JSON.parse(p.options); if (Array.isArray(arr)) return arr; } catch(e) {}
   if (typeof p.options === 'string' && p.options.includes(',')) return p.options.split(',').map(s => s.trim()).filter(Boolean);
-  return ['موافق', 'غير موافق']; // حالة افتراضية إذا لم توجد خيارات
+  return ['موافق', 'غير موافق'];
 }
 
 function propCard(p) {
@@ -525,146 +531,62 @@ function propCard(p) {
   let resultsUI = opts.map((optName, index) => {
     const optVotes = pVotes.filter(v => v.option_idx == index);
     const w = total ? ((optVotes.length / total) * 100).toFixed(0) : 0;
-    
-    let votersListHTML = '';
-    if (optVotes.length > 0) {
-      votersListHTML = `<div class="voters-list">` + 
-        optVotes.map(v => `<div class="voter-item"><span class="voter-name">${esc(nm(v.email))}</span>${v.note ? `<span class="voter-note">${esc(v.note)}</span>` : ''}</div>`).join('') + 
-      `</div>`;
-    }
-
-    return `
-    <div class="v-option">
-      <div class="v-stats"><span>${esc(optName)}</span><span>${optVotes.length} صوت (${w}%)</span></div>
-      <div class="v-bar-bg"><div class="v-bar-fill" style="width:${w}%"></div></div>
-      ${votersListHTML}
-    </div>`;
+    let votersListHTML = optVotes.length > 0 ? `<div class="voters-list">` + optVotes.map(v => `<div class="voter-item"><span class="voter-name">${esc(nm(v.email))}</span>${v.note ? `<span class="voter-note">${esc(v.note)}</span>` : ''}</div>`).join('') + `</div>` : '';
+    return `<div class="v-option"><div class="v-stats"><span>${esc(optName)}</span><span>${optVotes.length} صوت (${w}%)</span></div><div class="v-bar-bg"><div class="v-bar-fill" style="width:${w}%"></div></div>${votersListHTML}</div>`;
   }).join('');
 
-  let actionUI = '';
-  if (open) {
-    actionUI = `
-    <div class="vote-action">
-      <select id="v_opt_${p.id}">
-        <option value="">-- اختر أحد الخيارات --</option>
-        ${opts.map((optName, idx) => `<option value="${idx}" ${myVote && myVote.option_idx == idx ? 'selected' : ''}>${esc(optName)}</option>`).join('')}
-      </select>
-      <input id="v_not_${p.id}" placeholder="اكتب ملاحظاتك (اختياري)..." value="${myVote && myVote.note ? esc(myVote.note) : ''}">
-      <button class="p" data-cast="${p.id}">${myVote ? 'تحديث التصويت' : 'إرسال التصويت'}</button>
-    </div>`;
-  }
+  let actionUI = open ? `<div class="vote-action"><select id="v_opt_${p.id}"><option value="">-- اختر أحد الخيارات --</option>${opts.map((optName, idx) => `<option value="${idx}" ${myVote && myVote.option_idx == idx ? 'selected' : ''}>${esc(optName)}</option>`).join('')}</select><input id="v_not_${p.id}" placeholder="اكتب ملاحظاتك (اختياري)..." value="${myVote && myVote.note ? esc(myVote.note) : ''}"><button class="p" data-cast="${p.id}">${myVote ? 'تحديث التصويت' : 'إرسال التصويت'}</button></div>` : '';
 
   return `
   <div class="card pr">
-    <div class="bar">
-      <span class="ttl">${esc(p.title)}</span>
-      <span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span>
-    </div>
+    <div class="bar"><span class="ttl">${esc(p.title)}</span><span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span></div>
     <div class="m" style="margin-top:4px">بواسطة ${esc(nm(p.author_email))} في ${esc((p.created_at || '').slice(0, 10))}</div>
     ${p.details ? `<div class="det">${esc(p.details)}</div>` : ''}
-    
-    <div class="vote-panel">
-      <h3>النتائج الحالية (${total} مشارك)</h3>
-      ${resultsUI}
-      ${actionUI}
-    </div>
-
-    <div class="pa">
-      <button class="s" data-totask="${p.id}">➡️ تحويل لمهمة</button>
-      <span style="flex:1"></span>
-      ${can ? (open ? `<button class="s" data-ps="${p.id}" data-to="accepted">اعتماد</button><button class="s" data-ps="${p.id}" data-to="rejected">رفض</button>` : `<button class="s" data-ps="${p.id}" data-to="open">إعادة الفتح</button>`) + `<button class="dng s" data-pdel="${p.id}">حذف</button>` : ''}
-    </div>
+    <div class="vote-panel"><h3>النتائج الحالية (${total} مشارك)</h3>${resultsUI}${actionUI}</div>
+    <div class="pa"><button class="s" data-totask="${p.id}">➡️ تحويل لمهمة</button><span style="flex:1"></span>${can ? (open ? `<button class="s" data-ps="${p.id}" data-to="accepted">اعتماد</button><button class="s" data-ps="${p.id}" data-to="rejected">رفض</button>` : `<button class="s" data-ps="${p.id}" data-to="open">إعادة الفتح</button>`) + `<button class="dng s" data-pdel="${p.id}">حذف</button>` : ''}</div>
   </div>`;
 }
 
 function propsView() {
-  if (S.propsErr) return '<div class="card"><b>حدث خطأ في جلب المقترحات.</b><p class="m">يرجى التأكد من إضافة حقول (options) في جدول proposals، وحقلي (option_idx, note) في جدول votes.</p></div>';
+  if (S.propsErr) return '<div class="card"><b>حدث خطأ في جلب المقترحات.</b><p class="m">تأكد من تحديث قاعدة البيانات.</p></div>';
   const list = S.props.filter(p => S.pf === 'open' ? !isClosed(p) : isClosed(p));
-  return `
-  <div class="tools">
-    <div class="seg">
-      <button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">قيد التصويت</button>
-      <button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button>
-    </div>
-    <span class="sp"></span>
-    <button class="p" id="np">➕ طرح مقترح جديد</button>
-  </div>
-  ${list.length ? list.map(propCard).join('') : `<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>`}`;
+  return `<div class="tools"><div class="seg"><button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">قيد التصويت</button><button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button></div><span class="sp"></span><button class="p" id="np">➕ طرح مقترح جديد</button></div>${list.length ? list.map(propCard).join('') : `<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>`}`;
 }
 
 function bindProps() {
   if (S.propsErr) return;
   document.querySelectorAll('[data-pf]').forEach(b => b.onclick = () => { S.pf = b.dataset.pf; render(); });
   $('np').onclick = propDialog;
-  
-  // حفظ التصويت بالملاحظة
   document.querySelectorAll('[data-cast]').forEach(btn => {
     btn.onclick = async () => {
-      const pid = btn.dataset.cast;
-      const optVal = $(`v_opt_${pid}`).value;
+      const pid = btn.dataset.cast, optVal = $(`v_opt_${pid}`).value;
       if (optVal === '') return alert('الرجاء اختيار أحد الخيارات أولاً.');
-      
       const note = $(`v_not_${pid}`).value.trim();
       btn.textContent = 'جاري الإرسال...'; btn.disabled = true;
-      
-      const { error } = await sb.from('votes').upsert({ 
-        proposal_id: pid, 
-        email: S.me.email, 
-        option_idx: parseInt(optVal), 
-        note: note || null 
-      });
-      
+      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optVal), note: note || null });
       if (error) alert('فشل الإرسال: ' + error.message);
       load();
     };
   });
-
   document.querySelectorAll('[data-ps]').forEach(b => b.onclick = () => run(sb.from('proposals').update({ status: b.dataset.to }).eq('id', b.dataset.ps)));
-  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('هل أنت متأكد من حذف المقترح بالكامل مع جميع أصواته؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
-  document.querySelectorAll('[data-totask]').forEach(b => b.onclick = () => {
-    const p = S.props.find(x => x.id === b.dataset.totask);
-    taskDialog(null, { title: p.title, notes: p.details || '', for_all: true });
-  });
+  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('حذف المقترح بالكامل مع أصواته؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
+  document.querySelectorAll('[data-totask]').forEach(b => b.onclick = () => { const p = S.props.find(x => x.id === b.dataset.totask); taskDialog(null, { title: p.title, notes: p.details || '', for_all: true }); });
 }
 
 function propDialog() {
-  dlg.innerHTML = `
-  <h2>طرح مقترح جديد</h2>
-  <label>عنوان المقترح<input id="p_ti" placeholder="مثال: تغيير موعد الاجتماع الأسبوعي"></label>
-  <label>تفاصيل ومبررات المقترح (اختياري)<textarea id="p_de" rows="3"></textarea></label>
-  <label>الخيارات المتاحة للتصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_opts" rows="4" placeholder="الخيار الأول&#10;الخيار الثاني&#10;الخيار الثالث"></textarea></label>
-  <div class="row dact">
-    <button class="s" id="p_cx">إلغاء</button>
-    <button class="p s" id="p_sv">نشر المقترح</button>
-  </div>`;
-  
+  dlg.innerHTML = `<h2>طرح مقترح جديد</h2><label>عنوان المقترح<input id="p_ti" placeholder="مثال: تغيير موعد الاجتماع الأسبوعي"></label><label>تفاصيل ومبررات المقترح (اختياري)<textarea id="p_de" rows="3"></textarea></label><label>الخيارات المتاحة للتصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_opts" rows="4" placeholder="الخيار الأول&#10;الخيار الثاني&#10;الخيار الثالث"></textarea></label><div class="row dact"><button class="s" id="p_cx">إلغاء</button><button class="p s" id="p_sv">نشر المقترح</button></div>`;
   $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
-    const title = $('p_ti').value.trim();
-    if (!title) return $('p_ti').focus();
-    
-    // معالجة الخيارات المدخلة
+    const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
     let rawOpts = $('p_opts').value.split('\n').map(x => x.trim()).filter(Boolean);
-    if (rawOpts.length === 0) rawOpts = ['موافق', 'معارض']; // خيارات افتراضية إذا ترك فارغاً
-    
-    // تحويل المصفوفة إلى JSON string لتخزينها في قاعدة البيانات
-    const optionsJSON = JSON.stringify(rawOpts);
-
+    if (rawOpts.length === 0) rawOpts = ['موافق', 'معارض'];
     $('p_sv').disabled = true; $('p_sv').textContent = 'جاري النشر...';
-    const { error } = await sb.from('proposals').insert({ 
-      title, 
-      details: $('p_de').value.trim() || null, 
-      author_email: S.me.email, 
-      status: 'open',
-      options: optionsJSON 
-    });
-    
+    const { error } = await sb.from('proposals').insert({ title, details: $('p_de').value.trim() || null, author_email: S.me.email, status: 'open', options: JSON.stringify(rawOpts) });
     if (error) { alert('خطأ: ' + error.message); $('p_sv').disabled = false; $('p_sv').textContent = 'نشر المقترح'; return; }
     dlg.close(); load();
   };
   dlg.showModal(); $('p_ti').focus();
 }
 
-/* ---------- الإعدادات ---------- */
 function settingsView() {
   return `
   <div class="card">
@@ -673,80 +595,40 @@ function settingsView() {
     <div class="row"><button class="p" id="push">تفعيل التنبيهات</button></div>
     <p class="m" id="pm" style="margin-top:12px;background:var(--col);padding:10px;border-radius:8px">💡 <b>لمستخدمي الآيفون (iOS):</b> يجب أولاً الضغط على زر المشاركة في متصفح سفاري واختيار «إضافة إلى الشاشة الرئيسية»، ثم فتح التطبيق من الأيقونة الجديدة لتتمكن من تفعيل الإشعارات.</p>
   </div>
-  
   <div class="card">
     <h2>🛡️ الأمان والحساب</h2>
     <label class="m" style="display:block;margin-bottom:6px">تغيير كلمة المرور:</label>
-    <div class="row" style="align-items:center">
-      <input id="np" type="password" dir="ltr" placeholder="كلمة المرور الجديدة (6 أحرف كحد أدنى)" style="flex:2">
-      <button class="s" id="svp" style="flex:1">تحديث الرمز</button>
-    </div>
+    <div class="row" style="align-items:center"><input id="np" type="password" dir="ltr" placeholder="كلمة المرور الجديدة (6 أحرف كحد أدنى)" style="flex:2"><button class="s" id="svp" style="flex:1">تحديث الرمز</button></div>
   </div>
-  
-  ${isAdmin() ? `
-  <div class="card" style="border-color:var(--accsoft)">
-    <h2>👑 إدارة الفريق (صلاحية المدير)</h2>
-    <div style="margin-bottom:20px">
-      ${S.members.map(m => `
-        <div class="bar" style="background:var(--col);padding:10px 14px;border-radius:8px;margin-bottom:8px">
-          <div>
-            <strong>${esc(m.name)}</strong>
-            <div class="m" dir="ltr">${esc(m.email)} ${m.role === 'admin' ? '⭐' : ''}</div>
-          </div>
-          ${same(m.email, S.me.email) ? '<i>(أنت)</i>' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}
-        </div>
-      `).join('')}
-    </div>
-    <h3 style="font-size:14px;margin-bottom:8px">إضافة عضو جديد:</h3>
-    <div class="row">
-      <input id="nn" placeholder="اسم العضو">
-      <input id="ne" dir="ltr" placeholder="البريد الإلكتروني">
-      <button class="p s" id="addm">إضافة للفريق</button>
-    </div>
-  </div>` : ''}
-  
+  ${isAdmin() ? `<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الفريق (صلاحية المدير)</h2><div style="margin-bottom:20px">${S.members.map(m => `<div class="bar" style="background:var(--col);padding:10px 14px;border-radius:8px;margin-bottom:8px"><div><strong>${esc(m.name)}</strong><div class="m" dir="ltr">${esc(m.email)} ${m.role === 'admin' ? '⭐' : ''}</div></div>${same(m.email, S.me.email) ? '<i>(أنت)</i>' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}</div><h3 style="font-size:14px;margin-bottom:8px">إضافة عضو جديد:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>` : ''}
   <div class="card" style="text-align:center;background:var(--latesoft);border-color:var(--latesoft)">
-    <button class="dng" id="out" style="width:100%;padding:12px;background:transparent">تسجيل الخروج من الحساب</button>
+    <button class="dng" id="out" style="width:100%;padding:12px;background:transparent">تسجيل الخروج من الحساب ومسح الذاكرة</button>
   </div>`;
 }
 
 function bindSettings() {
   $('out').onclick = logout;
-  $('push').onclick = enablePush;
+  $('push').onclick = async () => {
+    const pm = $('pm');
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'متصفحك الحالي لا يدعم الإشعارات.';
+      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تقم بمنح صلاحية الإشعارات. يرجى تفعيلها من إعدادات المتصفح/الجهاز.';
+      const reg = await navigator.serviceWorker.ready;
+      const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
+      pm.innerHTML = error ? '<b>خطأ في الحفظ:</b> ' + error.message : '<b style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح على هذا الجهاز.</b>';
+    } catch (e) { pm.textContent = 'حدث خطأ: ' + e.message; }
+  };
   $('svp').onclick = async () => { 
-    const v = $('np').value; 
-    if (v.length < 6) return alert('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.'); 
+    const v = $('np').value; if (v.length < 6) return alert('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.'); 
     $('svp').textContent = 'جاري التحديث...';
     const { error } = await sb.auth.updateUser({ password: v }); 
     alert(error ? error.message : 'تم تغيير كلمة المرور بنجاح.'); 
     $('np').value = '';$('svp').textContent = 'تحديث الرمز';
   };
-  
-  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { 
-    if (confirm('هل أنت متأكد من إزالة هذا العضو؟ المهام المسندة إليه ستبقى بدون مسؤول.')) 
-      run(sb.from('members').delete().eq('email', b.dataset.rm)); 
-  });
-  
-  if ($('addm'))$('addm').onclick = () => { 
-    const e = $('ne').value.trim(), n =$('nn').value.trim(); 
-    if (e && n) run(sb.from('members').insert({ email: e, name: n })); 
-  };
-}
-
-async function enablePush() {
-  const pm = $('pm');
-  try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'متصفحك الحالي لا يدعم الإشعارات.';
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return pm.textContent = 'لم تقم بمنح صلاحية الإشعارات. يرجى تفعيلها من إعدادات المتصفح/الجهاز.';
-    
-    const reg = await navigator.serviceWorker.ready;
-    const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-    
-    const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-    pm.innerHTML = error ? '<b>خطأ في الحفظ:</b> ' + error.message : '<b style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح على هذا الجهاز.</b>';
-  } catch (e) { pm.textContent = 'حدث خطأ: ' + e.message; }
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('هل أنت متأكد من إزالة هذا العضو؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+  if ($('addm'))$('addm').onclick = () => { const e = $('ne').value.trim(), n =$('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
