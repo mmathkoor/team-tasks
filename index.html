@@ -89,8 +89,18 @@ dialog .dact{margin-top:12px}
 <main id="app"><p style="padding:24px;color:#6b7280;font:15px sans-serif" dir="rtl">جارٍ التحميل...</p></main>
 <dialog id="dlg"></dialog>
 <script>
-window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && a.textContent.includes('جارٍ التحميل')) a.innerHTML = '<div style="padding:24px;font:15px sans-serif" dir="rtl">حدث خطأ في تحميل التطبيق: ' + e.message + '<br>أغلق التطبيق وافتحه من جديد.</div>'; });
-// ====== بيانات مشروعك ======
+// ==========================================
+// هذا الكود يفرمت الذاكرة المؤقتة التالفة فوراً لمرة واحدة لتجنب شاشة "جار التحميل"
+if (localStorage.getItem('app_version') !== 'v7') {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('app_version', 'v7');
+    window.location.reload(true);
+}
+// ==========================================
+
+window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && a.textContent.includes('جارٍ التحميل')) a.innerHTML = '<div style="padding:24px;font:15px sans-serif" dir="rtl">حدث خطأ في تحميل التطبيق: ' + e.message + '<br><br><button onclick="localStorage.clear(); location.reload();">إصلاح الواجهة</button></div>'; });
+
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
 const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
@@ -98,6 +108,7 @@ const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAj
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
 const AUTH = { s: JSON.parse(localStorage.getItem('sbs') || 'null') };
 const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); };
+
 async function tok() {
   const s = AUTH.s;
   if (!s) return KEY;
@@ -109,6 +120,7 @@ async function tok() {
     j.expires_at = j.expires_at || Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); return j.access_token;
   } catch (e) { return s.access_token; }
 }
+
 class Q {
   constructor(t) { this.t = t; this.m = 'GET'; this.p = new URLSearchParams(); this.b = null; this.pf = ''; }
   select(c) { this.p.set('select', c || '*'); return this; }
@@ -129,6 +141,7 @@ class Q {
     } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال' } }; }
   }
 }
+
 const sb = {
   from: t => new Q(t),
   auth: {
@@ -152,7 +165,6 @@ const sb = {
   }
 };
 
-/* ---------- الحالة والأدوات ---------- */
 const $ = id => document.getElementById(id);
 const $app = $('app'), dlg =$('dlg');
 const S = { me: null, members: [], meetings: [], tasks: [], done: [], props: [], votes: [], propsErr: false, view: 'board', filter: 'mine', meeting: '', col: 'todo', pf: 'open' };
@@ -172,13 +184,12 @@ const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
-/* ---------- الدخول والتحميل ---------- */
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) return loginView();
+  if (!session || !session.user || !session.user.email) return loginView();
   const email = session.user.email;
-  // التخزين السريع
-  try { const c = JSON.parse(localStorage.getItem('cache3') || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
+  
+  try { const c = JSON.parse(localStorage.getItem('cache_v7') || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
   
   const { data: members, error } = await sb.from('members').select('*');
   if (error) { if (!S.me) { $app.innerHTML = '<div class="card" id="login">تعذّر تحميل البيانات.<br><br><button id="again">إعادة المحاولة</button> <button id="out">خروج</button></div>'; $('again').onclick = init; $('out').onclick = logout; } return; }
@@ -206,13 +217,13 @@ async function load() {
   if (!p.error) S.props = p.data || [];
   if (!v.error) S.votes = v.data || [];
   
-  if (!m.error && !t.error) try { localStorage.setItem('cache3', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
+  if (!m.error && !t.error && S.me) try { localStorage.setItem('cache_v7', JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
 }
 
 function loginView() {
   $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول بإيميلك وكلمة المرور.</p>
-  <div class="row"><input id="em" type="email" placeholder="you@example.com" dir="ltr"></div>
+  <div class="row"><input id="em" type="email" placeholder="البريد الإلكتروني" dir="ltr"></div>
   <div class="row" style="margin-top:8px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr"><button class="p s" id="go">دخول</button></div><p class="m" id="msg"></p></div>`;
   const doLogin = async () => {
     $('msg').textContent = 'جارٍ الدخول...';
@@ -221,13 +232,14 @@ function loginView() {
   $('go').onclick = doLogin;
   $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
 }
-const logout = async () => { await sb.auth.signOut(); localStorage.removeItem('cache3'); location.reload(); };
+const logout = async () => { await sb.auth.signOut(); localStorage.clear(); location.reload(); };
 
-const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
 function render() {
-  const openProps = S.props.filter(p => !isClosed(p)).length;
+  if (!S.me) return;
+  const props = S.props || [];
+  const openProps = props.filter(p => !isClosed(p)).length;
   $app.innerHTML = `
-  <div class="top"><h1>مهام الفريق</h1><div class="row s"><span class="m">${esc(S.me?.name || '')}</span><button id="rf">تحديث</button></div></div>
+  <div class="top"><h1>مهام الفريق</h1><div class="row s"><span class="m">${esc(S.me.name)}</span><button id="rf">تحديث</button></div></div>
   <div class="nav">
     <button data-nv="board" class="${S.view === 'board' ? 'on' : ''}">لوحة المهام</button>
     <button data-nv="props" class="${S.view === 'props' ? 'on' : ''}">المقترحات${openProps ? `<span class="n">${openProps}</span>` : ''}</button>
@@ -239,7 +251,6 @@ function render() {
   if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
 }
 
-/* ---------- لوحة المهام ---------- */
 function dueInfo(t) {
   if (!t.due_on) return null;
   if (eff(t) === 'done') return { c: '', t: t.due_on };
@@ -252,11 +263,11 @@ function card(t) {
   const acts = (t.for_all ? ACT_ALL : ACT)[st];
   const dn = doneBy(t);
   
-  // زر مشاركة الواتس اب يظهر إذا تم تعيين المهمة لشخص معين ولم تنجز بعد
+  // زر الواتساب الجديد - يظهر اذا أسندت المهمة لشخص اخر ولم يتم إنجازها
   let waBtn = '';
   if (!t.for_all && t.assignee_email && S.me && !same(t.assignee_email, S.me.email) && st !== 'done') {
-    const msg = `مرحباً ${nm(t.assignee_email)}،\nأرسلت لك مهمة جديدة:\n*${t.title}*\n${t.due_on ? 'موعد التسليم: ' + t.due_on : ''}\nبالتوفيق!`;
-    waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="chip" style="background:#25d366;color:#fff;text-decoration:none;border:none">💬 إشعار واتساب</a>`;
+    const msg = `مرحباً ${nm(t.assignee_email)}،\nلديك مهمة جديدة مطلوب إنجازها:\n*${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nبالتوفيق!`;
+    waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="chip ok" style="text-decoration:none;border:none">💬 مشاركة واتساب</a>`;
   }
 
   return `<div class="tk ${st}" draggable="true" data-id="${t.id}">
@@ -344,7 +355,7 @@ function taskDialog(t, pre = {}) {
   <label>العنوان<input id="f_ti" value="${esc(x.title || '')}" placeholder="عنوان المهمة"></label>
   <label>تفاصيل (اختياري)<textarea id="f_no" rows="3">${esc(x.notes || '')}</textarea></label>
   <div class="row">
-    <label>المسؤول (اختيار الشريك للنقل)<select id="f_as"><option value="__all" ${asVal === '__all' ? 'selected' : ''}>👥 الكل</option><option value="" ${asVal === '' ? 'selected' : ''}>غير مُسند</option>${S.members.map(m => `<option value="${esc(m.email)}" ${same(m.email, asVal) ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+    <label>المسؤول (اختر شريك للنقل والإشعار)<select id="f_as"><option value="__all" ${asVal === '__all' ? 'selected' : ''}>👥 الكل</option><option value="" ${asVal === '' ? 'selected' : ''}>غير مُسند</option>${S.members.map(m => `<option value="${esc(m.email)}" ${same(m.email, asVal) ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
     <label>تاريخ الاستحقاق<input id="f_du" type="date" value="${esc(x.due_on || '')}"></label>
   </div>
   <div class="row" style="margin-top:10px">
@@ -370,7 +381,7 @@ function taskDialog(t, pre = {}) {
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
-/* ---------- المقترحات (دعم الخيارات والملاحظات) ---------- */
+/* ---------- التصويت المتعدد المطور ---------- */
 function parseOptions(p) {
   if (!p || !p.options) return ['موافق', 'معارض'];
   if (Array.isArray(p.options)) return p.options;
@@ -381,37 +392,35 @@ function parseOptions(p) {
 
 function propCard(p) {
   const opts = parseOptions(p);
-  const vts = S.votes.filter(x => x.proposal_id === p.id);
+  const vts = (S.votes || []).filter(x => x.proposal_id === p.id);
   const myVote = S.me ? vts.find(x => same(x.email, S.me.email)) : null;
   const total = vts.length;
   const can = S.me && (same(p.author_email, S.me.email) || isAdmin());
   const open = !isClosed(p);
 
-  // رسم النتائج
   let res = opts.map((opt, i) => {
-    // التوافق مع التصويت القديم (موافق=1، معارض=-1) أو التصويت الجديد option_idx
+    // التوافق مع التصويت القديم والجديد
     const ov = vts.filter(x => x.option_idx == i || (x.option_idx == null && x.value == (i===0?1:-1))); 
     const w = total ? ((ov.length / total) * 100).toFixed(0) : 0;
-    let vlist = ov.length ? `<div style="font-size:12px;color:var(--mute);margin-top:4px;padding:4px;background:var(--col);border-radius:4px">` + ov.map(x => `<b>${esc(nm(x.email))}</b>${x.note ? ` <i>(${esc(x.note)})</i>` : ''}`).join('<br>') + `</div>` : '';
-    return `<div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;font-size:13px"><span>${esc(opt)}</span><span>${ov.length} صوت (${w}%)</span></div>
-      <div class="tally" style="margin:4px 0"><i style="width:${w}%;background:var(--ok)"></i></div>
+    let vlist = ov.length ? `<div style="font-size:12px;color:var(--mute);margin-top:4px;padding:6px;background:var(--card);border-radius:6px;border:1px solid var(--line)">` + ov.map(x => `<b>${esc(nm(x.email))}</b>${x.note ? ` <i style="color:var(--ink)">(${esc(x.note)})</i>` : ''}`).join('<br>') + `</div>` : '';
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${esc(opt)}</span><span style="font-weight:600">${ov.length} صوت (${w}%)</span></div>
+      <div class="tally" style="margin:0 0 6px"><i style="width:${w}%;background:var(--acc)"></i></div>
       ${vlist}
     </div>`;
   }).join('');
 
-  // شريط التصويت
-  let act = open ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
-    <select id="v_opt_${p.id}" style="flex:1;min-width:120px"><option value="">-- اختر --</option>${opts.map((o, i) => `<option value="${i}" ${myVote && (myVote.option_idx == i \vert{}\vert{} (myVote.option_idx == null && myVote.value == (i===0?1:-1))) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
-    <input id="v_not_${p.id}" placeholder="اكتب ملاحظة (اختياري)..." value="${myVote && myVote.note ? esc(myVote.note) : ''}" style="flex:2;min-width:140px">
-    <button class="p" data-cast="${p.id}">${myVote ? 'تحديث التصويت' : 'تصويت'}</button>
+  let act = open ? `<div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);display:flex;gap:8px;flex-wrap:wrap">
+    <select id="v_opt_${p.id}" style="flex:1;min-width:120px"><option value="">-- اختر خياراً --</option>${opts.map((o, i) => `<option value="${i}" ${myVote && (myVote.option_idx == i \vert{}\vert{} (myVote.option_idx == null && myVote.value == (i===0?1:-1))) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
+    <input id="v_not_${p.id}" placeholder="اكتب ملاحظة ليروها (اختياري)..." value="${myVote && myVote.note ? esc(myVote.note) : ''}" style="flex:2;min-width:140px">
+    <button class="p" data-cast="${p.id}">${myVote ? 'تحديث التصويت' : 'إرسال التصويت'}</button>
   </div>` : '';
 
   return `<div class="card pr">
     <div class="bar"><span class="ttl">${esc(p.title)}</span><span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span></div>
     ${p.details ? `<div class="det">${esc(p.details)}</div>` : ''}
     <div class="m">بواسطة ${esc(nm(p.author_email))} · ${esc((p.created_at || '').slice(0, 10))}</div>
-    <div style="margin-top:14px">${res}</div>
+    <div style="margin-top:16px;background:var(--col);padding:14px;border-radius:10px">${res}</div>
     ${act}
     <div class="pa">
       <button data-totask="${p.id}">تحويل إلى مهمة</button>
@@ -421,9 +430,9 @@ function propCard(p) {
 }
 
 function propsView() {
-  if (S.propsErr) return '<div class="card"><b>تعذّر تحميل المقترحات.</b><p class="m">تأكد من إضافة عمود options في القاعدة.</p></div>';
-  const list = S.props.filter(p => S.pf === 'open' ? !isClosed(p) : isClosed(p));
-  return `<div class="tools"><div class="seg"><button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">مفتوحة للتصويت</button><button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button></div><span class="sp"></span><button class="p" id="np">+ مقترح جديد</button></div>
+  if (S.propsErr) return '<div class="card"><b>تعذّر تحميل المقترحات.</b><p class="m">تأكد من إضافة الأعمدة options, option_idx, note في القاعدة.</p></div>';
+  const list = (S.props || []).filter(p => S.pf === 'open' ? !isClosed(p) : isClosed(p));
+  return `<div class="tools"><div class="seg"><button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">مفتوحة للتصويت</button><button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button></div><span class="sp"></span><button class="p" id="np">+ طرح مقترح جديد</button></div>
   ${list.length ? list.map(propCard).join('') : `<div class="card empty">لا توجد مقترحات.</div>`}`;
 }
 
@@ -436,31 +445,37 @@ function bindProps() {
     btn.onclick = async () => {
       const pid = btn.dataset.cast;
       const optSelect = document.getElementById(`v_opt_${pid}`);
-      if (!optSelect || optSelect.value === '') return alert('الرجاء اختيار خيار من القائمة.');
+      if (!optSelect || optSelect.value === '') return alert('الرجاء اختيار خيار من القائمة أولاً.');
       const note = document.getElementById(`v_not_${pid}`).value.trim();
       btn.textContent = '...'; btn.disabled = true;
-      // نمرر القيمة value للتوافق مع التصويت القديم (1 أو -1)
-      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optSelect.value), value: (optSelect.value == 0 ? 1 : -1), note: note || null });
+      const valMap = optSelect.value == 0 ? 1 : -1; // للتوافق العكسي
+      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optSelect.value), value: valMap, note: note || null });
       if (error) alert('فشل الإرسال: ' + error.message);
       load();
     };
   });
   
   document.querySelectorAll('[data-ps]').forEach(b => b.onclick = () => run(sb.from('proposals').update({ status: b.dataset.to }).eq('id', b.dataset.ps)));
-  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('حذف المقترح؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
+  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('حذف المقترح نهائياً؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
   document.querySelectorAll('[data-totask]').forEach(b => b.onclick = () => { const p = S.props.find(x => x.id === b.dataset.totask); taskDialog(null, { title: p.title, notes: p.details || '', for_all: true }); });
 }
 
 function propDialog() {
-  dlg.innerHTML = `<h2>مقترح جديد متقدم</h2>
-  <label>العنوان<input id="p_ti" placeholder="مثلاً: تغيير الموعد"></label>
+  dlg.innerHTML = `<h2>مقترح تصويت جديد</h2>
+  <label>العنوان<input id="p_ti" placeholder="مثلاً: تغيير موعد الاجتماع"></label>
   <label>التفاصيل والمبررات<textarea id="p_de" rows="2"></textarea></label>
-  <label>الخيارات (اكتب كل خيار في سطر مستقل)<textarea id="p_op" rows="3" placeholder="الخيار الأول&#10;الخيار الثاني&#10;الخيار الثالث..."></textarea></label>
-  <div class="row dact"><button class="p" id="p_sv">نشر</button><button id="p_cx">إلغاء</button></div>`;
+  <label>خيارات التصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_op" rows="3" placeholder="الخيار الأول&#10;الخيار الثاني&#10;الخيار الثالث"></textarea></label>
+  <div class="row dact"><button class="p" id="p_sv">نشر للتصويت</button><button id="p_cx">إلغاء</button></div>`;
   $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
     const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
-    let rawOpts = $('p_op').value.split('\n').map(x => x.trim()).filter(Boolean);
+    let rawOpts = $('p_op').value.split('\\n').map(x => x.trim()).filter(Boolean); // fallback
+    if ($('p_op').value.includes('\\n') === false) {
+      rawOpts = $('p_op').value.split('\\n').length > 1 ? $('p_op').value.split('\\n') :$('p_op').value.split('\\n').map(x=>x.trim()).filter(Boolean);
+    }
+    // معالجة الاسطر بشكل سليم
+    rawOpts = $('p_op').value.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);
     if (rawOpts.length === 0) rawOpts = ['موافق', 'غير موافق'];
+    
     $('p_sv').disabled = true;
     const { error } = await sb.from('proposals').insert({ title, details: $('p_de').value.trim() || null, author_email: S.me.email, status: 'open', options: JSON.stringify(rawOpts) });
     if (error) return alert('خطأ: ' + error.message);
@@ -469,14 +484,14 @@ function propDialog() {
   dlg.showModal(); $('p_ti').focus();
 }
 
-/* ---------- الإعدادات والتنبيهات ---------- */
+/* ---------- الإعدادات وإشعارات الجوال ---------- */
 function settingsView() {
   return `
   <div class="card">
-    <h2>إشعارات الجوال (مهم للشركاء)</h2>
+    <h2>تفعيل إشعارات الجوال</h2>
     <p class="m">كيف تتأكد أنها شغالة عند الشركاء؟<br>
     1- <b>أندرويد:</b> يفتح الموقع ويضغط على الزر الأزرق تحت ويوافق.<br>
-    2- <b>آيفون:</b> يفتح الموقع من سفاري > مشاركة > <b>إضافة للشاشة الرئيسية</b>، ثم يفتح التطبيق من الأيقونة ويضغط تفعيل.</p>
+    2- <b>آيفون:</b> يفتح الموقع من سفاري > مشاركة > <b>إضافة للشاشة الرئيسية</b>، ثم يفتح التطبيق من الأيقونة ويضغط الزر.</p>
     <div class="row"><button class="p s" id="push">تفعيل الإشعارات الآن</button></div>
     <p class="m" id="pm"></p>
   </div>
@@ -490,21 +505,21 @@ function bindSettings() {
   $('push').onclick = async () => {
     const pm = $('pm');
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات.';
-      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح الصلاحية.';
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات. (تأكد من إضافة الموقع للشاشة الرئيسية في الآيفون).';
+      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'تم رفض الصلاحية. قم بتفعيلها من الإعدادات.';
       const reg = await navigator.serviceWorker.ready;
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? 'خطأ: ' + error.message : '<b style="color:var(--ok)">تم تفعيل الإشعارات بنجاح.</b>';
+      pm.innerHTML = error ? 'خطأ: ' + error.message : '<b style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح.</b>';
     } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
   };
   $('svp').onclick = async () => { 
     const v = $('np').value; if (v.length < 6) return alert('6 أحرف على الأقل'); 
     const { error } = await sb.auth.updateUser({ password: v }); 
-    alert(error ? error.message : 'تم تغيير كلمة المرور'); $('np').value = ''; 
+    alert(error ? error.message : 'تم تغيير كلمة المرور بنجاح.'); $('np').value = ''; 
   };
-  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
   if ($('addm'))$('addm').onclick = () => { const e = $('ne').value.trim(), n =$('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
 }
 
