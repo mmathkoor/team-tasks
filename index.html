@@ -90,14 +90,14 @@ dialog .dact{margin-top:12px}
 <dialog id="dlg"></dialog>
 <script>
 // ==========================================
-// أنظمة اصطياد أخطاء قاعدة البيانات الصامتة
+// أنظمة اصطياد الأخطاء لإظهار أي مشكلة لك بدلاً من الشاشة البيضاء
 // ==========================================
 function showErrorBox(msg) {
     const a = document.getElementById('app');
     if (a) a.innerHTML = `<div class="card" style="margin:40px auto;max-width:400px;border-color:var(--late);text-align:center">
         <h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال بقاعدة البيانات</h2>
         <p style="color:var(--mute);margin-bottom:20px;font-size:14px;">${msg}</p>
-        <button class="p" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="width:100%">مسح الجلسة وإعادة المحاولة 🔄</button>
+        <button class="p" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="width:100%">إصلاح الجلسة وإعادة المحاولة 🔄</button>
     </div>`;
 }
 window.addEventListener('error', e => showErrorBox(e.message));
@@ -142,7 +142,7 @@ class Q {
       const r = await fetch(API + '/rest/v1/' + this.t + '?' + this.p, { method: this.m, headers: h, body: this.b ? JSON.stringify(this.b) : undefined });
       if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || r.statusText } }; }
       return { data: mut ? null : await r.json(), error: null };
-    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بقاعدة البيانات. (تأكد من الإنترنت أو أن المشروع ليس Paused)' } }; }
+    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بقاعدة البيانات. (تأكد من الإنترنت أو أن المشروع ليس متوقفاً في Supabase)' } }; }
   }
 }
 
@@ -192,7 +192,7 @@ async function init() {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session || !session.user || !session.user.email) {
-      saveS(null); // مسح الجلسة المعلقة
+      saveS(null);
       return loginView();
     }
     const email = session.user.email;
@@ -230,7 +230,6 @@ async function load() {
   if (!t.error) S.tasks = t.data || [];
   if (!d.error) S.done = d.data || [];
   S.propsErr = !!(p.error || v.error);
-  if (S.propsErr) console.warn("Proposals Error:", p.error, v.error);
   if (!p.error) S.props = p.data || [];
   if (!v.error) S.votes = v.data || [];
   
@@ -482,7 +481,7 @@ function propDialog() {
   <div class="row dact"><button class="p" id="p_sv">نشر</button><button id="p_cx">إلغاء</button></div>`;
   $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
     const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
-    let rawOpts = $('p_op').value.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);
+    let rawOpts = $('p_op').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
     if (rawOpts.length === 0) rawOpts = ['موافق', 'غير موافق'];
     $('p_sv').disabled = true;
     const { error } = await sb.from('proposals').insert({ title, details: $('p_de').value.trim() || null, author_email: S.me.email, status: 'open', options: JSON.stringify(rawOpts) });
