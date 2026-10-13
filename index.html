@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#27408b">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/supabase.js"></script>
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#1c2433;--mute:#6b7280;--line:#e2e5ea;--acc:#27408b;--late:#b42318;--soon:#b7791f;--ok:#2f7d4f}
 @media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2a313d;--acc:#8fa8f0;--late:#f08a80;--soon:#e6b85c;--ok:#6cc58f}}
@@ -33,6 +33,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <body>
 <main id="app"></main>
 <script>
+window.addEventListener('error', e => { const a = document.getElementById('app'); if (a && !a.innerHTML.trim()) a.innerHTML = '<div style="padding:24px;font:15px sans-serif" dir="rtl">حدث خطأ في تحميل التطبيق: ' + e.message + '<br>أغلق التطبيق وافتحه من جديد.</div>'; });
 // ====== ضع بيانات مشروعك من Supabase > Project Settings > API ======
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
