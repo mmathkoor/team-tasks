@@ -65,12 +65,16 @@ async function load() {
   render();
 }
 function loginView() {
-  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">أدخل إيميلك وسيصلك رابط دخول.</p>
-  <div class="row"><input id="em" type="email" placeholder="you@example.com" dir="ltr"><button class="p s" id="go">إرسال الرابط</button></div><p class="m" id="msg"></p></div>`;
-  go.onclick = async () => {
-    const { error } = await sb.auth.signInWithOtp({ email: em.value.trim(), options: { emailRedirectTo: location.origin, shouldCreateUser: true } });
-    msg.textContent = error ? 'تعذّر الإرسال: ' + error.message : 'تم الإرسال، افتح بريدك.';
+  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول بإيميلك وكلمة المرور.</p>
+  <div class="row"><input id="em" type="email" placeholder="you@example.com" dir="ltr"></div>
+  <div class="row" style="margin-top:8px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr"><button class="p s" id="go">دخول</button></div><p class="m" id="msg"></p></div>`;
+  const doLogin = async () => {
+    msg.textContent = 'جارٍ الدخول...';
+    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value });
+    msg.textContent = error ? 'تعذّر الدخول: ' + error.message : '';
   };
+  go.onclick = doLogin;
+  pw.onkeydown = e => { if (e.key === 'Enter') doLogin(); };
 }
 const logout = async () => { await sb.auth.signOut(); location.reload(); };
 const isAdmin = () => S.me.role === 'admin';
@@ -99,6 +103,7 @@ function render() {
     ${canDel(t) ? `<button data-del="${t.id}" aria-label="حذف">حذف</button>` : ''}</div>`).join('') : '<p class="m">لا توجد مهام هنا.</p>'}</div>
   <div class="card"><h2>إشعارات الجوال</h2><div class="row"><button class="p s" id="push">تفعيل الإشعارات على هذا الجهاز</button></div><p class="m" id="pm">على الآيفون: افتح الموقع في سفاري ← مشاركة ← «إضافة إلى الشاشة الرئيسية»، ثم افتح التطبيق من الأيقونة وفعّل الإشعارات.</p></div>
   ${isAdmin() ? `<div class="card"><h2>الأعضاء (للأدمن)</h2>${S.members.map(m => `<div class="row" style="align-items:center;margin-bottom:6px"><span>${esc(m.name)} <span class="m" dir="ltr">${esc(m.email)}${m.role === 'admin' ? ' · أدمن' : ''}</span></span>${m.email === S.me.email ? '' : `<button class="s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}<div class="row"><input id="ne" dir="ltr" placeholder="إيميل العضو الجديد"><input id="nn" placeholder="الاسم"><button class="p s" id="addm">إضافة</button></div></div>` : ''}
+  <div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="كلمة مرور جديدة (6 أحرف على الأقل)"><button class="s" id="svp">حفظ</button></div></div>
   <div class="card"><h2>تنبيهات تيليجرام (اختياري)</h2><div class="row"><input id="tg" dir="ltr" placeholder="Chat ID" value="${esc(S.me.telegram_chat_id || '')}"><button class="s" id="svtg">حفظ</button></div></div>`;
   out.onclick = logout;
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
@@ -115,6 +120,7 @@ function render() {
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة هذا العضو؟ ستبقى مهامه بدون مسؤول.')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
   const am = document.getElementById('addm');
   if (am) am.onclick = () => { const e = document.getElementById('ne').value.trim(), n = document.getElementById('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
+  svp.onclick = async () => { if (np.value.length < 6) return alert('6 أحرف على الأقل'); const { error } = await sb.auth.updateUser({ password: np.value }); alert(error ? error.message : 'تم تغيير كلمة المرور'); np.value = ''; };
   svtg.onclick = async () => { await sb.from('members').update({ telegram_chat_id: tg.value.trim() || null }).eq('email', S.me.email); S.me.telegram_chat_id = tg.value.trim(); svtg.textContent = 'تم'; };
 }
 async function enablePush() {
