@@ -709,6 +709,28 @@ function propDialog() {
 }
 
 /* ---------- الإعدادات ---------- */
+async function autoEnablePush() {
+    if (!S.me || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+        // طلب الصلاحية تلقائياً إذا لم تكن ممنوحة
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        
+        const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+        
+        // إذا لم يكن هناك اشتراك، قم بإنشائه بصمت
+        if (!sub) {
+            sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+        }
+        
+        // تحديث قاعدة البيانات بصمت لضمان وصول الإشعارات دائماً
+        await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
+    } catch (e) { console.log('Auto push error:', e); }
+}
+  
 function settingsView() {
   let adminHtml = '';
   if (isAdmin()) {
@@ -779,7 +801,7 @@ function bindSettings() {
   
 $('push').onclick = async () => {
     const pm = $('pm');
-    pm.textContent = 'جاري مسح الذاكرة العميقة والتفعيل...';
+    pm.textContent = 'جاري التفعيل...';
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات.';
       if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح الصلاحية.';
