@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const webpush = require('web-push');
+const { member, isCron } = require('../lib/auth');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,6 +16,7 @@ webpush.setVapidDetails(
 );
 
 module.exports = async (req, res) => {
+  if (!isCron(req)) { const me = await member(req); if (!me || me.role !== 'admin') return res.status(401).json({ error: 'unauthorized — اضبط CRON_SECRET في Vercel أو سجّل كأدمن' }); }
   if (!publicVapidKey || !privateVapidKey) {
       return res.status(500).json({ error: "VAPID keys are missing in Vercel settings" });
   }
@@ -45,6 +47,7 @@ module.exports = async (req, res) => {
           body: `المهمة: ${task.title}\nتاريخ التسليم: ${task.due_on}`,
           icon: '/icon-192.png',
           task_id: task.id,
+          task_title: task.title,
           for_all: !!task.for_all,
           actions: [{ action: 'done', title: 'إنجاز ✅' }, { action: 'open', title: 'عرض التفاصيل 🔍' }]
         });
