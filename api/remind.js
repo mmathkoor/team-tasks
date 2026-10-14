@@ -1,40 +1,73 @@
-// يعمل يومياً 9 صباحاً بتوقيت اليمن (06:00 UTC) عبر Vercel Cron
+const { createClient } = require('@supabase/supabase-js');
 const webpush = require('web-push');
-const { VAPID_PUBLIC, VAPID_PRIVATE } = process.env;
-const { SUPABASE_URL, SUPABASE_SERVICE_KEY, TELEGRAM_BOT_TOKEN, RESEND_API_KEY, MAIL_FROM, CRON_SECRET, MEETING_DAY } = process.env;
-const H = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
-const get = async (p) => (await fetch(`${SUPABASE_URL}/rest/v1/${p}`, { headers: H })).json();
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+webpush.setVapidDetails(
+  'mailto:admin@matjark.com',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
 
 module.exports = async (req, res) => {
-  if (CRON_SECRET && req.headers.authorization !== `Bearer ${CRON_SECRET}`) return res.status(401).end();
-  if (VAPID_PUBLIC && VAPID_PRIVATE) webpush.setVapidDetails('mailto:' + (MAIL_FROM || 'admin@example.com'), VAPID_PUBLIC, VAPID_PRIVATE);
-  const subs = await get('push_subs?select=*');
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-  const isMeetingDay = String(new Date().getUTCDay()) === (MEETING_DAY ?? '');
-  const members = await get('members?select=*');
-  const open0 = await get('tasks?status=neq.done&select=*&order=due_on');
-  const done = await get('task_done?select=*');
-  const isDone = (t, email) => done.some(d => d.task_id === t.id && d.email === email);
-  // مهمة "الكل" تبقى مفتوحة حتى ينجزها جميع الأعضاء
-  const open = open0.filter(t => !t.for_all || members.some(m => !isDone(t, m.email)));
-  let sent = 0;
-  for (const m of members) {
-    const mine = open.filter(t => t.for_all ? !isDone(t, m.email) : t.assignee_email === m.email);
-    // اليوم المحدد للاجتماع: ملخص بكل المهام المفتوحة، وغيره: فقط المتأخر وما يستحق اليوم/غداً
-    const list = isMeetingDay ? open : mine.filter(t => t.due_on && t.due_on <= tomorrow);
-    if (!list.length) continue;
-    const line = t => `${t.due_on && t.due_on < today ? '🔴' : '🟡'} ${t.title}${t.due_on ? ' (' + t.due_on + ')' : ''}${isMeetingDay ? ' — ' + (t.for_all ? 'الكل' : (members.find(x => x.email === t.assignee_email)?.name || '')) : ''}`;
-    const text = `مرحباً ${m.name}\n${isMeetingDay ? 'ملخص المهام المفتوحة قبل الاجتماع:' : 'مهامك القادمة والمتأخرة:'}\n` + list.map(line).join('\n');
-    if (TELEGRAM_BOT_TOKEN && m.telegram_chat_id)
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: m.telegram_chat_id, text }) });
-    if (VAPID_PUBLIC && VAPID_PRIVATE)
-      for (const x of subs.filter(x => x.email === m.email))
-        await webpush.sendNotification(x.sub, JSON.stringify({ title: 'مهام الفريق', body: text }))
-          .catch(async err => { if ([404, 410].includes(err.statusCode)) await fetch(SUPABASE_URL + '/rest/v1/push_subs?endpoint=eq.' + encodeURIComponent(x.endpoint), { method: 'DELETE', headers: H }); });
-    if (RESEND_API_KEY)
-      await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: MAIL_FROM, to: m.email, subject: 'تذكير بالمهام', text }) });
-    sent++;
+  try {
+    // تحديد التاريخ بعد 3 أيام من اليوم
+    const today = new Date();
+    const targetDate = new Date();
+    targetDate.setDate(today.getDate() + 3);
+    const dateString = targetDate.toISOString().slice(0, 10);
+
+    // 1. جلب اشتراكات الجوالات
+    const { data: subs } = await supabase.from('push_subs').select('*');
+    if (!subs || subs.length === 0) return res.status(200).json({ message: 'لا توجد أجهزة مسجلة' });
+
+    // 2. جلب المهام غير المنجزة والتي تاريخها خلال 3 أيام أو أقل
+    const { data: tasks } = await supabase.from('tasks')
+      .select('*')
+      .neq('status', 'done')
+      .lte('due_on', dateString);
+
+    // 3. جلب المقترحات المفتوحة
+    const { data: proposals } = await supabase.from('proposals').select('*').eq('status', 'open');
+
+    let sendPromises = [];
+
+    // إرسال تذكيرات المهام
+    if (tasks) {
+      tasks.forEach(task => {
+        const payload = JSON.stringify({
+          title: '⏳ تذكير بمهمة تقترب',
+          body: `المهمة: ${task.title}\nتاريخ التسليم: ${task.due_on}`,
+          icon: '/icon-192.png'
+        });
+
+        subs.forEach(subRow => {
+          // إرسال للشخص المسؤول، أو للكل إذا كانت مهمة جماعية
+          if (task.for_all || task.assignee_email === subRow.email) {
+            sendPromises.push(webpush.sendNotification(subRow.sub, payload).catch(e => console.error(e)));
+          }
+        });
+      });
+    }
+
+    // إرسال تذكيرات التصويت
+    if (proposals) {
+      proposals.forEach(prop => {
+        const payload = JSON.stringify({
+          title: '📊 تذكير بالتصويت',
+          body: `يوجد مقترح مفتوح للتصويت: ${prop.title}`,
+          icon: '/icon-192.png'
+        });
+        subs.forEach(subRow => {
+          sendPromises.push(webpush.sendNotification(subRow.sub, payload).catch(e => console.error(e)));
+        });
+      });
+    }
+
+    await Promise.all(sendPromises);
+    return res.status(200).json({ success: true, message: 'تم إرسال التذكيرات بنجاح' });
+    
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-  res.status(200).json({ sent });
 };
