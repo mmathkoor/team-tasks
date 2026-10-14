@@ -9,32 +9,14 @@
 <meta name="theme-color" content="#4f46e5">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <style>
-/* === متغيرات الألوان والتصميم العصري جداً === */
-:root {
-  --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --mute: #64748b; --line: #e2e8f0;
-  --acc: #4f46e5; --acc-hover: #4338ca; --accsoft: #e0e7ff;
-  --late: #ef4444; --latesoft: #fee2e2; --soon: #f59e0b; --soonsoft: #fef3c7;
-  --ok: #10b981; --oksoft: #d1fae5; --col: #f1f5f9;
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --rad: 14px;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f172a; --card: #1e293b; --ink: #f8fafc; --mute: #94a3b8; --line: #334155;
-    --acc: #6366f1; --acc-hover: #818cf8; --accsoft: #312e81;
-    --late: #f87171; --latesoft: #7f1d1d; --soon: #fbbf24; --soonsoft: #78350f;
-    --ok: #34d399; --oksoft: #064e3b; --col: #0f172a;
-    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3); --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.4);
-  }
-}
-
+/* نفس التنسيقات السابقة تماماً */
+:root { --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --mute: #64748b; --line: #e2e8f0; --acc: #4f46e5; --acc-hover: #4338ca; --accsoft: #e0e7ff; --late: #ef4444; --latesoft: #fee2e2; --soon: #f59e0b; --soonsoft: #fef3c7; --ok: #10b981; --oksoft: #d1fae5; --col: #f1f5f9; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); --rad: 14px; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --ink: #f8fafc; --mute: #94a3b8; --line: #334155; --acc: #6366f1; --acc-hover: #818cf8; --accsoft: #312e81; --late: #f87171; --latesoft: #7f1d1d; --soon: #fbbf24; --soonsoft: #78350f; --ok: #34d399; --oksoft: #064e3b; --col: #0f172a; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3); --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.4); } }
 * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; padding-bottom: env(safe-area-inset-bottom); }
 main { max-width: 1200px; margin: auto; padding: 20px 16px 60px; }
 h1 { font-size: 24px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
 h2 { font-size: 16px; margin: 0 0 12px; color: var(--ink); font-weight: 700; }
-
 input, select, textarea, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 0; transition: all 0.2s ease; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--accsoft); }
 button { cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -46,7 +28,6 @@ button.p:hover { background: var(--acc-hover); }
 @media (prefers-color-scheme: dark) { button.p { color: #fff; } }
 button.dng { color: var(--late); border-color: var(--latesoft); background: var(--latesoft); }
 button.dng:hover { background: var(--late); color: #fff; }
-
 .m { font-size: 13.5px; color: var(--mute); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); transition: box-shadow 0.3s; }
 .card:hover { box-shadow: var(--shadow-hover); }
@@ -54,33 +35,28 @@ button.dng:hover { background: var(--late); color: #fff; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
 .row > * { flex: 1 1 150px; }
 .row .s { flex: 0 0 auto; }
-
 .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0 20px; }
 .nav { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; background: rgba(var(--bg), 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
 .nav button { flex: 1; border: none; background: transparent; color: var(--mute); padding: 12px 8px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: none; }
 .nav button:hover { background: var(--col); color: var(--ink); transform: none; }
 .nav button.on { background: var(--accsoft); color: var(--acc); box-shadow: inset 0 -3px 0 var(--acc); border-radius: 8px 8px 0 0; }
 .nav .n { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; margin-inline-start: 6px; border-radius: 11px; background: var(--late); color: #fff; font-size: 12px; }
-
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 16px; box-shadow: var(--shadow); text-align: center; }
 .stat b { display: block; font-size: 28px; line-height: 1.2; font-weight: 800; margin-bottom: 4px; }
 .stat span { font-size: 13px; color: var(--mute); font-weight: 600; }
 .stat.late b { color: var(--late); } .stat.soon b { color: var(--soon); }
-
 .tools { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--card); padding: 2px; }
 .seg button { border: none; border-radius: 6px; background: transparent; padding: 8px 16px; color: var(--mute); margin: 0; box-shadow: none; }
 .seg button.on { background: var(--acc); color: #fff; box-shadow: var(--shadow); }
 .tools .sp { flex: 1; }
-
 .ctabs { display: none; }
 .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
 .col { background: var(--col); border-radius: var(--rad); padding: 14px; min-height: 200px; border: 2px dashed transparent; transition: all 0.2s; }
 .col.over { border-color: var(--acc); background: var(--accsoft); }
 .col > .ch { display: flex; justify-content: space-between; align-items: center; margin: 0 4px 16px; font-weight: 700; font-size: 16px; }
 .col > .ch i { font-style: normal; font-weight: 700; font-size: 12px; background: var(--card); border-radius: 12px; padding: 2px 10px; color: var(--mute); box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); }
-
 .tk { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: grab; box-shadow: 0 1px 3px rgb(0 0 0 / 0.05); transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .tk:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); border-color: var(--accsoft); }
 .tk:active { cursor: grabbing; transform: translateY(0); }
@@ -96,18 +72,14 @@ button.dng:hover { background: var(--late); color: #fff; }
 .chip.ok { background: var(--oksoft); color: var(--ok); }
 .wa-btn { display: inline-flex; align-items: center; gap: 4px; background: #25D366; color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 12px; text-decoration: none; font-weight: 700; border: none; transition: transform 0.2s; cursor: pointer; }
 .wa-btn:hover { background: #1ebd57; transform: scale(1.05); }
-
-/* Workflow Path UI */
 .wf-list { margin-top: 10px; border-inline-start: 2px solid var(--accsoft); padding-inline-start: 12px; display: flex; flex-direction: column; gap: 8px; }
 .wf-item { background: var(--col); padding: 10px 12px; border-radius: 8px; font-size: 13px; }
 .wf-meta { color: var(--mute); margin-bottom: 4px; font-size: 12px; display: flex; align-items: center; gap: 4px; }
 .wf-msg { color: var(--ink); font-weight: 600; }
-
 .acts { display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--col); padding-top: 14px; }
 .acts button { flex: 1; font-size: 13px; padding: 8px; background: var(--col); border: none; border-radius: 6px; }
 .acts button:hover { background: var(--accsoft); color: var(--acc); }
 .empty { font-size: 14px; color: var(--mute); text-align: center; padding: 30px 0; font-weight: 600; }
-
 .pr .ttl { font-weight: 800; font-size: 18px; line-height: 1.3; }
 .pr .det { white-space: pre-wrap; margin: 12px 0; font-size: 14px; color: var(--mute); background: var(--col); padding: 12px; border-radius: 8px; }
 .tally { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--line); margin: 6px 0 10px; }
@@ -115,7 +87,6 @@ button.dng:hover { background: var(--late); color: #fff; }
 .voters-box { font-size: 12px; color: var(--mute); background: var(--col); padding: 8px 10px; border-radius: 6px; margin-top: 6px; line-height: 1.8; }
 .pa { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .pa button { font-size: 13.5px; padding: 8px 14px; }
-
 dialog { border: none; border-radius: var(--rad); background: var(--card); color: var(--ink); padding: 24px; width: min(540px, 92vw); box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25); font: inherit; }
 dialog::backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
 dialog h2 { font-size: 20px; margin-bottom: 20px; font-weight: 800; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
@@ -124,11 +95,9 @@ dialog label > * { display: block; width: 100%; margin-top: 8px; font-weight: 40
 dialog .row label { margin-bottom: 0; }
 dialog .dact { margin-top: 24px; gap: 12px; justify-content: flex-end; }
 dialog .dact button { min-width: 110px; padding: 10px; }
-
 .multi-options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .multi-options label { font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
 .multi-options input { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--acc); }
-
 #login { max-width: 400px; margin: 15vh auto; text-align: center; }
 #login h1 { margin-bottom: 8px; font-size: 28px; }
 @media (max-width: 768px) {
@@ -146,12 +115,9 @@ dialog .dact button { min-width: 110px; padding: 10px; }
 </style>
 </head>
 <body>
-<main id="app"><p style="padding:40px;text-align:center;color:var(--mute);font-weight:600;" dir="rtl">جارٍ تهيئة النظام الذكي...</p></main>
+<main id="app"><p style="padding:40px;text-align:center;color:var(--mute);font-weight:600;" dir="rtl">جارٍ تهيئة النظام...</p></main>
 <dialog id="dlg"></dialog>
 <script>
-// ==========================================
-// أنظمة اصطياد الأخطاء وضمان الاستقرار
-// ==========================================
 function showErrorBox(msg) {
     const a = document.getElementById('app');
     if (a) a.innerHTML = '<div class="card" style="margin:40px auto;max-width:400px;text-align:center">' +
@@ -166,7 +132,7 @@ window.addEventListener('unhandledrejection', e => showErrorBox(e.reason?.messag
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
 const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
-const CACHE_KEY = 'cache_v9';
+const CACHE_KEY = 'cache_v10';
 
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
 let AUTH = { s: null };
@@ -240,8 +206,6 @@ const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجز
 const ACT = { todo: [['doing', 'بدء التنفيذ'], ['done', 'إنجاز ✓']], doing: [['done', 'إنجاز ✓'], ['todo', 'إيقاف']], done: [['doing', 'إعادة فتح']] };
 const ACT_ALL = { todo: [['done', 'إنجاز المهمة ✓']], done: [['todo', 'تراجع']] };
 const PST = { open: 'قيد التصويت', accepted: 'مُعتمد', rejected: 'مرفوض', closed: 'مغلق' };
-
-// السطر الذي كان مفقوداً وسبب الخطأ:
 const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
 
 const nm = e => S.members.find(m => same(m.email, e))?.name || 'غير مُسند';
@@ -333,13 +297,11 @@ function render() {
   if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
 }
 
-/* ---------- نظام الورك فلو (المسار) ---------- */
 function renderNotesAndWorkflow(notesStr) {
     if (!notesStr) return '';
     const lines = notesStr.split('\n');
     let mainNotes = [];
     let wfHistory = [];
-    
     lines.forEach(l => {
         if(l.startsWith('[WF_HANDOFF]')) {
             let p = l.replace('[WF_HANDOFF]', '').split('||');
@@ -348,7 +310,6 @@ function renderNotesAndWorkflow(notesStr) {
             mainNotes.push(l);
         }
     });
-    
     let html = '';
     let mainTxt = mainNotes.join('\n').trim();
     if(mainTxt) html += '<div class="nt">' + esc(mainTxt) + '</div>';
@@ -371,7 +332,7 @@ function card(t) {
   
   let waBtn = '';
   if (!t.for_all && t.assignee_email && S.me && t.assignee_email) {
-    const msg = 'مرحباً ' + nm(t.assignee_email) + '،\nتذكير بمهمة: *' + t.title + '*\n' + (t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : '') + '\nنرجو المتابعة والتحديث. 🚀';
+    const msg = 'مرحباً ' + nm(t.assignee_email) + '،\nتذكير بمهمة: *' + t.title + '*\n' + (t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : '') + '\nنرجو المتابعة. 🚀';
     waBtn = '<a href="https://wa.me/?text=' + encodeURIComponent(msg) + '" target="_blank" class="wa-btn" title="تذكير عبر الواتساب">💬</a>';
   }
 
@@ -434,10 +395,7 @@ function bindBoard() {
   if ($('nmt')) $('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
   
   document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
-  
-  document.querySelectorAll('[data-hf]').forEach(b => {
-      b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); };
-  });
+  document.querySelectorAll('[data-hf]').forEach(b => { b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); }; });
 
   document.querySelectorAll('.tk').forEach(el => {
     el.onclick = () => taskDialog(S.tasks.find(t => t.id === el.dataset.id));
@@ -451,7 +409,6 @@ function bindBoard() {
   });
 }
 
-// نافذة الإحالة
 function handoffDialog(tId) {
     const t = S.tasks.find(x => x.id === tId);
     if(!t) return;
@@ -476,6 +433,14 @@ function handoffDialog(tId) {
         $('hf_sv').disabled = true; $('hf_sv').textContent = 'جاري الإحالة...';
         const { error } = await sb.from('tasks').update({ assignee_email: to, notes: newNotes, status: 'todo' }).eq('id', t.id);
         if(error) { alert('خطأ: ' + error.message); $('hf_sv').disabled = false; return; }
+        
+        // إشعار السيرفر بوجود مهمة جديدة أُحيلت لشخص
+        fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: t.title, assignee_email: to, for_all: false, sender_name: S.me.name })
+        }).catch(e => console.error(e));
+
         dlg.close(); load();
     };
     dlg.showModal();
@@ -534,12 +499,23 @@ function taskDialog(t, pre = {}) {
   $('f_sv').onclick = async () => {
     const title = $('f_ti').value.trim(); if (!title) return $('f_ti').focus();
     const all = $('f_as').value === '__all';
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
+    const assignee = $('f_as').value;
+    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
     if (!edit) row.created_by = S.me.email;
     
     $('f_sv').disabled = true; $('f_sv').textContent = '...';
     const { error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row);
     if (error) { alert('خطأ: ' + error.message); $('f_sv').disabled = false; $('f_sv').textContent = 'حفظ'; return; }
+    
+    // إرسال إشعار فوري عند الإضافة (ليست تعديلاً)
+    if (!edit && (all || assignee)) {
+        fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: row.for_all, sender_name: S.me.name })
+        }).catch(e => console.error(e));
+    }
+
     dlg.close(); load();
   };
   if (edit && canDel(t)) $('f_dl').onclick = () => { if (confirm('هل أنت متأكد من حذف المهمة؟')) { dlg.close(); run(sb.from('tasks').delete().eq('id', t.id)); } };
@@ -547,7 +523,6 @@ function taskDialog(t, pre = {}) {
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
-/* ---------- التصويت (مفرد ومتعدد) ---------- */
 function parseOptions(p) {
   let arr = ['موافق', 'معارض'];
   if (p && p.options) {
@@ -741,7 +716,11 @@ function settingsView() {
         let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
         return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span></div>' + rmBtn + '</div>';
     }).join('');
-    adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء</h2>' + memList + '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
+    
+    adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء والتنبيهات</h2>' +
+      '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon)">إرسال تذكير شامل للفريق 🔔</button>' +
+      memList + 
+      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
   }
 
   return '<div class="card" style="border-color:var(--oksoft)">' +
@@ -757,8 +736,20 @@ function settingsView() {
 
 function bindSettings() {
   $('out').onclick = logout;
+
+  if ($('admin_remind')) {
+    $('admin_remind').onclick = async () => {
+        $('admin_remind').textContent = 'جاري إرسال التذكيرات...';
+        try {
+            await fetch('/api/remind');
+            alert('تم إرسال تذكير بالمهام المتأخرة والتصويتات المفتوحة لجميع أعضاء الفريق!');
+        } catch(e) {
+            alert('حدث خطأ في الإرسال.');
+        }
+        $('admin_remind').textContent = 'إرسال تذكير شامل للفريق 🔔';
+    };
+  }
   
-  // 1. زر تفعيل وربط الجهاز بقاعدة البيانات
   $('push').onclick = async () => {
     const pm = $('pm');
     try {
@@ -768,25 +759,17 @@ function bindSettings() {
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">تم تفعيل الإشعارات بنجاح. يمكنك التجربة الآن.</span>';
+      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">تم تفعيل الإشعارات بنجاح.</span>';
     } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
   };
 
-  // 2. زر إرسال إشعار تجريبي فوري
   $('test_push').onclick = async () => {
     if (!('serviceWorker' in navigator)) return alert('المتصفح لا يدعم الإشعارات.');
     if (Notification.permission !== 'granted') return alert('يجب تفعيل الإشعارات أولاً من الزر الأخضر.');
     const reg = await navigator.serviceWorker.ready;
-    
-    alert('ممتاز! سيصلك الإشعار خلال 3 ثوانٍ.. اخرج من التطبيق الآن للشاشة الرئيسية لترى الإشعار وهو يصلك.');
-    
+    alert('سيصلك الإشعار خلال 3 ثوانٍ.. اخرج من التطبيق الآن للشاشة الرئيسية لترى الإشعار.');
     setTimeout(() => {
-      reg.showNotification('🔔 تذكير تجريبي', {
-        body: 'هذا إشعار حقيقي من تطبيق المهام! النظام يعمل بنجاح.',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        vibrate: [200, 100, 200]
-      });
+      reg.showNotification('🔔 تذكير تجريبي', { body: 'هذا إشعار حقيقي! النظام يعمل بنجاح.', icon: '/icon-192.png', badge: '/icon-192.png', vibrate: [200, 100, 200] });
     }, 3000);
   };
 
