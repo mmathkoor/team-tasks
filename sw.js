@@ -1,4 +1,4 @@
-const C = 'tasks-v3';
+const C = 'tasks-v4';
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
 const kget = k => idb().then(d => new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(undefined); })).catch(() => undefined);
 const kset = (k, v) => idb().then(d => new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = () => ok(); })).catch(() => {});
@@ -30,7 +30,7 @@ async function auth() {
 const send = (a, it) => fetch(a.cfg.url + it.path, { method: it.m, headers: Object.assign({ apikey: a.cfg.key, Authorization: 'Bearer ' + a.t, 'Content-Type': 'application/json' }, it.pf ? { Prefer: it.pf } : {}), body: it.b || undefined });
 const tell = () => clients.matchAll({ type: 'window' }).then(l => l.forEach(c => c.postMessage('synced')));
 let fl = null;
-const flushOnce = () => fl || (fl = flush().finally(() => { fl = null; }));
+const flushOnce = () => fl || (fl = (self.navigator.locks ? self.navigator.locks.request('flush-q', flush) : flush()).finally(() => { fl = null; }));
 async function flush() {
   const q = (await kget('q')) || [];
   if (!q.length) return;
@@ -51,8 +51,8 @@ self.addEventListener('push', e => {
   if (!e.data) return;
   const d = e.data.json();
   e.waitUntil(self.registration.showNotification(d.title, {
-    body: d.body, icon: d.icon || '/icon-192.png', badge: '/icon-192.png', vibrate: [200, 100, 200],
-    actions: d.actions || [], data: { url: '/', task_id: d.task_id, for_all: d.for_all }
+    body: d.body, icon: d.icon || '/icon-192.png', badge: '/badge-96.png', vibrate: [200, 100, 200],
+    actions: d.actions || [], data: { url: '/', task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
   }));
 });
 async function markDone(d) {
@@ -61,15 +61,16 @@ async function markDone(d) {
   const email = a.s.user && a.s.user.email, name = (a.cfg.name || email);
   const it = d.for_all
     ? { i: Date.now() + '' + Math.random(), path: '/rest/v1/task_done', m: 'POST', pf: 'resolution=merge-duplicates,return=minimal', b: JSON.stringify({ task_id: d.task_id, email }) }
-    : { i: Date.now() + '' + Math.random(), path: '/rest/v1/tasks?id=eq.' + d.task_id, m: 'PATCH', pf: 'return=minimal', b: JSON.stringify({ status: 'done' }) };
-  let ok = false;
-  try { ok = (await send(a, it)).ok; } catch (e) {}
+    : { i: Date.now() + '' + Math.random(), path: '/rest/v1/tasks?id=eq.' + d.task_id, m: 'PATCH', pf: 'return=representation', b: JSON.stringify({ status: 'done' }) };
+  let ok = false, adv = null;
+  try { const r = await send(a, it); ok = r.ok; if (ok && !d.for_all) { try { adv = (await r.json())[0]; } catch (e) {} } } catch (e) {}
   if (!ok) { await kset('q', ((await kget('q')) || []).concat(it)); if (self.registration.sync) await self.registration.sync.register('flush-q').catch(() => {}); }
   else {
-    fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '✅ إنجاز جديد', body: 'أنجز المهمة من الإشعار', to_admins: true, is_custom: true, sender_name: name }) }).catch(() => {});
+    fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.t }, body: JSON.stringify({ title: '✅ إنجاز جديد', body: 'أنجز المهمة «' + (d.task_title || '') + '»', to_admins: true, is_custom: true }) }).catch(() => {});
+    if (adv && adv.status === 'todo' && adv.assignee_email) { const nt = adv.flow && adv.flow[adv.flow_step] && adv.flow[adv.flow_step].note; fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.t }, body: JSON.stringify({ title: '🔗 دورك الآن في المسار', body: '«' + (d.task_title || '') + '»' + (nt ? ' — ' + nt : ''), assignee_email: adv.assignee_email, for_all: false, is_custom: true, task_id: d.task_id, task_title: d.task_title }) }).catch(() => {}); }
     await tell();
   }
-  await self.registration.showNotification(ok ? 'تم إنجاز المهمة ✅' : 'سيتم تسجيل الإنجاز عند عودة الاتصال', { icon: '/icon-192.png', tag: 'done-' + d.task_id });
+  await self.registration.showNotification(ok ? (adv && adv.status === 'todo' ? 'تم! انتقلت المهمة للمرحلة التالية ✅' : 'تم إنجاز المهمة ✅') : 'سيتم تسجيل الإنجاز عند عودة الاتصال', { icon: '/icon-192.png', tag: 'done-' + d.task_id });
 }
 self.addEventListener('notificationclick', e => {
   e.notification.close();
