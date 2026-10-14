@@ -3,110 +3,170 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>مهام الفريق</title>
+<title>مهام الفريق - نظام الإدارة المتقدم</title>
 <link rel="preconnect" href="https://wrmpyywosathqxrjuicx.supabase.co" crossorigin>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#27408b">
+<meta name="theme-color" content="#4f46e5">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <style>
-:root{--bg:#f3f4f6;--card:#fff;--ink:#1c2433;--mute:#6b7280;--line:#e2e5ea;--acc:#27408b;--accsoft:#e8edf9;--late:#b42318;--latesoft:#fdecea;--soon:#b7791f;--soonsoft:#fdf3dc;--ok:#2f7d4f;--oksoft:#e6f4ec;--col:#e9ebef}
-@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2a313d;--acc:#8fa8f0;--accsoft:#232c45;--late:#f08a80;--latesoft:#3a2222;--soon:#e6b85c;--soonsoft:#3a3220;--ok:#6cc58f;--oksoft:#1f3326;--col:#171b23}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 'Segoe UI',Tahoma,system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-main{max-width:1080px;margin:auto;padding:12px 14px 40px}
-h1{font-size:20px;margin:0;font-weight:600}h2{font-size:15px;margin:0 0 8px;color:var(--mute);font-weight:600}
-input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:0}
-button{cursor:pointer}button:hover{border-color:var(--acc)}
-button.p{background:var(--acc);border-color:var(--acc);color:#fff}
-@media (prefers-color-scheme:dark){button.p{color:#12151c}}
-button.dng{color:var(--late)}
-:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.m{font-size:13px;color:var(--mute)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}.row .s{flex:0 0 auto}
-.top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0 10px}
-.top .row{align-items:center}
-.nav{position:sticky;top:0;z-index:5;display:flex;gap:4px;background:var(--bg);padding:6px 0 10px;border-bottom:1px solid var(--line);margin-bottom:14px}
-.nav button{flex:1;border:0;background:transparent;color:var(--mute);padding:9px 6px;border-radius:10px;font-weight:600}
-.nav button.on{background:var(--accsoft);color:var(--acc)}
-.nav .n{display:inline-block;min-width:20px;padding:0 6px;margin-inline-start:4px;border-radius:10px;background:var(--acc);color:#fff;font-size:12px;line-height:20px}
-@media (prefers-color-scheme:dark){.nav .n{color:#12151c}}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
-.stat b{display:block;font-size:22px;line-height:1.3}.stat span{font-size:12px;color:var(--mute)}
-.stat.late b{color:var(--late)}.stat.soon b{color:var(--soon)}
-.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
-.seg button{border:0;border-radius:0;background:transparent}.seg button.on{background:var(--acc);color:#fff}
-@media (prefers-color-scheme:dark){.seg button.on{color:#12151c}}
-.tools .sp{flex:1}
-.ctabs{display:none}
-.board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start}
-.col{background:var(--col);border-radius:14px;padding:10px;min-height:140px;border:2px solid transparent}
-.col.over{border-color:var(--acc)}
-.col>.ch{display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px;font-weight:600;font-size:14px}
-.col>.ch i{font-style:normal;font-weight:400;font-size:12px;background:var(--card);border-radius:10px;padding:0 9px;color:var(--mute)}
-.col[data-st=todo]>.ch{color:var(--mute)}.col[data-st=doing]>.ch{color:var(--acc)}.col[data-st=done]>.ch{color:var(--ok)}
-.tk{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
-.tk:hover{border-color:var(--acc)}.tk.drag{opacity:.4}
-.tk .tt{font-weight:600;line-height:1.5}.tk.done .tt{text-decoration:line-through;color:var(--mute)}
-.tk .nt{font-size:13px;color:var(--mute);margin-top:2px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.chip{font-size:12px;border-radius:20px;padding:0 9px;background:var(--col);color:var(--mute);line-height:22px}
-.chip.all{background:var(--accsoft);color:var(--acc)}
-.chip.late{background:var(--latesoft);color:var(--late)}.chip.soon{background:var(--soonsoft);color:var(--soon)}
-.chip.ok{background:var(--oksoft);color:var(--ok)}
-.acts{display:flex;gap:6px;margin-top:8px}.acts button{flex:0 0 auto;font-size:13px;padding:3px 10px}
-.empty{font-size:13px;color:var(--mute);text-align:center;padding:18px 0}
-.pr .ttl{font-weight:600;font-size:16px}
-.pr .det{white-space:pre-wrap;margin:6px 0}
-.tally{display:flex;height:8px;border-radius:6px;overflow:hidden;background:var(--col);margin:10px 0 6px}
-.tally i{display:block;height:100%}.tally .y{background:var(--ok)}.tally .n{background:var(--late)}
-.votes{display:flex;gap:8px;flex-wrap:wrap}
-.votes button{flex:1 1 110px;padding:8px 6px}
-.pa{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
-.pa button{font-size:13px;padding:3px 10px}
-dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);padding:16px;width:min(520px,94vw);font:inherit}
-dialog::backdrop{background:rgba(0,0,0,.45)}
-dialog h2{color:var(--ink);font-size:17px;margin-bottom:10px}
-dialog label{display:block;font-size:13px;color:var(--mute);margin-bottom:10px}
-dialog label>*{display:block;width:100%;margin-top:3px;color:var(--ink)}
-dialog .row label{margin-bottom:0}
-dialog .dact{margin-top:12px}
-#login{max-width:360px;margin:20vh auto}
-@media (max-width:760px){
-  .board{display:block}
-  .ctabs{display:flex;gap:6px;margin-bottom:10px}
-  .ctabs button{flex:1;padding:7px 4px;font-size:14px}.ctabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-  .col{display:none}.col.on{display:block}
-  .stat b{font-size:19px}
+/* === متغيرات الألوان والتصميم العصري جداً === */
+:root {
+  --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --mute: #64748b; --line: #e2e8f0;
+  --acc: #4f46e5; --acc-hover: #4338ca; --accsoft: #e0e7ff;
+  --late: #ef4444; --latesoft: #fee2e2; --soon: #f59e0b; --soonsoft: #fef3c7;
+  --ok: #10b981; --oksoft: #d1fae5; --col: #f1f5f9;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --rad: 14px;
 }
-@media (max-width:760px) and (prefers-color-scheme:dark){.ctabs button.on{color:#12151c}}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a; --card: #1e293b; --ink: #f8fafc; --mute: #94a3b8; --line: #334155;
+    --acc: #6366f1; --acc-hover: #818cf8; --accsoft: #312e81;
+    --late: #f87171; --latesoft: #7f1d1d; --soon: #fbbf24; --soonsoft: #78350f;
+    --ok: #34d399; --oksoft: #064e3b; --col: #0f172a;
+    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3); --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.4);
+  }
+}
+
+* { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; padding-bottom: env(safe-area-inset-bottom); }
+main { max-width: 1200px; margin: auto; padding: 20px 16px 60px; }
+h1 { font-size: 24px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+h2 { font-size: 16px; margin: 0 0 12px; color: var(--ink); font-weight: 700; }
+
+input, select, textarea, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 0; transition: all 0.2s ease; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--accsoft); }
+button { cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+button:hover:not(:disabled) { border-color: var(--acc); transform: translateY(-1px); }
+button:active:not(:disabled) { transform: translateY(0); }
+button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+button.p { background: var(--acc); border-color: var(--acc); color: #fff; box-shadow: 0 2px 4px rgb(79 70 229 / 0.2); }
+button.p:hover { background: var(--acc-hover); }
+@media (prefers-color-scheme: dark) { button.p { color: #fff; } }
+button.dng { color: var(--late); border-color: var(--latesoft); background: var(--latesoft); }
+button.dng:hover { background: var(--late); color: #fff; }
+
+.m { font-size: 13.5px; color: var(--mute); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); transition: box-shadow 0.3s; }
+.card:hover { box-shadow: var(--shadow-hover); }
+.bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > * { flex: 1 1 150px; }
+.row .s { flex: 0 0 auto; }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0 20px; }
+.nav { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; background: rgba(var(--bg), 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+.nav button { flex: 1; border: none; background: transparent; color: var(--mute); padding: 12px 8px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: none; }
+.nav button:hover { background: var(--col); color: var(--ink); transform: none; }
+.nav button.on { background: var(--accsoft); color: var(--acc); box-shadow: inset 0 -3px 0 var(--acc); border-radius: 8px 8px 0 0; }
+.nav .n { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; margin-inline-start: 6px; border-radius: 11px; background: var(--late); color: #fff; font-size: 12px; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 16px; box-shadow: var(--shadow); text-align: center; }
+.stat b { display: block; font-size: 28px; line-height: 1.2; font-weight: 800; margin-bottom: 4px; }
+.stat span { font-size: 13px; color: var(--mute); font-weight: 600; }
+.stat.late b { color: var(--late); } .stat.soon b { color: var(--soon); }
+
+.tools { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--card); padding: 2px; }
+.seg button { border: none; border-radius: 6px; background: transparent; padding: 8px 16px; color: var(--mute); margin: 0; box-shadow: none; }
+.seg button.on { background: var(--acc); color: #fff; box-shadow: var(--shadow); }
+.tools .sp { flex: 1; }
+
+.ctabs { display: none; }
+.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+.col { background: var(--col); border-radius: var(--rad); padding: 14px; min-height: 200px; border: 2px dashed transparent; transition: all 0.2s; }
+.col.over { border-color: var(--acc); background: var(--accsoft); }
+.col > .ch { display: flex; justify-content: space-between; align-items: center; margin: 0 4px 16px; font-weight: 700; font-size: 16px; }
+.col > .ch i { font-style: normal; font-weight: 700; font-size: 12px; background: var(--card); border-radius: 12px; padding: 2px 10px; color: var(--mute); box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); }
+
+.tk { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: grab; box-shadow: 0 1px 3px rgb(0 0 0 / 0.05); transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+.tk:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); border-color: var(--accsoft); }
+.tk:active { cursor: grabbing; transform: translateY(0); }
+.tk.drag { opacity: 0.5; transform: scale(0.98); }
+.tk .tt { font-weight: 700; font-size: 15px; line-height: 1.4; margin-bottom: 8px; }
+.tk.done .tt { text-decoration: line-through; color: var(--mute); }
+.tk .nt { font-size: 13.5px; color: var(--mute); white-space: pre-wrap; padding-bottom: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { font-size: 12px; border-radius: 20px; padding: 4px 10px; background: var(--line); color: var(--ink); font-weight: 600; display: inline-flex; align-items: center; }
+.chip.all { background: var(--accsoft); color: var(--acc); }
+.chip.late { background: var(--latesoft); color: var(--late); }
+.chip.soon { background: var(--soonsoft); color: var(--soon); }
+.chip.ok { background: var(--oksoft); color: var(--ok); }
+.wa-btn { display: inline-flex; align-items: center; gap: 4px; background: #25D366; color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 12px; text-decoration: none; font-weight: 700; border: none; transition: transform 0.2s; cursor: pointer; }
+.wa-btn:hover { background: #1ebd57; transform: scale(1.05); }
+
+/* Workflow Path UI */
+.wf-list { margin-top: 10px; border-inline-start: 2px solid var(--accsoft); padding-inline-start: 12px; display: flex; flex-direction: column; gap: 8px; }
+.wf-item { background: var(--col); padding: 10px 12px; border-radius: 8px; font-size: 13px; }
+.wf-meta { color: var(--mute); margin-bottom: 4px; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.wf-msg { color: var(--ink); font-weight: 600; }
+
+.acts { display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--col); padding-top: 14px; }
+.acts button { flex: 1; font-size: 13px; padding: 8px; background: var(--col); border: none; border-radius: 6px; }
+.acts button:hover { background: var(--accsoft); color: var(--acc); }
+.empty { font-size: 14px; color: var(--mute); text-align: center; padding: 30px 0; font-weight: 600; }
+
+.pr .ttl { font-weight: 800; font-size: 18px; line-height: 1.3; }
+.pr .det { white-space: pre-wrap; margin: 12px 0; font-size: 14px; color: var(--mute); background: var(--col); padding: 12px; border-radius: 8px; }
+.tally { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--line); margin: 6px 0 10px; }
+.tally i { display: block; height: 100%; transition: width 0.5s ease-out; }
+.voters-box { font-size: 12px; color: var(--mute); background: var(--col); padding: 8px 10px; border-radius: 6px; margin-top: 6px; line-height: 1.8; }
+.pa { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pa button { font-size: 13.5px; padding: 8px 14px; }
+
+dialog { border: none; border-radius: var(--rad); background: var(--card); color: var(--ink); padding: 24px; width: min(540px, 92vw); box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25); font: inherit; }
+dialog::backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
+dialog h2 { font-size: 20px; margin-bottom: 20px; font-weight: 800; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+dialog label { display: block; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 16px; }
+dialog label > * { display: block; width: 100%; margin-top: 8px; font-weight: 400; }
+dialog .row label { margin-bottom: 0; }
+dialog .dact { margin-top: 24px; gap: 12px; justify-content: flex-end; }
+dialog .dact button { min-width: 110px; padding: 10px; }
+
+.multi-options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.multi-options label { font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.multi-options input { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--acc); }
+
+#login { max-width: 400px; margin: 15vh auto; text-align: center; }
+#login h1 { margin-bottom: 8px; font-size: 28px; }
+@media (max-width: 768px) {
+  .board { display: block; }
+  .ctabs { display: flex; gap: 8px; margin-bottom: 16px; background: var(--card); padding: 6px; border-radius: 8px; border: 1px solid var(--line); }
+  .ctabs button { flex: 1; padding: 10px 4px; font-size: 14px; border: none; }
+  .ctabs button.on { background: var(--acc); color: #fff; box-shadow: var(--shadow); border-radius: 6px; }
+  .col { display: none; padding: 0; background: transparent; border: none; min-height: auto; }
+  .col.on { display: block; }
+  .col > .ch { display: none; }
+  .stats { grid-template-columns: 1fr; }
+  .tools { flex-direction: column; align-items: stretch; }
+  .tools .sp { display: none; }
+}
 </style>
 </head>
 <body>
-<main id="app"><p style="padding:24px;color:#6b7280;font:15px sans-serif;text-align:center;" dir="rtl">جارٍ الاتصال بقاعدة البيانات...</p></main>
+<main id="app"><p style="padding:40px;text-align:center;color:var(--mute);font-weight:600;" dir="rtl">جارٍ تهيئة النظام الذكي...</p></main>
 <dialog id="dlg"></dialog>
 <script>
 // ==========================================
-// أنظمة اصطياد الأخطاء لإظهار أي مشكلة لك بدلاً من الشاشة البيضاء
+// أنظمة اصطياد الأخطاء وضمان الاستقرار
 // ==========================================
 function showErrorBox(msg) {
     const a = document.getElementById('app');
-    if (a) a.innerHTML = '<div class="card" style="margin:40px auto;max-width:400px;border-color:var(--late);text-align:center">' +
-        '<h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال بقاعدة البيانات</h2>' +
-        '<p style="color:var(--mute);margin-bottom:20px;font-size:14px;">' + msg + '</p>' +
-        '<button class="p" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="width:100%">إصلاح الجلسة وإعادة المحاولة 🔄</button>' +
-    '</div>';
+    if (a) a.innerHTML = `<div class="card" style="margin:40px auto;max-width:400px;text-align:center">
+        <h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال مؤقتاً</h2>
+        <p style="color:var(--mute);margin-bottom:20px;font-size:14px;">${msg}</p>
+        <button class="p" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="width:100%">تحديث وإصلاح تلقائي 🔄</button>
+    </div>`;
 }
 window.addEventListener('error', e => showErrorBox(e.message));
-window.addEventListener('unhandledrejection', e => showErrorBox(e.reason?.message || e.reason || 'تعذر استرجاع البيانات من Supabase.'));
+window.addEventListener('unhandledrejection', e => showErrorBox(e.reason?.message || e.reason || 'خطأ في جلب البيانات من الخادم.'));
 
-// ====== بيانات مشروعك ======
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
 const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
+const CACHE_KEY = 'cache_v8'; // مفتاح جديد لتجاوز أي مشاكل سابقة
 
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
 let AUTH = { s: null };
@@ -177,9 +237,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
 const daysTo = d => Math.round((new Date(d) - new Date(today())) / 864e5);
 const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجزة' };
-const ACT = { todo: [['doing', 'بدء'], ['done', 'إنجاز ✓']], doing: [['done', 'إنجاز ✓'], ['todo', 'إرجاع']], done: [['doing', 'إعادة فتح']] };
-const ACT_ALL = { todo: [['done', 'إنجاز ✓']], done: [['todo', 'إعادة فتح']] };
-const PST = { open: 'مفتوح', accepted: 'مقبول', rejected: 'مرفوض', closed: 'مغلق' };
+const ACT = { todo: [['doing', 'بدء التنفيذ'], ['done', 'إنجاز ✓']], doing: [['done', 'إنجاز ✓'], ['todo', 'إيقاف']], done: [['doing', 'إعادة فتح']] };
+const ACT_ALL = { todo: [['done', 'إنجاز المهمة ✓']], done: [['todo', 'تراجع']] };
+const PST = { open: 'قيد التصويت', accepted: 'مُعتمد', rejected: 'مرفوض', closed: 'مغلق' };
 const nm = e => S.members.find(m => same(m.email, e))?.name || 'غير مُسند';
 const isAdmin = () => S.me && S.me.role === 'admin';
 const canDel = t => isAdmin() || (S.me && same(t.created_by, S.me.email));
@@ -197,24 +257,21 @@ async function init() {
     }
     const email = session.user.email;
     
+    try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
+
     const { data: members, error } = await sb.from('members').select('*');
-    if (error) {
-        showErrorBox('لا يمكن جلب قائمة الأعضاء من Supabase. (' + error.message + ')');
-        return; 
-    }
+    if (error) return showErrorBox('تعذر جلب الأعضاء: ' + error.message); 
     
     const me = members.find(m => same(m.email, email));
     if (!members.length || !me) { 
         saveS(null); 
-        $app.innerHTML = '<div class="card" id="login">هذا الإيميل غير مضاف للفريق.<br><br><button onclick="location.reload()">رجوع</button></div>'; 
+        $app.innerHTML = '<div class="card" id="login">حسابك غير مرتبط بالفريق.<br><br><button class="p" onclick="location.reload()">رجوع</button></div>'; 
         return; 
     }
     
     S.members = members; S.me = me;
     await load();
-  } catch (err) {
-      showErrorBox('خطأ برمجي أثناء التهيئة: ' + err.message);
-  }
+  } catch (err) { showErrorBox(err.message); }
 }
 
 async function load() {
@@ -233,49 +290,74 @@ async function load() {
   if (!p.error) S.props = p.data || [];
   if (!v.error) S.votes = v.data || [];
   
+  if (!m.error && !t.error && S.me) try { localStorage.setItem(CACHE_KEY, JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
 }
 
 function loginView() {
-  $app.innerHTML = '<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول بإيميلك وكلمة المرور.</p>' +
-  '<div class="row"><input id="em" type="email" placeholder="الالكتروني" dir="ltr"></div>' +
-  '<div class="row" style="margin-top:8px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr"><button class="p s" id="go">دخول</button></div><p class="m" id="msg"></p></div>';
+  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول للمتابعة</p>
+  <div class="row"><input id="em" type="email" placeholder="البريد الإلكتروني" dir="ltr" style="width:100%"></div>
+  <div class="row" style="margin-top:12px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr" style="width:100%"></div>
+  <button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button><p class="m" id="msg" style="margin-top:12px;color:var(--late)"></p></div>`;
   const doLogin = async () => {
-    $('msg').textContent = 'جارٍ الدخول...';
-    const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password: $('pw').value });
-    $('msg').textContent = error ? error.message : '';
+    $('msg').textContent = 'جارٍ الدخول...'; $('msg').style.color = 'inherit';
+    const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password:$('pw').value });
+    if(error){ $('msg').textContent = error.message; $('msg').style.color = 'var(--late)'; }
   };
   $('go').onclick = doLogin;
   $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
 }
 const logout = async () => { await sb.auth.signOut(); localStorage.clear(); location.reload(); };
 
-const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
 function render() {
   if (!S.me) return;
   const props = S.props || [];
   const openProps = props.filter(p => !isClosed(p)).length;
-  const badge = openProps ? '<span class="n">' + openProps + '</span>' : '';
+  const badge = openProps ? `<span class="n">${openProps}</span>` : '';
   
-  $app.innerHTML = '<div class="top"><h1>مهام الفريق</h1><div class="row s"><span class="m">' + esc(S.me.name) + '</span><button id="rf">تحديث</button></div></div>' +
-  '<div class="nav">' +
-    '<button data-nv="board" class="' + (S.view === 'board' ? 'on' : '') + '">لوحة المهام</button>' +
-    '<button data-nv="props" class="' + (S.view === 'props' ? 'on' : '') + '">المقترحات' + badge + '</button>' +
-    '<button data-nv="set" class="' + (S.view === 'set' ? 'on' : '') + '">الإعدادات</button>' +
-  '</div>' +
-  (S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView());
+  $app.innerHTML = `
+  <div class="top"><h1>مدير المهام</h1><div class="row s"><span class="chip" style="font-size:14px">👤 ${esc(S.me.name)}</span><button id="rf" class="s">🔄 تحديث</button></div></div>
+  <div class="nav">
+    <button data-nv="board" class="${S.view === 'board' ? 'on' : ''}">المهام والمشاريع</button>
+    <button data-nv="props" class="${S.view === 'props' ? 'on' : ''}">القرارات والتصويت${badge}</button>
+    <button data-nv="set" class="${S.view === 'set' ? 'on' : ''}">الإعدادات</button>
+  </div>
+  ${S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView()}`;
   
-  $('rf').onclick = () => { $('rf').textContent = '...'; load(); };
+  $('rf').onclick = () => {$('rf').textContent = '⏳'; load(); };
   document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
   if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
+}
+
+/* ---------- نظام الورك فلو (المسار) ---------- */
+function renderNotesAndWorkflow(notesStr) {
+    if (!notesStr) return '';
+    const lines = notesStr.split('\n');
+    let mainNotes = [];
+    let wfHistory = [];
+    
+    lines.forEach(l => {
+        if(l.startsWith('[WF_HANDOFF]')) {
+            let p = l.replace('[WF_HANDOFF]', '').split('||'); // from || to || date || msg
+            wfHistory.push(`<div class="wf-item"><div class="wf-meta">🔄 <b>${esc(p[0])}</b> أحالها إلى <b>${esc(p[1])}</b> <span dir="ltr">(${esc(p[2])})</span></div><div class="wf-msg">${esc(p[3]||'')}</div></div>`);
+        } else {
+            mainNotes.push(l);
+        }
+    });
+    
+    let html = '';
+    let mainTxt = mainNotes.join('\n').trim();
+    if(mainTxt) html += `<div class="nt">${esc(mainTxt)}</div>`;
+    if(wfHistory.length > 0) html += `<div class="wf-list">${wfHistory.join('')}</div>`;
+    return html;
 }
 
 function dueInfo(t) {
   if (!t.due_on) return null;
   if (eff(t) === 'done') return { c: '', t: t.due_on };
-  if (t.due_on < today()) return { c: 'late', t: 'متأخرة · ' + t.due_on };
+  if (t.due_on < today()) return { c: 'late', t: '⚠️ متأخرة (' + t.due_on + ')' };
   const d = daysTo(t.due_on);
-  return d <= 1 ? { c: 'soon', t: d ? 'غداً' : 'اليوم' } : { c: '', t: t.due_on };
+  return d <= 1 ? { c: 'soon', t: d ? '⏱️ غداً' : '🔥 اليوم' } : { c: '', t: '📅 ' + t.due_on };
 }
 
 function card(t) {
@@ -283,26 +365,27 @@ function card(t) {
   const acts = (t.for_all ? ACT_ALL : ACT)[st];
   const dn = doneBy(t);
   
+  // زر الواتساب ظاهر دائماً إذا كانت المهمة مسندة لشخص!
   let waBtn = '';
-  if (!t.for_all && t.assignee_email && S.me && !same(t.assignee_email, S.me.email) && st !== 'done') {
-    const msg = 'مرحباً ' + nm(t.assignee_email) + '،\nلديك مهمة جديدة مطلوب إنجازها:\n*' + t.title + '*\n' + (t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : '') + '\nبالتوفيق!';
-    waBtn = '<a href="https://wa.me/?text=' + encodeURIComponent(msg) + '" target="_blank" class="chip ok" style="text-decoration:none;border:none">💬 مشاركة واتساب</a>';
+  if (!t.for_all && t.assignee_email && S.me && t.assignee_email) {
+    const msg = `مرحباً ${nm(t.assignee_email)}،\nتذكير بمهمة: *${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nنرجو المتابعة والتحديث. 🚀`;
+    waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="wa-btn" title="تذكير عبر الواتساب">💬</a>`;
   }
 
-  let metaAll = t.for_all 
-    ? '<span class="chip all" title="' + esc(dn.map(x => nm(x.email)).join('، ')) + '">👥 الكل · أنجز ' + dn.length + ' من ' + S.members.length + '</span>' 
-    : '<span class="chip">' + esc(nm(t.assignee_email)) + '</span>';
-    
-  let metaD = d ? '<span class="chip ' + d.c + '">' + esc(d.t) + '</span>' : '';
-  let metaMt = mt ? '<span class="chip">' + esc(mt.title) + '</span>' : '';
-  let actsHtml = acts.map(([k, l]) => '<button data-mv="' + t.id + '" data-to="' + k + '">' + l + '</button>').join('');
+  let actsHtml = acts.map(([k, l]) => `<button data-mv="${t.id}" data-to="${k}">${l}</button>`).join('');
+  let handoffBtn = (!t.for_all && st !== 'done') ? `<button class="s" data-hf="${t.id}" style="background:var(--accsoft);color:var(--acc)">إحالة 🔄</button>` : '';
 
-  return '<div class="tk ' + st + '" draggable="true" data-id="' + t.id + '">' +
-    '<div class="tt">' + esc(t.title) + '</div>' +
-    (t.notes ? '<div class="nt">' + esc(t.notes) + '</div>' : '') +
-    '<div class="meta">' + metaAll + metaD + metaMt + waBtn + '</div>' +
-    '<div class="acts">' + actsHtml + '</div>' +
-  '</div>';
+  return `<div class="tk ${st}" draggable="true" data-id="${t.id}">
+    <div class="tt">${esc(t.title)}</div>
+    ${renderNotesAndWorkflow(t.notes)}
+    <div class="meta" style="align-items:center;">
+      ${t.for_all ? `<span class="chip all" title="${esc(dn.map(x => nm(x.email)).join('\n'))}">👥 فريق (${dn.length}/${S.members.length})</span>` : `<span class="chip" style="font-weight:700">👤 ${esc(nm(t.assignee_email))}</span>`}
+      ${d ? `<span class="chip ${d.c}">${esc(d.t)}</span>` : ''}
+      ${mt ? `<span class="chip">📌 ${esc(mt.title)}</span>` : ''}
+      ${waBtn}
+    </div>
+    <div class="acts">${actsHtml} ${handoffBtn}</div>
+  </div>`;
 }
 
 function boardView() {
@@ -310,38 +393,45 @@ function boardView() {
   const open = all.filter(t => eff(t) !== 'done');
   const late = open.filter(t => t.due_on && t.due_on < today()).length;
   const soon = open.filter(t => t.due_on && t.due_on >= today() && daysTo(t.due_on) <= 1).length;
+  
   const cols = Object.keys(ST).map(k => {
     const items = all.filter(t => eff(t) === k);
-    return '<div class="col ' + (S.col === k ? 'on' : '') + '" data-st="' + k + '"><div class="ch"><span>' + ST[k] + '</span><i>' + items.length + '</i></div>' +
-      (items.length ? items.map(card).join('') : '<div class="empty">لا مهام</div>') + '</div>';
+    return `<div class="col ${S.col === k ? 'on' : ''}" data-st="${k}">
+      <div class="ch"><span>${ST[k]}</span><i>${items.length}</i></div>
+      ${items.length ? items.map(card).join('') : `<div class="empty">لا يوجد مهام</div>`}
+    </div>`;
   }).join('');
   
-  let mtOpts = '<option value="">كل الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
-  let btnHtml = isAdmin() ? '<button id="nmt">+ اجتماع</button>' : '';
-  let tabs = Object.keys(ST).map(k => '<button data-c="' + k + '" class="' + (S.col === k ? 'on' : '') + '">' + ST[k] + ' (' + all.filter(t => eff(t) === k).length + ')</button>').join('');
-
-  return '<div class="stats">' +
-    '<div class="stat"><b>' + open.length + '</b><span>مهام مفتوحة</span></div>' +
-    '<div class="stat late"><b>' + late + '</b><span>متأخرة</span></div>' +
-    '<div class="stat soon"><b>' + soon + '</b><span>تستحق اليوم/غداً</span></div>' +
-  '</div>' +
-  '<div class="tools">' +
-    '<div class="seg"><button data-f="mine" class="' + (S.filter === 'mine' ? 'on' : '') + '">مهامي</button><button data-f="all" class="' + (S.filter === 'all' ? 'on' : '') + '">كل الفريق</button></div>' +
-    '<select id="fm" aria-label="الاجتماع">' + mtOpts + '</select>' +
-    '<span class="sp"></span>' +
-    btnHtml + '<button class="p" id="nt">+ مهمة</button>' +
-  '</div>' +
-  '<div class="ctabs">' + tabs + '</div>' +
-  '<div class="board">' + cols + '</div>';
+  return `
+  <div class="stats">
+    <div class="stat"><b>${open.length}</b><span>قيد العمل</span></div>
+    <div class="stat late"><b>${late}</b><span>متأخرة</span></div>
+    <div class="stat soon"><b>${soon}</b><span>اليوم/غداً</span></div>
+  </div>
+  <div class="tools">
+    <div class="seg"><button data-f="mine" class="${S.filter === 'mine' ? 'on' : ''}">مهامي فقط</button><button data-f="all" class="${S.filter === 'all' ? 'on' : ''}">كل الفريق</button></div>
+    <select id="fm" style="border-radius:6px"><option value="">كل الاجتماعات/المشاريع</option>${S.meetings.map(m => `<option value="${m.id}" ${S.meeting === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select>
+    <span class="sp"></span>
+    ${isAdmin() ? `<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>` : ''}
+    <button class="p s" id="nt">➕ إضافة مهمة</button>
+  </div>
+  <div class="ctabs">${Object.keys(ST).map(k => `<button data-c="${k}" class="${S.col === k ? 'on' : ''}">${ST[k]} (${all.filter(t => eff(t) === k).length})</button>`).join('')}</div>
+  <div class="board">${cols}</div>`;
 }
 
 function bindBoard() {
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
   document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.col = b.dataset.c; render(); });
-  $('fm').onchange = e => { S.meeting = e.target.value; render(); };
-  $('nt').onclick = () => taskDialog(null);
-  if ($('nmt')) $('nmt').onclick = () => { const t = prompt('اسم الاجتماع'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
+  $('fm').onchange = e => { S.meeting = e.target.value; render(); };$('nt').onclick = () => taskDialog(null);
+  if ($('nmt'))$('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
+  
   document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
+  
+  // تفعيل زر الإحالة (Workflow)
+  document.querySelectorAll('[data-hf]').forEach(b => {
+      b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); };
+  });
+
   document.querySelectorAll('.tk').forEach(el => {
     el.onclick = () => taskDialog(S.tasks.find(t => t.id === el.dataset.id));
     el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag'); };
@@ -352,6 +442,35 @@ function bindBoard() {
     c.ondragleave = () => c.classList.remove('over');
     c.ondrop = e => { e.preventDefault(); c.classList.remove('over'); const id = e.dataTransfer.getData('text/plain'); if (id) moveTask(id, c.dataset.st); };
   });
+}
+
+// نافذة الإحالة
+function handoffDialog(tId) {
+    const t = S.tasks.find(x => x.id === tId);
+    if(!t) return;
+    let opts = S.members.filter(m => !same(m.email, t.assignee_email)).map(m => `<option value="${esc(m.email)}">${esc(m.name)}</option>`).join('');
+    
+    dlg.innerHTML = `<h2>إحالة المهمة (Workflow)</h2>
+    <div style="background:var(--col);padding:10px;border-radius:8px;margin-bottom:16px;font-weight:600">${esc(t.title)}</div>
+    <label>إحالة إلى الزميل:<select id="hf_to"><option value="">-- اختر الزميل --</option>${opts}</select></label>
+    <label>رسالة التوجيه/المطلوب:<textarea id="hf_msg" rows="3" placeholder="اكتب ملاحظاتك ليكمل عليها..."></textarea></label>
+    <div class="row dact"><button id="hf_cx" class="s">إلغاء</button><button class="p" id="hf_sv">إحالة المهمة الآن</button></div>`;
+    
+    $('hf_cx').onclick = () => dlg.close();$('hf_sv').onclick = async () => {
+        const to = $('hf_to').value;
+        if(!to) return alert('الرجاء اختيار زميل لإحالة المهمة إليه.');
+        const msg = $('hf_msg').value.trim();
+        if(!msg) return alert('الرجاء كتابة رسالة توجيه للزميل.');
+        
+        const noteAppend = '\n[WF_HANDOFF]' + S.me.name + '||' + nm(to) + '||' + today() + '||' + msg;
+        const newNotes = (t.notes || '') + noteAppend;
+        
+        $('hf_sv').disabled = true; $('hf_sv').textContent = 'جاري الإحالة...';
+        const { error } = await sb.from('tasks').update({ assignee_email: to, notes: newNotes, status: 'todo' }).eq('id', t.id);
+        if(error) { alert('خطأ: ' + error.message); $('hf_sv').disabled = false; return; }
+        dlg.close(); load();
+    };
+    dlg.showModal();
 }
 
 async function moveTask(id, to) {
@@ -378,131 +497,167 @@ function taskDialog(t, pre = {}) {
   const x = t || pre, edit = !!t;
   const asVal = x.for_all ? '__all' : (x.assignee_email || (S.me ? S.me.email : ''));
   
-  let asOpts = '<option value="__all" ' + (asVal === '__all' ? 'selected' : '') + '>👥 الكل</option>' +
-               '<option value="" ' + (asVal === '' ? 'selected' : '') + '>غير مُسند</option>' +
-               S.members.map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, asVal) ? 'selected' : '') + '>' + esc(m.name) + '</option>').join('');
+  let asOpts = `<option value="__all" ${asVal === '__all' ? 'selected' : ''}>👥 مهمة جماعية للكل</option>
+                <option value="" ${asVal === '' ? 'selected' : ''}>غير مُسند</option>` +
+               S.members.map(m => `<option value="${esc(m.email)}" ${same(m.email, asVal) ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
                
-  let mtOpts = '<option value="">بدون ارتباط</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (x.meeting_id === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
-  
-  let stOpts = Object.entries(ST).map(([k, v]) => '<option value="' + k + '" ' + ((x.status || 'todo') === k ? 'selected' : '') + '>' + v + '</option>').join('');
-  
-  let dlBtn = edit && canDel(t) ? '<button class="dng" id="f_dl">حذف</button>' : '';
+  let mtOpts = `<option value="">بدون ارتباط</option>` + S.meetings.map(m => `<option value="${m.id}" ${x.meeting_id === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('');
+  let stOpts = Object.entries(ST).map(([k, v]) => `<option value="${k}" ${(x.status || 'todo') === k ? 'selected' : ''}>${v}</option>`).join('');
 
-  dlg.innerHTML = '<h2>' + (edit ? 'تعديل المهمة' : 'مهمة جديدة') + '</h2>' +
-  '<label>العنوان<input id="f_ti" value="' + esc(x.title || '') + '" placeholder="عنوان المهمة"></label>' +
-  '<label>تفاصيل (اختياري)<textarea id="f_no" rows="3">' + esc(x.notes || '') + '</textarea></label>' +
-  '<div class="row">' +
-    '<label>المسؤول (لإشعار الشريك عبر الواتس)<select id="f_as">' + asOpts + '</select></label>' +
-    '<label>تاريخ الاستحقاق<input id="f_du" type="date" value="' + esc(x.due_on || '') + '"></label>' +
-  '</div>' +
-  '<div class="row" style="margin-top:10px">' +
-    '<label>الاجتماع<select id="f_mt">' + mtOpts + '</select></label>' +
-    '<label id="f_stw">الحالة<select id="f_st">' + stOpts + '</select></label>' +
-  '</div>' +
-  '<p class="m" id="f_hint" style="margin:8px 0 0">مهمة «الكل»: ينجزها كل عضو بنفسه.</p>' +
-  '<div class="row dact"><button class="p" id="f_sv">حفظ</button>' + dlBtn + '<button id="f_cx">إلغاء</button></div>';
+  dlg.innerHTML = `<h2>${edit ? 'تعديل المهمة' : 'مهمة جديدة'}</h2>
+  <label>العنوان<input id="f_ti" value="${esc(x.title || '')}" placeholder="ما هو المطلوب إنجازه؟"></label>
+  <label>تفاصيل وروابط (اختياري)<textarea id="f_no" rows="3">${esc(x.notes || '')}</textarea></label>
+  <div class="row">
+    <label>المسؤول الأول عن التنفيذ<select id="f_as">${asOpts}</select></label>
+    <label>تاريخ الاستحقاق<input id="f_du" type="date" value="${esc(x.due_on || '')}"></label>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label>الارتباط (قسم/مشروع)<select id="f_mt">${mtOpts}</select></label>
+    <label id="f_stw">الحالة<select id="f_st">${stOpts}</select></label>
+  </div>
+  <p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة للكل:</b> تظهر لجميع الأعضاء، وكل عضو يعتمد إنجازها لنفسه بشكل منفصل.</p>
+  <div class="row dact">
+    ${edit && canDel(t) ? `<button class="dng s" id="f_dl" style="margin-inline-end:auto">حذف</button>` : '<span></span>'}
+    <button id="f_cx" class="s">إلغاء</button>
+    <button class="p s" id="f_sv">حفظ</button>
+  </div>`;
   
   const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; };
   $('f_as').onchange = sync; sync();
-  $('f_cx').onclick = () => dlg.close();
-  $('f_sv').onclick = async () => {
-    const title = $('f_ti').value.trim(); if (!title) return $('f_ti').focus();
+  $('f_cx').onclick = () => dlg.close();$('f_sv').onclick = async () => {
+    const title = $('f_ti').value.trim(); if (!title) return$('f_ti').focus();
     const all = $('f_as').value === '__all';
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
+    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value \vert{}\vert{} null), due_on:$('f_du').value || null, meeting_id: $('f_mt').value \vert{}\vert{} null, status: all ? 'todo' : $('f_st').value };
     if (!edit) row.created_by = S.me.email;
+    
+    $('f_sv').disabled = true; $('f_sv').textContent = '...';
     const { error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row);
-    if (error) return alert('خطأ: ' + error.message);
+    if (error) { alert('خطأ: ' + error.message); $('f_sv').disabled = false; $('f_sv').textContent = 'حفظ'; return; }
     dlg.close(); load();
   };
-  if (edit && canDel(t)) $('f_dl').onclick = () => { if (confirm('حذف المهمة؟')) { dlg.close(); run(sb.from('tasks').delete().eq('id', t.id)); } };
+  if (edit && canDel(t)) $('f_dl').onclick = () => { if (confirm('هل أنت متأكد من حذف المهمة؟')) { dlg.close(); run(sb.from('tasks').delete().eq('id', t.id)); } };
   dlg.showModal(); if (!edit) $('f_ti').focus();
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
-/* ---------- المقترحات ---------- */
+/* ---------- التصويت (مفرد ومتعدد) ذكي بدون تغيير الداتابيز ---------- */
 function parseOptions(p) {
-  if (!p || !p.options) return ['موافق', 'معارض'];
-  if (Array.isArray(p.options)) return p.options;
-  try { const arr = JSON.parse(p.options); if (Array.isArray(arr)) return arr; } catch(e) {}
-  if (typeof p.options === 'string' && p.options.includes(',')) return p.options.split(',').map(s => s.trim()).filter(Boolean);
-  return ['موافق', 'معارض'];
+  let arr = ['موافق', 'معارض'];
+  if (p && p.options) {
+      if (Array.isArray(p.options)) arr = p.options;
+      else try { const j = JSON.parse(p.options); if(Array.isArray(j)) arr = j; } catch(e){}
+  }
+  let isMulti = false;
+  if(arr[0] === '__MULTI__') { isMulti = true; arr = arr.slice(1); }
+  return { opts: arr, isMulti };
 }
 
 function propCard(p) {
-  const opts = parseOptions(p);
+  const { opts, isMulti } = parseOptions(p);
   const vts = (S.votes || []).filter(x => x.proposal_id === p.id);
   const myVote = S.me ? vts.find(x => same(x.email, S.me.email)) : null;
-  const total = vts.length;
+  
+  // حساب الأصوات (Tallying)
+  let optCounts = opts.map(()=>0);
+  let optVoters = opts.map(()=>[]);
+  
+  vts.forEach(v => {
+      let nStr = v.note || '';
+      let selections = [];
+      if(v.option_idx === -1 && nStr.startsWith('MULTI:')) {
+          let parts = nStr.substring(6).split('||');
+          selections = parts[0].split(',').map(Number);
+          v.actualNote = parts[1] || '';
+      } else {
+          selections = [v.option_idx != null ? v.option_idx : (v.value===1?0:1)];
+          v.actualNote = nStr;
+      }
+      selections.forEach(idx => {
+          if(optCounts[idx] !== undefined) {
+              optCounts[idx]++;
+              optVoters[idx].push(v);
+          }
+      });
+  });
+
+  const totalVotes = vts.length; // Number of unique voters
   const can = S.me && (same(p.author_email, S.me.email) || isAdmin());
   const open = !isClosed(p);
 
+  // رسم النتائج
   let res = opts.map((opt, i) => {
-    const ov = vts.filter(x => x.option_idx == i || (x.option_idx == null && x.value == (i===0?1:-1))); 
-    const w = total ? ((ov.length / total) * 100).toFixed(0) : 0;
+    let count = optCounts[i];
+    let w = totalVotes ? ((count / totalVotes) * 100).toFixed(0) : 0;
     
     let vlist = '';
-    if (ov.length) {
-      let items = ov.map(x => '<b>' + esc(nm(x.email)) + '</b>' + (x.note ? ' <i>(' + esc(x.note) + ')</i>' : '')).join('<br>');
-      vlist = '<div style="font-size:12px;color:var(--mute);margin-top:4px;padding:4px;background:var(--col);border-radius:4px">' + items + '</div>';
+    if (count > 0) {
+      let items = optVoters[i].map(x => `<b>${esc(nm(x.email))}</b>${x.actualNote ? ` <span style="color:var(--mute)">(${esc(x.actualNote)})</span>` : ''}`).join('<br>');
+      vlist = `<div class="voters-box">${items}</div>`;
     }
     
-    return '<div style="margin-bottom:10px">' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px"><span>' + esc(opt) + '</span><span>' + ov.length + ' صوت (' + w + '%)</span></div>' +
-      '<div class="tally" style="margin:4px 0"><i style="width:' + w + '%;background:var(--ok)"></i></div>' +
-      vlist +
-    '</div>';
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px"><span>${esc(opt)}</span><span>${count} صوت (${w}%)</span></div>
+      <div class="tally"><i style="width:${w}%;background:var(--acc)"></i></div>
+      ${vlist}
+    </div>`;
   }).join('');
 
+  // شريط التصويت
   let act = '';
   if (open) {
-    let optsHtml = opts.map((o, i) => {
-      let sel = (myVote && (myVote.option_idx == i || (myVote.option_idx == null && myVote.value == (i===0?1:-1)))) ? 'selected' : '';
-      return '<option value="' + i + '" ' + sel + '>' + esc(o) + '</option>';
-    }).join('');
+    let mySelections = [];
+    let myNote = '';
+    if(myVote) {
+        if(myVote.option_idx === -1 && (myVote.note||'').startsWith('MULTI:')) {
+            let parts = myVote.note.substring(6).split('||');
+            mySelections = parts[0].split(',').map(Number);
+            myNote = parts[1] || '';
+        } else {
+            mySelections = [myVote.option_idx != null ? myVote.option_idx : (myVote.value===1?0:1)];
+            myNote = myVote.note || '';
+        }
+    }
     
-    let noteVal = (myVote && myVote.note) ? esc(myVote.note) : '';
-    let btnTxt = myVote ? 'تحديث التصويت' : 'تصويت';
+    let inputUI = '';
+    if (isMulti) {
+        inputUI = `<div class="multi-options" id="v_m_${p.id}">` + opts.map((o, i) => 
+            `<label><input type="checkbox" value="${i}" ${mySelections.includes(i) ? 'checked' : ''}> ${esc(o)}</label>`
+        ).join('') + `</div>`;
+    } else {
+        inputUI = `<select id="v_s_${p.id}" style="width:100%;margin-bottom:8px"><option value="">-- اختر أحد الخيارات --</option>` + 
+        opts.map((o, i) => `<option value="${i}" ${mySelections.includes(i) ? 'selected' : ''}>${esc(o)}</option>`).join('') + 
+        `</select>`;
+    }
     
-    act = '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">' +
-      '<select id="v_opt_' + p.id + '" style="flex:1;min-width:120px"><option value="">-- اختر --</option>' + optsHtml + '</select>' +
-      '<input id="v_not_' + p.id + '" placeholder="ملاحظة (اختياري)..." value="' + noteVal + '" style="flex:2;min-width:140px">' +
-      '<button class="p" data-cast="' + p.id + '">' + btnTxt + '</button>' +
-    '</div>';
+    act = `<div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);">
+      <h3 style="font-size:14px;margin:0 0 10px;color:var(--acc)">صوّت الآن:</h3>
+      ${inputUI}
+      <input id="v_n_${p.id}" placeholder="اكتب ملاحظة ليروها الجميع (اختياري)..." value="${esc(myNote)}" style="width:100%;margin-top:8px">
+      <button class="p" data-cast="${p.id}" data-ismulti="${isMulti}" style="width:100%;margin-top:12px">${myVote ? 'تحديث التصويت' : 'إرسال التصويت'}</button>
+    </div>`;
   }
   
-  let actionBtns = '';
-  if (can) {
-    if (open) {
-       actionBtns = '<button data-ps="' + p.id + '" data-to="accepted">اعتماد</button>' +
-                    '<button data-ps="' + p.id + '" data-to="rejected">رفض</button>';
-    } else {
-       actionBtns = '<button data-ps="' + p.id + '" data-to="open">إعادة فتح</button>';
-    }
-    actionBtns += '<button class="dng" data-pdel="' + p.id + '">حذف</button>';
-  }
+  let actionBtns = can ? (open ? `<button data-ps="${p.id}" data-to="accepted">اعتماد</button><button data-ps="${p.id}" data-to="rejected">رفض</button>` : `<button data-ps="${p.id}" data-to="open">إعادة فتح</button>`) + `<button class="dng" data-pdel="${p.id}">حذف</button>` : '';
 
-  let detHtml = p.details ? '<div class="det">' + esc(p.details) + '</div>' : '';
-
-  return '<div class="card pr">' +
-    '<div class="bar"><span class="ttl">' + esc(p.title) + '</span><span class="chip ' + (p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all') + '">' + esc(PST[p.status] || p.status) + '</span></div>' +
-    detHtml +
-    '<div class="m">بواسطة ' + esc(nm(p.author_email)) + ' · ' + esc((p.created_at || '').slice(0, 10)) + '</div>' +
-    '<div style="margin-top:14px">' + res + '</div>' +
-    act +
-    '<div class="pa">' +
-      '<button data-totask="' + p.id + '">تحويل إلى مهمة</button>' +
-      actionBtns +
-    '</div>' +
-  '</div>';
+  return `<div class="card pr">
+    <div class="bar"><span class="ttl">${esc(p.title)}</span><span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span></div>
+    ${p.details ? `<div class="det">${esc(p.details)}</div>` : ''}
+    <div class="m">بواسطة ${esc(nm(p.author_email))} · ${esc((p.created_at || '').slice(0, 10))}</div>
+    <div style="margin-top:16px;background:var(--col);padding:16px;border-radius:12px">${res}</div>
+    ${act}
+    <div class="pa">
+      <button data-totask="${p.id}">تحويل إلى مهمة</button>
+      ${actionBtns}
+    </div>
+  </div>`;
 }
 
 function propsView() {
-  if (S.propsErr) return '<div class="card"><b style="color:var(--late)">خطأ في المقترحات.</b><p class="m">يرجى التأكد من إضافة الأعمدة options, option_idx, note.</p></div>';
+  if (S.propsErr) return `<div class="card"><b style="color:var(--late)">عذراً، يوجد خطأ في الاتصال بجداول التصويت.</b></div>`;
   const list = S.props.filter(p => S.pf === 'open' ? !isClosed(p) : isClosed(p));
-  let listHtml = list.length ? list.map(propCard).join('') : '<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>';
   
-  return '<div class="tools"><div class="seg"><button data-pf="open" class="' + (S.pf === 'open' ? 'on' : '') + '">مفتوحة للتصويت</button><button data-pf="closed" class="' + (S.pf === 'closed' ? 'on' : '') + '">المغلقة</button></div><span class="sp"></span><button class="p" id="np">+ مقترح جديد</button></div>' +
-  listHtml;
+  return `<div class="tools"><div class="seg"><button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">قيد التصويت</button><button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button></div><span class="sp"></span><button class="p" id="np">➕ مقترح/تصويت جديد</button></div>
+  ${list.length ? list.map(propCard).join('') : `<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>`}`;
 }
 
 function bindProps() {
@@ -513,34 +668,52 @@ function bindProps() {
   document.querySelectorAll('[data-cast]').forEach(btn => {
     btn.onclick = async () => {
       const pid = btn.dataset.cast;
-      const optSelect = document.getElementById('v_opt_' + pid);
-      if (!optSelect || optSelect.value === '') return alert('الرجاء اختيار خيار.');
-      const note = document.getElementById('v_not_' + pid).value.trim();
-      btn.textContent = '...'; btn.disabled = true;
-      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: parseInt(optSelect.value), value: (optSelect.value == 0 ? 1 : -1), note: note || null });
+      const isMulti = btn.dataset.ismulti === 'true';
+      let selectedIdx = -1;
+      let finalNote = '';
+      let userNote = $(`v_n_${pid}`).value.trim();
+      
+      if (isMulti) {
+          let checks = document.querySelectorAll(`#v_m_${pid} input[type="checkbox"]:checked`);
+          if(checks.length === 0) return alert('الرجاء اختيار خيار واحد على الأقل.');
+          let vals = Array.from(checks).map(c => c.value);
+          selectedIdx = -1;
+          finalNote = 'MULTI:' + vals.join(',') + '||' + userNote;
+      } else {
+          let sel = $(`v_s_${pid}`).value;
+          if(sel === '') return alert('الرجاء اختيار خيار.');
+          selectedIdx = parseInt(sel);
+          finalNote = userNote;
+      }
+      
+      btn.textContent = 'جاري الإرسال...'; btn.disabled = true;
+      const { error } = await sb.from('votes').upsert({ proposal_id: pid, email: S.me.email, option_idx: selectedIdx, value: (selectedIdx === 0 ? 1 : -1), note: finalNote || null });
       if (error) alert('خطأ: ' + error.message);
       load();
     };
   });
   
   document.querySelectorAll('[data-ps]').forEach(b => b.onclick = () => run(sb.from('proposals').update({ status: b.dataset.to }).eq('id', b.dataset.ps)));
-  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('حذف؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
+  document.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => { if (confirm('حذف نهائي للمقترح وأصواته؟')) run(sb.from('proposals').delete().eq('id', b.dataset.pdel)); });
   document.querySelectorAll('[data-totask]').forEach(b => b.onclick = () => { const p = S.props.find(x => x.id === b.dataset.totask); taskDialog(null, { title: p.title, notes: p.details || '', for_all: true }); });
 }
 
 function propDialog() {
-  dlg.innerHTML = '<h2>مقترح تصويت جديد</h2>' +
-  '<label>العنوان<input id="p_ti"></label>' +
-  '<label>التفاصيل<textarea id="p_de" rows="2"></textarea></label>' +
-  '<label>الخيارات (اكتب كل خيار في سطر مستقل)<textarea id="p_op" rows="3" placeholder="الخيار الأول\nالخيار الثاني"></textarea></label>' +
-  '<div class="row dact"><button class="p" id="p_sv">نشر</button><button id="p_cx">إلغاء</button></div>';
+  dlg.innerHTML = `<h2>طرح تصويت/مقترح جديد</h2>
+  <label>عنوان المقترح<input id="p_ti" placeholder="مثلاً: تغيير موعد الاجتماع"></label>
+  <label>التفاصيل والمبررات<textarea id="p_de" rows="2"></textarea></label>
+  <label>خيارات التصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_op" rows="3" placeholder="الخيار الأول\nالخيار الثاني"></textarea></label>
+  <label style="display:flex;align-items:center;gap:8px;font-weight:600;margin-top:12px"><input type="checkbox" id="p_multi" style="width:18px;height:18px;margin:0"> السماح باختيار أكثر من خيار</label>
+  <div class="row dact"><button id="p_cx" class="s">إلغاء</button><button class="p s" id="p_sv">نشر للتصويت</button></div>`;
   
-  $('p_cx').onclick = () => dlg.close();
-  $('p_sv').onclick = async () => {
-    const title = $('p_ti').value.trim(); if (!title) return $('p_ti').focus();
-    let rawOpts = $('p_op').value.split('\n').map(x => x.trim()).filter(Boolean);
+  $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
+    const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
+    let rawOpts = $('p_op').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
     if (rawOpts.length === 0) rawOpts = ['موافق', 'غير موافق'];
-    $('p_sv').disabled = true;
+    
+    if($('p_multi').checked) rawOpts.unshift('__MULTI__');
+    
+    $('p_sv').disabled = true; $('p_sv').textContent = '...';
     const { error } = await sb.from('proposals').insert({ title, details: $('p_de').value.trim() || null, author_email: S.me.email, status: 'open', options: JSON.stringify(rawOpts) });
     if (error) return alert('خطأ: ' + error.message);
     dlg.close(); load();
@@ -550,25 +723,18 @@ function propDialog() {
 
 /* ---------- الإعدادات ---------- */
 function settingsView() {
-  let adminHtml = '';
-  if (isAdmin()) {
-    let membersList = S.members.map(m => {
-      let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="s" data-rm="' + esc(m.email) + '">إزالة</button>';
-      return '<div class="row" style="align-items:center;margin-bottom:6px"><span>' + esc(m.name) + ' <span class="m" dir="ltr">' + esc(m.email) + '</span></span>' + rmBtn + '</div>';
-    }).join('');
-    
-    adminHtml = '<div class="card"><h2>الأعضاء (للأدمن)</h2>' + membersList + 
-      '<div class="row"><input id="ne" dir="ltr" placeholder="إيميل العضو الجديد"><input id="nn" placeholder="الاسم"><button class="p s" id="addm">إضافة</button></div></div>';
-  }
-
-  return '<div class="card">' +
-    '<h2>إشعارات الجوال</h2>' +
-    '<div class="row"><button class="p s" id="push">تفعيل الإشعارات الآن</button></div>' +
-    '<p class="m" id="pm"></p>' +
-  '</div>' +
-  '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ</button></div></div>' +
-  adminHtml +
-  '<div class="card"><div class="bar"><span class="m">' + esc(S.me?.name || '') + '</span><button id="out">تسجيل خروج</button></div></div>';
+  return `
+  <div class="card" style="border-color:var(--oksoft)">
+    <h2>🔔 إشعارات الجوال للأعضاء</h2>
+    <p class="m" style="margin-bottom:12px;color:var(--ink)">لضمان وصول الإشعارات لشركائك:<br>
+    <b>أندرويد:</b> يفتح الموقع ويضغط تفعيل الإشعارات.<br>
+    <b>آيفون (iOS):</b> يجب أن يفتح الموقع من سفاري ويضغط "مشاركة" > <b>إضافة للشاشة الرئيسية</b>، ثم يفتح التطبيق من الأيقونة ويضغط تفعيل.</p>
+    <div class="row"><button class="p s" id="push" style="background:var(--ok);border-color:var(--ok)">تفعيل الإشعارات في جهازي</button></div>
+    <p class="m" id="pm" style="margin-top:10px;font-weight:600"></p>
+  </div>
+  <div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>
+  ${isAdmin() ? `<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء</h2>${S.members.map(m => `<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>${esc(m.name)}</b> <span class="m" dir="ltr">(${esc(m.email)})</span></div>${S.me && same(m.email, S.me.email) ? '' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>` : ''}
+  <div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>`;
 }
 
 function bindSettings() {
@@ -576,22 +742,23 @@ function bindSettings() {
   $('push').onclick = async () => {
     const pm = $('pm');
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات.';
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات (تأكد من إضافة التطبيق للشاشة الرئيسية).';
       if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح الصلاحية.';
       const reg = await navigator.serviceWorker.ready;
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? 'خطأ: ' + error.message : '<b style="color:var(--ok)">تم تفعيل الإشعارات بنجاح.</b>';
+      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">تم تفعيل الإشعارات بنجاح.</span>';
     } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
   };
   $('svp').onclick = async () => { 
     const v = $('np').value; if (v.length < 6) return alert('6 أحرف على الأقل'); 
+    $('svp').textContent = '...';
     const { error } = await sb.auth.updateUser({ password: v }); 
-    alert(error ? error.message : 'تم تغيير كلمة المرور'); $('np').value = ''; 
+    alert(error ? error.message : 'تم التغيير.'); $('np').value = '';$('svp').textContent = 'حفظ التغيير';
   };
-  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
-  if ($('addm')) $('addm').onclick = () => { const e = $('ne').value.trim(), n = $('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+  if ($('addm'))$('addm').onclick = () => { const e = $('ne').value.trim(), n =$('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
