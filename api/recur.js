@@ -2,11 +2,13 @@
 const { createClient } = require('@supabase/supabase-js');
 const webpush = require('web-push');
 const { randomUUID } = require('crypto');
+const { member, isCron } = require('./../lib/auth');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const pub = process.env.VAPID_PUBLIC_KEY || '', pri = process.env.VAPID_PRIVATE_KEY || '';
 if (pub && pri) webpush.setVapidDetails('mailto:admin@matjark.com', pub, pri);
 
 module.exports = async (req, res) => {
+  if (!isCron(req)) { const me = await member(req); if (!me || me.role !== 'admin') return res.status(401).json({ error: 'unauthorized — اضبط CRON_SECRET في Vercel أو سجّل كأدمن' }); }
   try {
     const now = new Date(Date.now() + 3 * 3600e3);
     const today = now.toISOString().slice(0, 10), dow = now.getUTCDay(), dom = now.getUTCDate();
@@ -30,7 +32,7 @@ module.exports = async (req, res) => {
     if (created.length && pub && pri) {
       const { data: subs } = await supabase.from('push_subs').select('*');
       await Promise.all(created.flatMap(t => (subs || []).filter(s => t.for_all || s.email === t.assignee_email).map(s =>
-        webpush.sendNotification(s.sub, JSON.stringify({ title: '🔁 مهمة دورية جديدة', body: t.title, icon: '/icon-192.png', task_id: t.id, for_all: t.for_all,
+        webpush.sendNotification(s.sub, JSON.stringify({ title: '🔁 مهمة دورية جديدة', body: t.title, icon: '/icon-192.png', task_id: t.id, task_title: t.title, for_all: t.for_all,
           actions: [{ action: 'done', title: 'إنجاز ✅' }, { action: 'open', title: 'عرض التفاصيل 🔍' }] })).catch(() => {}))));
     }
     res.status(200).json({ created: created.length });
