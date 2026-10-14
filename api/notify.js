@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { title, body, assignee_email, for_all, sender_name, is_custom } = req.body;
+    const { title, body, assignee_email, for_all, sender_name, is_custom, task_id, to_admins } = req.body;
     
     const { data: subs } = await supabase.from('push_subs').select('*');
     if (!subs || subs.length === 0) return res.status(200).json({ message: 'لا توجد أجهزة مسجلة' });
@@ -31,15 +31,20 @@ module.exports = async (req, res) => {
     let finalTitle = is_custom ? title : '🆕 مهمة جديدة';
     let finalBody = is_custom ? `من ${sender_name}: ${body}` : `تم تكليفك بمهمة جديدة من ${sender_name}:\n"${title}"`;
 
+    let adminEmails = [];
+    if (to_admins) { const { data: ad } = await supabase.from('members').select('email').eq('role', 'admin'); adminEmails = (ad || []).map(a => a.email.toLowerCase()); }
     const payload = JSON.stringify({
       title: finalTitle,
       body: finalBody,
-      icon: '/icon-192.png'
+      icon: '/icon-192.png',
+      task_id: task_id || undefined,
+      for_all: !!for_all,
+      actions: task_id && !is_custom ? [{ action: 'done', title: 'إنجاز ✅' }, { action: 'open', title: 'عرض التفاصيل 🔍' }] : undefined
     });
 
     let sendPromises = [];
     subs.forEach(subRow => {
-      if (for_all || subRow.email === assignee_email) {
+      if (to_admins ? adminEmails.includes(String(subRow.email).toLowerCase()) : (for_all || subRow.email === assignee_email)) {
         sendPromises.push(webpush.sendNotification(subRow.sub, payload).catch(e => console.error('Push error:', e)));
       }
     });
