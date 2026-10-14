@@ -240,6 +240,10 @@ const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجز
 const ACT = { todo: [['doing', 'بدء التنفيذ'], ['done', 'إنجاز ✓']], doing: [['done', 'إنجاز ✓'], ['todo', 'إيقاف']], done: [['doing', 'إعادة فتح']] };
 const ACT_ALL = { todo: [['done', 'إنجاز المهمة ✓']], done: [['todo', 'تراجع']] };
 const PST = { open: 'قيد التصويت', accepted: 'مُعتمد', rejected: 'مرفوض', closed: 'مغلق' };
+
+// السطر الذي كان مفقوداً وسبب الخطأ:
+const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
+
 const nm = e => S.members.find(m => same(m.email, e))?.name || 'غير مُسند';
 const isAdmin = () => S.me && S.me.role === 'admin';
 const canDel = t => isAdmin() || (S.me && same(t.created_by, S.me.email));
