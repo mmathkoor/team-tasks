@@ -154,11 +154,11 @@ dialog .dact button { min-width: 110px; padding: 10px; }
 // ==========================================
 function showErrorBox(msg) {
     const a = document.getElementById('app');
-    if (a) a.innerHTML = `<div class="card" style="margin:40px auto;max-width:400px;text-align:center">
-        <h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال مؤقتاً</h2>
-        <p style="color:var(--mute);margin-bottom:20px;font-size:14px;">${msg}</p>
-        <button class="p" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="width:100%">تحديث وإصلاح تلقائي 🔄</button>
-    </div>`;
+    if (a) a.innerHTML = '<div class="card" style="margin:40px auto;max-width:400px;text-align:center">' +
+        '<h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال مؤقتاً</h2>' +
+        '<p style="color:var(--mute);margin-bottom:20px;font-size:14px;">' + msg + '</p>' +
+        '<button class="p" onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload(true);" style="width:100%">تحديث وإصلاح تلقائي 🔄</button>' +
+    '</div>';
 }
 window.addEventListener('error', e => showErrorBox(e.message));
 window.addEventListener('unhandledrejection', e => showErrorBox(e.reason?.message || e.reason || 'خطأ في جلب البيانات من الخادم.'));
@@ -166,7 +166,7 @@ window.addEventListener('unhandledrejection', e => showErrorBox(e.reason?.messag
 const SUPABASE_URL = 'https://wrmpyywosathqxrjuicx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
 const VAPID_PUBLIC = 'BHxCfyzW8k847mfJYuR-EvsQjegMcA7an34Ls7kLj7ZvHe6mUeCKOoKtAjEIz53esjpN2IKB9EcYPxr3C2S3298';
-const CACHE_KEY = 'cache_v8'; // مفتاح جديد لتجاوز أي مشاكل سابقة
+const CACHE_KEY = 'cache_v9';
 
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
 let AUTH = { s: null };
@@ -295,13 +295,14 @@ async function load() {
 }
 
 function loginView() {
-  $app.innerHTML = `<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول للمتابعة</p>
-  <div class="row"><input id="em" type="email" placeholder="البريد الإلكتروني" dir="ltr" style="width:100%"></div>
-  <div class="row" style="margin-top:12px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr" style="width:100%"></div>
-  <button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button><p class="m" id="msg" style="margin-top:12px;color:var(--late)"></p></div>`;
+  $app.innerHTML = '<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول للمتابعة</p>' +
+  '<div class="row"><input id="em" type="email" placeholder="البريد الإلكتروني" dir="ltr" style="width:100%"></div>' +
+  '<div class="row" style="margin-top:12px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr" style="width:100%"></div>' +
+  '<button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button><p class="m" id="msg" style="margin-top:12px;color:var(--late)"></p></div>';
+  
   const doLogin = async () => {
     $('msg').textContent = 'جارٍ الدخول...'; $('msg').style.color = 'inherit';
-    const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password:$('pw').value });
+    const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password: $('pw').value });
     if(error){ $('msg').textContent = error.message; $('msg').style.color = 'var(--late)'; }
   };
   $('go').onclick = doLogin;
@@ -313,18 +314,17 @@ function render() {
   if (!S.me) return;
   const props = S.props || [];
   const openProps = props.filter(p => !isClosed(p)).length;
-  const badge = openProps ? `<span class="n">${openProps}</span>` : '';
+  const badge = openProps ? '<span class="n">' + openProps + '</span>' : '';
   
-  $app.innerHTML = `
-  <div class="top"><h1>مدير المهام</h1><div class="row s"><span class="chip" style="font-size:14px">👤 ${esc(S.me.name)}</span><button id="rf" class="s">🔄 تحديث</button></div></div>
-  <div class="nav">
-    <button data-nv="board" class="${S.view === 'board' ? 'on' : ''}">المهام والمشاريع</button>
-    <button data-nv="props" class="${S.view === 'props' ? 'on' : ''}">القرارات والتصويت${badge}</button>
-    <button data-nv="set" class="${S.view === 'set' ? 'on' : ''}">الإعدادات</button>
-  </div>
-  ${S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView()}`;
+  $app.innerHTML = '<div class="top"><h1>مدير المهام</h1><div class="row s"><span class="chip" style="font-size:14px">👤 ' + esc(S.me.name) + '</span><button id="rf" class="s">🔄 تحديث</button></div></div>' +
+  '<div class="nav">' +
+    '<button data-nv="board" class="' + (S.view === 'board' ? 'on' : '') + '">المهام والمشاريع</button>' +
+    '<button data-nv="props" class="' + (S.view === 'props' ? 'on' : '') + '">القرارات والتصويت' + badge + '</button>' +
+    '<button data-nv="set" class="' + (S.view === 'set' ? 'on' : '') + '">الإعدادات</button>' +
+  '</div>' +
+  (S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : settingsView());
   
-  $('rf').onclick = () => {$('rf').textContent = '⏳'; load(); };
+  $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
   document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
   if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else bindSettings();
 }
@@ -338,8 +338,8 @@ function renderNotesAndWorkflow(notesStr) {
     
     lines.forEach(l => {
         if(l.startsWith('[WF_HANDOFF]')) {
-            let p = l.replace('[WF_HANDOFF]', '').split('||'); // from || to || date || msg
-            wfHistory.push(`<div class="wf-item"><div class="wf-meta">🔄 <b>${esc(p[0])}</b> أحالها إلى <b>${esc(p[1])}</b> <span dir="ltr">(${esc(p[2])})</span></div><div class="wf-msg">${esc(p[3]||'')}</div></div>`);
+            let p = l.replace('[WF_HANDOFF]', '').split('||');
+            wfHistory.push('<div class="wf-item"><div class="wf-meta">🔄 <b>' + esc(p[0]) + '</b> أحالها إلى <b>' + esc(p[1]) + '</b> <span dir="ltr">(' + esc(p[2]) + ')</span></div><div class="wf-msg">' + esc(p[3]||'') + '</div></div>');
         } else {
             mainNotes.push(l);
         }
@@ -347,8 +347,8 @@ function renderNotesAndWorkflow(notesStr) {
     
     let html = '';
     let mainTxt = mainNotes.join('\n').trim();
-    if(mainTxt) html += `<div class="nt">${esc(mainTxt)}</div>`;
-    if(wfHistory.length > 0) html += `<div class="wf-list">${wfHistory.join('')}</div>`;
+    if(mainTxt) html += '<div class="nt">' + esc(mainTxt) + '</div>';
+    if(wfHistory.length > 0) html += '<div class="wf-list">' + wfHistory.join('') + '</div>';
     return html;
 }
 
@@ -365,27 +365,28 @@ function card(t) {
   const acts = (t.for_all ? ACT_ALL : ACT)[st];
   const dn = doneBy(t);
   
-  // زر الواتساب ظاهر دائماً إذا كانت المهمة مسندة لشخص!
   let waBtn = '';
   if (!t.for_all && t.assignee_email && S.me && t.assignee_email) {
-    const msg = `مرحباً ${nm(t.assignee_email)}،\nتذكير بمهمة: *${t.title}*\n${t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : ''}\nنرجو المتابعة والتحديث. 🚀`;
-    waBtn = `<a href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" class="wa-btn" title="تذكير عبر الواتساب">💬</a>`;
+    const msg = 'مرحباً ' + nm(t.assignee_email) + '،\nتذكير بمهمة: *' + t.title + '*\n' + (t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : '') + '\nنرجو المتابعة والتحديث. 🚀';
+    waBtn = '<a href="https://wa.me/?text=' + encodeURIComponent(msg) + '" target="_blank" class="wa-btn" title="تذكير عبر الواتساب">💬</a>';
   }
 
-  let actsHtml = acts.map(([k, l]) => `<button data-mv="${t.id}" data-to="${k}">${l}</button>`).join('');
-  let handoffBtn = (!t.for_all && st !== 'done') ? `<button class="s" data-hf="${t.id}" style="background:var(--accsoft);color:var(--acc)">إحالة 🔄</button>` : '';
+  let actsHtml = acts.map(([k, l]) => '<button data-mv="' + t.id + '" data-to="' + k + '">' + l + '</button>').join('');
+  let handoffBtn = (!t.for_all && st !== 'done') ? '<button class="s" data-hf="' + t.id + '" style="background:var(--accsoft);color:var(--acc)">إحالة 🔄</button>' : '';
 
-  return `<div class="tk ${st}" draggable="true" data-id="${t.id}">
-    <div class="tt">${esc(t.title)}</div>
-    ${renderNotesAndWorkflow(t.notes)}
-    <div class="meta" style="align-items:center;">
-      ${t.for_all ? `<span class="chip all" title="${esc(dn.map(x => nm(x.email)).join('\n'))}">👥 فريق (${dn.length}/${S.members.length})</span>` : `<span class="chip" style="font-weight:700">👤 ${esc(nm(t.assignee_email))}</span>`}
-      ${d ? `<span class="chip ${d.c}">${esc(d.t)}</span>` : ''}
-      ${mt ? `<span class="chip">📌 ${esc(mt.title)}</span>` : ''}
-      ${waBtn}
-    </div>
-    <div class="acts">${actsHtml} ${handoffBtn}</div>
-  </div>`;
+  let metaAll = t.for_all 
+    ? '<span class="chip all" title="' + esc(dn.map(x => nm(x.email)).join('\n')) + '">👥 فريق (' + dn.length + '/' + S.members.length + ')</span>' 
+    : '<span class="chip" style="font-weight:700">👤 ' + esc(nm(t.assignee_email)) + '</span>';
+
+  let metaD = d ? '<span class="chip ' + d.c + '">' + esc(d.t) + '</span>' : '';
+  let metaMt = mt ? '<span class="chip">📌 ' + esc(mt.title) + '</span>' : '';
+
+  return '<div class="tk ' + st + '" draggable="true" data-id="' + t.id + '">' +
+    '<div class="tt">' + esc(t.title) + '</div>' +
+    renderNotesAndWorkflow(t.notes) +
+    '<div class="meta" style="align-items:center;">' + metaAll + metaD + metaMt + waBtn + '</div>' +
+    '<div class="acts">' + actsHtml + ' ' + handoffBtn + '</div>' +
+  '</div>';
 }
 
 function boardView() {
@@ -396,38 +397,40 @@ function boardView() {
   
   const cols = Object.keys(ST).map(k => {
     const items = all.filter(t => eff(t) === k);
-    return `<div class="col ${S.col === k ? 'on' : ''}" data-st="${k}">
-      <div class="ch"><span>${ST[k]}</span><i>${items.length}</i></div>
-      ${items.length ? items.map(card).join('') : `<div class="empty">لا يوجد مهام</div>`}
-    </div>`;
+    return '<div class="col ' + (S.col === k ? 'on' : '') + '" data-st="' + k + '">' +
+      '<div class="ch"><span>' + ST[k] + '</span><i>' + items.length + '</i></div>' +
+      (items.length ? items.map(card).join('') : '<div class="empty">لا يوجد مهام</div>') +
+    '</div>';
   }).join('');
   
-  return `
-  <div class="stats">
-    <div class="stat"><b>${open.length}</b><span>قيد العمل</span></div>
-    <div class="stat late"><b>${late}</b><span>متأخرة</span></div>
-    <div class="stat soon"><b>${soon}</b><span>اليوم/غداً</span></div>
-  </div>
-  <div class="tools">
-    <div class="seg"><button data-f="mine" class="${S.filter === 'mine' ? 'on' : ''}">مهامي فقط</button><button data-f="all" class="${S.filter === 'all' ? 'on' : ''}">كل الفريق</button></div>
-    <select id="fm" style="border-radius:6px"><option value="">كل الاجتماعات/المشاريع</option>${S.meetings.map(m => `<option value="${m.id}" ${S.meeting === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('')}</select>
-    <span class="sp"></span>
-    ${isAdmin() ? `<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>` : ''}
-    <button class="p s" id="nt">➕ إضافة مهمة</button>
-  </div>
-  <div class="ctabs">${Object.keys(ST).map(k => `<button data-c="${k}" class="${S.col === k ? 'on' : ''}">${ST[k]} (${all.filter(t => eff(t) === k).length})</button>`).join('')}</div>
-  <div class="board">${cols}</div>`;
+  let mtOpts = '<option value="">كل المشاريع/الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
+  let adminBtn = isAdmin() ? '<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>' : '';
+  let cTabs = Object.keys(ST).map(k => '<button data-c="' + k + '" class="' + (S.col === k ? 'on' : '') + '">' + ST[k] + ' (' + all.filter(t => eff(t) === k).length + ')</button>').join('');
+
+  return '<div class="stats">' +
+    '<div class="stat"><b>' + open.length + '</b><span>قيد العمل</span></div>' +
+    '<div class="stat late"><b>' + late + '</b><span>متأخرة</span></div>' +
+    '<div class="stat soon"><b>' + soon + '</b><span>اليوم/غداً</span></div>' +
+  '</div>' +
+  '<div class="tools">' +
+    '<div class="seg"><button data-f="mine" class="' + (S.filter === 'mine' ? 'on' : '') + '">مهامي فقط</button><button data-f="all" class="' + (S.filter === 'all' ? 'on' : '') + '">كل الفريق</button></div>' +
+    '<select id="fm" style="border-radius:6px">' + mtOpts + '</select>' +
+    '<span class="sp"></span>' +
+    adminBtn + '<button class="p s" id="nt">➕ إضافة مهمة</button>' +
+  '</div>' +
+  '<div class="ctabs">' + cTabs + '</div>' +
+  '<div class="board">' + cols + '</div>';
 }
 
 function bindBoard() {
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
   document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.col = b.dataset.c; render(); });
-  $('fm').onchange = e => { S.meeting = e.target.value; render(); };$('nt').onclick = () => taskDialog(null);
-  if ($('nmt'))$('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
+  $('fm').onchange = e => { S.meeting = e.target.value; render(); };
+  $('nt').onclick = () => taskDialog(null);
+  if ($('nmt')) $('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
   
   document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
   
-  // تفعيل زر الإحالة (Workflow)
   document.querySelectorAll('[data-hf]').forEach(b => {
       b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); };
   });
@@ -448,15 +451,16 @@ function bindBoard() {
 function handoffDialog(tId) {
     const t = S.tasks.find(x => x.id === tId);
     if(!t) return;
-    let opts = S.members.filter(m => !same(m.email, t.assignee_email)).map(m => `<option value="${esc(m.email)}">${esc(m.name)}</option>`).join('');
+    let opts = '<option value="">-- اختر الزميل --</option>' + S.members.filter(m => !same(m.email, t.assignee_email)).map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
     
-    dlg.innerHTML = `<h2>إحالة المهمة (Workflow)</h2>
-    <div style="background:var(--col);padding:10px;border-radius:8px;margin-bottom:16px;font-weight:600">${esc(t.title)}</div>
-    <label>إحالة إلى الزميل:<select id="hf_to"><option value="">-- اختر الزميل --</option>${opts}</select></label>
-    <label>رسالة التوجيه/المطلوب:<textarea id="hf_msg" rows="3" placeholder="اكتب ملاحظاتك ليكمل عليها..."></textarea></label>
-    <div class="row dact"><button id="hf_cx" class="s">إلغاء</button><button class="p" id="hf_sv">إحالة المهمة الآن</button></div>`;
+    dlg.innerHTML = '<h2>إحالة المهمة (Workflow)</h2>' +
+    '<div style="background:var(--col);padding:10px;border-radius:8px;margin-bottom:16px;font-weight:600">' + esc(t.title) + '</div>' +
+    '<label>إحالة إلى الزميل:<select id="hf_to">' + opts + '</select></label>' +
+    '<label>رسالة التوجيه/المطلوب:<textarea id="hf_msg" rows="3" placeholder="اكتب ملاحظاتك ليكمل عليها..."></textarea></label>' +
+    '<div class="row dact"><button id="hf_cx" class="s">إلغاء</button><button class="p" id="hf_sv">إحالة المهمة الآن</button></div>';
     
-    $('hf_cx').onclick = () => dlg.close();$('hf_sv').onclick = async () => {
+    $('hf_cx').onclick = () => dlg.close();
+    $('hf_sv').onclick = async () => {
         const to = $('hf_to').value;
         if(!to) return alert('الرجاء اختيار زميل لإحالة المهمة إليه.');
         const msg = $('hf_msg').value.trim();
@@ -497,37 +501,36 @@ function taskDialog(t, pre = {}) {
   const x = t || pre, edit = !!t;
   const asVal = x.for_all ? '__all' : (x.assignee_email || (S.me ? S.me.email : ''));
   
-  let asOpts = `<option value="__all" ${asVal === '__all' ? 'selected' : ''}>👥 مهمة جماعية للكل</option>
-                <option value="" ${asVal === '' ? 'selected' : ''}>غير مُسند</option>` +
-               S.members.map(m => `<option value="${esc(m.email)}" ${same(m.email, asVal) ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+  let asOpts = '<option value="__all" ' + (asVal === '__all' ? 'selected' : '') + '>👥 مهمة جماعية للكل</option>' +
+               '<option value="" ' + (asVal === '' ? 'selected' : '') + '>غير مُسند</option>' +
+               S.members.map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, asVal) ? 'selected' : '') + '>' + esc(m.name) + '</option>').join('');
                
-  let mtOpts = `<option value="">بدون ارتباط</option>` + S.meetings.map(m => `<option value="${m.id}" ${x.meeting_id === m.id ? 'selected' : ''}>${esc(m.title)}</option>`).join('');
-  let stOpts = Object.entries(ST).map(([k, v]) => `<option value="${k}" ${(x.status || 'todo') === k ? 'selected' : ''}>${v}</option>`).join('');
+  let mtOpts = '<option value="">بدون ارتباط</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (x.meeting_id === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
+  let stOpts = Object.entries(ST).map(([k, v]) => '<option value="' + k + '" ' + ((x.status || 'todo') === k ? 'selected' : '') + '>' + v + '</option>').join('');
 
-  dlg.innerHTML = `<h2>${edit ? 'تعديل المهمة' : 'مهمة جديدة'}</h2>
-  <label>العنوان<input id="f_ti" value="${esc(x.title || '')}" placeholder="ما هو المطلوب إنجازه؟"></label>
-  <label>تفاصيل وروابط (اختياري)<textarea id="f_no" rows="3">${esc(x.notes || '')}</textarea></label>
-  <div class="row">
-    <label>المسؤول الأول عن التنفيذ<select id="f_as">${asOpts}</select></label>
-    <label>تاريخ الاستحقاق<input id="f_du" type="date" value="${esc(x.due_on || '')}"></label>
-  </div>
-  <div class="row" style="margin-top:10px">
-    <label>الارتباط (قسم/مشروع)<select id="f_mt">${mtOpts}</select></label>
-    <label id="f_stw">الحالة<select id="f_st">${stOpts}</select></label>
-  </div>
-  <p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة للكل:</b> تظهر لجميع الأعضاء، وكل عضو يعتمد إنجازها لنفسه بشكل منفصل.</p>
-  <div class="row dact">
-    ${edit && canDel(t) ? `<button class="dng s" id="f_dl" style="margin-inline-end:auto">حذف</button>` : '<span></span>'}
-    <button id="f_cx" class="s">إلغاء</button>
-    <button class="p s" id="f_sv">حفظ</button>
-  </div>`;
+  let dlBtn = edit && canDel(t) ? '<button class="dng s" id="f_dl" style="margin-inline-end:auto">حذف</button>' : '<span></span>';
+
+  dlg.innerHTML = '<h2>' + (edit ? 'تعديل المهمة' : 'مهمة جديدة') + '</h2>' +
+  '<label>العنوان<input id="f_ti" value="' + esc(x.title || '') + '" placeholder="ما هو المطلوب إنجازه؟"></label>' +
+  '<label>تفاصيل وروابط (اختياري)<textarea id="f_no" rows="3">' + esc(x.notes || '') + '</textarea></label>' +
+  '<div class="row">' +
+    '<label>المسؤول الأول عن التنفيذ<select id="f_as">' + asOpts + '</select></label>' +
+    '<label>تاريخ الاستحقاق<input id="f_du" type="date" value="' + esc(x.due_on || '') + '"></label>' +
+  '</div>' +
+  '<div class="row" style="margin-top:10px">' +
+    '<label>الارتباط (قسم/مشروع)<select id="f_mt">' + mtOpts + '</select></label>' +
+    '<label id="f_stw">الحالة<select id="f_st">' + stOpts + '</select></label>' +
+  '</div>' +
+  '<p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة للكل:</b> تظهر لجميع الأعضاء، وكل عضو يعتمد إنجازها لنفسه بشكل منفصل.</p>' +
+  '<div class="row dact">' + dlBtn + '<button id="f_cx" class="s">إلغاء</button><button class="p s" id="f_sv">حفظ</button></div>';
   
   const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; };
   $('f_as').onchange = sync; sync();
-  $('f_cx').onclick = () => dlg.close();$('f_sv').onclick = async () => {
-    const title = $('f_ti').value.trim(); if (!title) return$('f_ti').focus();
+  $('f_cx').onclick = () => dlg.close();
+  $('f_sv').onclick = async () => {
+    const title = $('f_ti').value.trim(); if (!title) return $('f_ti').focus();
     const all = $('f_as').value === '__all';
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value \vert{}\vert{} null), due_on:$('f_du').value || null, meeting_id: $('f_mt').value \vert{}\vert{} null, status: all ? 'todo' : $('f_st').value };
+    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : ($('f_as').value || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
     if (!edit) row.created_by = S.me.email;
     
     $('f_sv').disabled = true; $('f_sv').textContent = '...';
@@ -540,7 +543,7 @@ function taskDialog(t, pre = {}) {
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
-/* ---------- التصويت (مفرد ومتعدد) ذكي بدون تغيير الداتابيز ---------- */
+/* ---------- التصويت (مفرد ومتعدد) ---------- */
 function parseOptions(p) {
   let arr = ['موافق', 'معارض'];
   if (p && p.options) {
@@ -553,11 +556,13 @@ function parseOptions(p) {
 }
 
 function propCard(p) {
-  const { opts, isMulti } = parseOptions(p);
+  const parsed = parseOptions(p);
+  const opts = parsed.opts;
+  const isMulti = parsed.isMulti;
+  
   const vts = (S.votes || []).filter(x => x.proposal_id === p.id);
   const myVote = S.me ? vts.find(x => same(x.email, S.me.email)) : null;
   
-  // حساب الأصوات (Tallying)
   let optCounts = opts.map(()=>0);
   let optVoters = opts.map(()=>[]);
   
@@ -580,29 +585,27 @@ function propCard(p) {
       });
   });
 
-  const totalVotes = vts.length; // Number of unique voters
+  const totalVotes = vts.length;
   const can = S.me && (same(p.author_email, S.me.email) || isAdmin());
   const open = !isClosed(p);
 
-  // رسم النتائج
   let res = opts.map((opt, i) => {
     let count = optCounts[i];
     let w = totalVotes ? ((count / totalVotes) * 100).toFixed(0) : 0;
     
     let vlist = '';
     if (count > 0) {
-      let items = optVoters[i].map(x => `<b>${esc(nm(x.email))}</b>${x.actualNote ? ` <span style="color:var(--mute)">(${esc(x.actualNote)})</span>` : ''}`).join('<br>');
-      vlist = `<div class="voters-box">${items}</div>`;
+      let items = optVoters[i].map(x => '<b>' + esc(nm(x.email)) + '</b>' + (x.actualNote ? ' <span style="color:var(--mute)">(' + esc(x.actualNote) + ')</span>' : '')).join('<br>');
+      vlist = '<div class="voters-box">' + items + '</div>';
     }
     
-    return `<div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px"><span>${esc(opt)}</span><span>${count} صوت (${w}%)</span></div>
-      <div class="tally"><i style="width:${w}%;background:var(--acc)"></i></div>
-      ${vlist}
-    </div>`;
+    return '<div style="margin-bottom:14px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px"><span>' + esc(opt) + '</span><span>' + count + ' صوت (' + w + '%)</span></div>' +
+      '<div class="tally"><i style="width:' + w + '%;background:var(--acc)"></i></div>' +
+      vlist +
+    '</div>';
   }).join('');
 
-  // شريط التصويت
   let act = '';
   if (open) {
     let mySelections = [];
@@ -620,44 +623,48 @@ function propCard(p) {
     
     let inputUI = '';
     if (isMulti) {
-        inputUI = `<div class="multi-options" id="v_m_${p.id}">` + opts.map((o, i) => 
-            `<label><input type="checkbox" value="${i}" ${mySelections.includes(i) ? 'checked' : ''}> ${esc(o)}</label>`
-        ).join('') + `</div>`;
+        inputUI = '<div class="multi-options" id="v_m_' + p.id + '">' + opts.map((o, i) => 
+            '<label><input type="checkbox" value="' + i + '" ' + (mySelections.includes(i) ? 'checked' : '') + '> ' + esc(o) + '</label>'
+        ).join('') + '</div>';
     } else {
-        inputUI = `<select id="v_s_${p.id}" style="width:100%;margin-bottom:8px"><option value="">-- اختر أحد الخيارات --</option>` + 
-        opts.map((o, i) => `<option value="${i}" ${mySelections.includes(i) ? 'selected' : ''}>${esc(o)}</option>`).join('') + 
-        `</select>`;
+        inputUI = '<select id="v_s_' + p.id + '" style="width:100%;margin-bottom:8px"><option value="">-- اختر أحد الخيارات --</option>' + 
+        opts.map((o, i) => '<option value="' + i + '" ' + (mySelections.includes(i) ? 'selected' : '') + '>' + esc(o) + '</option>').join('') + 
+        '</select>';
     }
     
-    act = `<div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);">
-      <h3 style="font-size:14px;margin:0 0 10px;color:var(--acc)">صوّت الآن:</h3>
-      ${inputUI}
-      <input id="v_n_${p.id}" placeholder="اكتب ملاحظة ليروها الجميع (اختياري)..." value="${esc(myNote)}" style="width:100%;margin-top:8px">
-      <button class="p" data-cast="${p.id}" data-ismulti="${isMulti}" style="width:100%;margin-top:12px">${myVote ? 'تحديث التصويت' : 'إرسال التصويت'}</button>
-    </div>`;
+    let btnText = myVote ? 'تحديث التصويت' : 'إرسال التصويت';
+    act = '<div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);">' +
+      '<h3 style="font-size:14px;margin:0 0 10px;color:var(--acc)">صوّت الآن:</h3>' +
+      inputUI +
+      '<input id="v_n_' + p.id + '" placeholder="اكتب ملاحظة ليروها الجميع (اختياري)..." value="' + esc(myNote) + '" style="width:100%;margin-top:8px">' +
+      '<button class="p" data-cast="' + p.id + '" data-ismulti="' + isMulti + '" style="width:100%;margin-top:12px">' + btnText + '</button>' +
+    '</div>';
   }
   
-  let actionBtns = can ? (open ? `<button data-ps="${p.id}" data-to="accepted">اعتماد</button><button data-ps="${p.id}" data-to="rejected">رفض</button>` : `<button data-ps="${p.id}" data-to="open">إعادة فتح</button>`) + `<button class="dng" data-pdel="${p.id}">حذف</button>` : '';
+  let actionBtns = can ? (open ? '<button data-ps="' + p.id + '" data-to="accepted">اعتماد</button><button data-ps="' + p.id + '" data-to="rejected">رفض</button>' : '<button data-ps="' + p.id + '" data-to="open">إعادة فتح</button>') + '<button class="dng" data-pdel="' + p.id + '">حذف</button>' : '';
+  let detHtml = p.details ? '<div class="det">' + esc(p.details) + '</div>' : '';
 
-  return `<div class="card pr">
-    <div class="bar"><span class="ttl">${esc(p.title)}</span><span class="chip ${p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all'}">${esc(PST[p.status] || p.status)}</span></div>
-    ${p.details ? `<div class="det">${esc(p.details)}</div>` : ''}
-    <div class="m">بواسطة ${esc(nm(p.author_email))} · ${esc((p.created_at || '').slice(0, 10))}</div>
-    <div style="margin-top:16px;background:var(--col);padding:16px;border-radius:12px">${res}</div>
-    ${act}
-    <div class="pa">
-      <button data-totask="${p.id}">تحويل إلى مهمة</button>
-      ${actionBtns}
-    </div>
-  </div>`;
+  return '<div class="card pr">' +
+    '<div class="bar"><span class="ttl">' + esc(p.title) + '</span><span class="chip ' + (p.status === 'accepted' ? 'ok' : p.status === 'rejected' ? 'late' : 'all') + '">' + esc(PST[p.status] || p.status) + '</span></div>' +
+    detHtml +
+    '<div class="m">بواسطة ' + esc(nm(p.author_email)) + ' · ' + esc((p.created_at || '').slice(0, 10)) + '</div>' +
+    '<div style="margin-top:16px;background:var(--col);padding:16px;border-radius:12px">' + res + '</div>' +
+    act +
+    '<div class="pa">' +
+      '<button data-totask="' + p.id + '">تحويل إلى مهمة</button>' +
+      actionBtns +
+    '</div>' +
+  '</div>';
 }
 
 function propsView() {
-  if (S.propsErr) return `<div class="card"><b style="color:var(--late)">عذراً، يوجد خطأ في الاتصال بجداول التصويت.</b></div>`;
+  if (S.propsErr) return '<div class="card"><b style="color:var(--late)">عذراً، يوجد خطأ في الاتصال بجداول التصويت.</b></div>';
   const list = S.props.filter(p => S.pf === 'open' ? !isClosed(p) : isClosed(p));
   
-  return `<div class="tools"><div class="seg"><button data-pf="open" class="${S.pf === 'open' ? 'on' : ''}">قيد التصويت</button><button data-pf="closed" class="${S.pf === 'closed' ? 'on' : ''}">المغلقة</button></div><span class="sp"></span><button class="p" id="np">➕ مقترح/تصويت جديد</button></div>
-  ${list.length ? list.map(propCard).join('') : `<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>`}`;
+  let listHtml = list.length ? list.map(propCard).join('') : '<div class="card empty">لا توجد مقترحات في هذه القائمة.</div>';
+  
+  return '<div class="tools"><div class="seg"><button data-pf="open" class="' + (S.pf === 'open' ? 'on' : '') + '">قيد التصويت</button><button data-pf="closed" class="' + (S.pf === 'closed' ? 'on' : '') + '">المغلقة</button></div><span class="sp"></span><button class="p" id="np">➕ مقترح/تصويت جديد</button></div>' +
+  listHtml;
 }
 
 function bindProps() {
@@ -671,16 +678,16 @@ function bindProps() {
       const isMulti = btn.dataset.ismulti === 'true';
       let selectedIdx = -1;
       let finalNote = '';
-      let userNote = $(`v_n_${pid}`).value.trim();
+      let userNote = $('v_n_' + pid).value.trim();
       
       if (isMulti) {
-          let checks = document.querySelectorAll(`#v_m_${pid} input[type="checkbox"]:checked`);
+          let checks = document.querySelectorAll('#v_m_' + pid + ' input[type="checkbox"]:checked');
           if(checks.length === 0) return alert('الرجاء اختيار خيار واحد على الأقل.');
           let vals = Array.from(checks).map(c => c.value);
           selectedIdx = -1;
           finalNote = 'MULTI:' + vals.join(',') + '||' + userNote;
       } else {
-          let sel = $(`v_s_${pid}`).value;
+          let sel = $('v_s_' + pid).value;
           if(sel === '') return alert('الرجاء اختيار خيار.');
           selectedIdx = parseInt(sel);
           finalNote = userNote;
@@ -699,15 +706,16 @@ function bindProps() {
 }
 
 function propDialog() {
-  dlg.innerHTML = `<h2>طرح تصويت/مقترح جديد</h2>
-  <label>عنوان المقترح<input id="p_ti" placeholder="مثلاً: تغيير موعد الاجتماع"></label>
-  <label>التفاصيل والمبررات<textarea id="p_de" rows="2"></textarea></label>
-  <label>خيارات التصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_op" rows="3" placeholder="الخيار الأول\nالخيار الثاني"></textarea></label>
-  <label style="display:flex;align-items:center;gap:8px;font-weight:600;margin-top:12px"><input type="checkbox" id="p_multi" style="width:18px;height:18px;margin:0"> السماح باختيار أكثر من خيار</label>
-  <div class="row dact"><button id="p_cx" class="s">إلغاء</button><button class="p s" id="p_sv">نشر للتصويت</button></div>`;
+  dlg.innerHTML = '<h2>طرح تصويت/مقترح جديد</h2>' +
+  '<label>عنوان المقترح<input id="p_ti" placeholder="مثلاً: تغيير موعد الاجتماع"></label>' +
+  '<label>التفاصيل والمبررات<textarea id="p_de" rows="2"></textarea></label>' +
+  '<label>خيارات التصويت (اكتب كل خيار في سطر مستقل)<textarea id="p_op" rows="3" placeholder="الخيار الأول\nالخيار الثاني"></textarea></label>' +
+  '<label style="display:flex;align-items:center;gap:8px;font-weight:600;margin-top:12px"><input type="checkbox" id="p_multi" style="width:18px;height:18px;margin:0"> السماح باختيار أكثر من خيار</label>' +
+  '<div class="row dact"><button id="p_cx" class="s">إلغاء</button><button class="p s" id="p_sv">نشر للتصويت</button></div>';
   
-  $('p_cx').onclick = () => dlg.close();$('p_sv').onclick = async () => {
-    const title = $('p_ti').value.trim(); if (!title) return$('p_ti').focus();
+  $('p_cx').onclick = () => dlg.close();
+  $('p_sv').onclick = async () => {
+    const title = $('p_ti').value.trim(); if (!title) return $('p_ti').focus();
     let rawOpts = $('p_op').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
     if (rawOpts.length === 0) rawOpts = ['موافق', 'غير موافق'];
     
@@ -723,18 +731,28 @@ function propDialog() {
 
 /* ---------- الإعدادات ---------- */
 function settingsView() {
-  return `
-  <div class="card" style="border-color:var(--oksoft)">
-    <h2>🔔 إشعارات الجوال للأعضاء</h2>
-    <p class="m" style="margin-bottom:12px;color:var(--ink)">لضمان وصول الإشعارات لشركائك:<br>
-    <b>أندرويد:</b> يفتح الموقع ويضغط تفعيل الإشعارات.<br>
-    <b>آيفون (iOS):</b> يجب أن يفتح الموقع من سفاري ويضغط "مشاركة" > <b>إضافة للشاشة الرئيسية</b>، ثم يفتح التطبيق من الأيقونة ويضغط تفعيل.</p>
-    <div class="row"><button class="p s" id="push" style="background:var(--ok);border-color:var(--ok)">تفعيل الإشعارات في جهازي</button></div>
-    <p class="m" id="pm" style="margin-top:10px;font-weight:600"></p>
-  </div>
-  <div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>
-  ${isAdmin() ? `<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء</h2>${S.members.map(m => `<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>${esc(m.name)}</b> <span class="m" dir="ltr">(${esc(m.email)})</span></div>${S.me && same(m.email, S.me.email) ? '' : `<button class="dng s" data-rm="${esc(m.email)}">إزالة</button>`}</div>`).join('')}<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>` : ''}
-  <div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>`;
+  let adminHtml = '';
+  if (isAdmin()) {
+    let memList = S.members.map(m => {
+        let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
+        return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span></div>' + rmBtn + '</div>';
+    }).join('');
+    
+    adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء</h2>' + memList + 
+      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
+  }
+
+  return '<div class="card" style="border-color:var(--oksoft)">' +
+    '<h2>🔔 إشعارات الجوال للأعضاء</h2>' +
+    '<p class="m" style="margin-bottom:12px;color:var(--ink)">لضمان وصول الإشعارات لشركائك:<br>' +
+    '<b>أندرويد:</b> يفتح الموقع ويضغط تفعيل الإشعارات.<br>' +
+    '<b>آيفون (iOS):</b> يجب أن يفتح الموقع من سفاري ويضغط "مشاركة" > <b>إضافة للشاشة الرئيسية</b>، ثم يفتح التطبيق من الأيقونة ويضغط تفعيل.</p>' +
+    '<div class="row"><button class="p s" id="push" style="background:var(--ok);border-color:var(--ok)">تفعيل الإشعارات في جهازي</button></div>' +
+    '<p class="m" id="pm" style="margin-top:10px;font-weight:600"></p>' +
+  '</div>' +
+  '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
+  adminHtml +
+  '<div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>';
 }
 
 function bindSettings() {
@@ -755,10 +773,10 @@ function bindSettings() {
     const v = $('np').value; if (v.length < 6) return alert('6 أحرف على الأقل'); 
     $('svp').textContent = '...';
     const { error } = await sb.auth.updateUser({ password: v }); 
-    alert(error ? error.message : 'تم التغيير.'); $('np').value = '';$('svp').textContent = 'حفظ التغيير';
+    alert(error ? error.message : 'تم التغيير.'); $('np').value = ''; $('svp').textContent = 'حفظ التغيير';
   };
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
-  if ($('addm'))$('addm').onclick = () => { const e = $('ne').value.trim(), n =$('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
+  if ($('addm')) $('addm').onclick = () => { const e = $('ne').value.trim(), n = $('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
