@@ -137,7 +137,7 @@ const CACHE_KEY = 'cache_v10';
 const API = SUPABASE_URL, KEY = SUPABASE_ANON_KEY;
 let AUTH = { s: null };
 try { AUTH.s = JSON.parse(localStorage.getItem('sbs') || 'null'); } catch(e){}
-const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); };
+const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); idbSet('sbs', s || null); };
 
 async function tok() {
   const s = AUTH.s;
@@ -168,7 +168,10 @@ class Q {
       const r = await fetch(API + '/rest/v1/' + this.t + '?' + this.p, { method: this.m, headers: h, body: this.b ? JSON.stringify(this.b) : undefined });
       if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || r.statusText } }; }
       return { data: mut ? null : await r.json(), error: null };
-    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بقاعدة البيانات. (تأكد من الإنترنت)' } }; }
+    } catch (e) {
+      if (this.m !== 'GET') { await enqueue({ path: '/rest/v1/' + this.t + '?' + this.p, m: this.m, pf: (this.pf ? this.pf + ',' : '') + 'return=minimal', b: this.b ? JSON.stringify(this.b) : null }); return { data: null, error: null, queued: true }; }
+      return { data: null, error: { message: 'تعذّر الاتصال بقاعدة البيانات. (تأكد من الإنترنت)' } };
+    }
   }
 }
 
@@ -216,6 +219,122 @@ const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
+// ===== المزامنة دون اتصال / الشارة / المرفقات / التعليقات =====
+const idbOpen = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+const idbGet = k => idbOpen().then(d => new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(undefined); })).catch(() => undefined);
+const idbSet = (k, v) => idbOpen().then(d => new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = () => ok(); })).catch(() => {});
+async function requestFlush() {
+  try { const reg = await navigator.serviceWorker.ready; if ('sync' in reg) await reg.sync.register('flush-q'); else if (reg.active) reg.active.postMessage('flush'); } catch (e) {}
+}
+async function enqueue(it) {
+  it.i = Date.now() + '' + Math.random();
+  await idbSet('q', ((await idbGet('q')) || []).concat(it)); updateNet(); requestFlush();
+}
+const netEl = document.createElement('div');
+netEl.style.cssText = 'position:fixed;bottom:12px;inset-inline:12px;margin:auto;max-width:440px;z-index:50;background:#b7791f;color:#fff;border-radius:10px;padding:8px 14px;text-align:center;font-size:14px;display:none';
+document.body.appendChild(netEl);
+async function updateNet() {
+  const n = ((await idbGet('q')) || []).length, off = !navigator.onLine;
+  netEl.style.display = off || n ? 'block' : 'none';
+  netEl.textContent = (off ? 'غير متصل — تعمل على النسخة المحفوظة' : 'جارٍ المزامنة...') + (n ? ' · ' + n + ' تغيير بانتظار المزامنة' : '');
+}
+window.addEventListener('online', () => { updateNet(); if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('flush'); setTimeout(updateNet, 3000); });
+window.addEventListener('offline', updateNet);
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data === 'synced') { updateNet(); load(); } });
+updateNet();
+
+function updateBadge() {
+  if (!navigator.setAppBadge || !S.me) return;
+  const n = S.tasks.filter(t => mine(t) && eff(t) !== 'done').length;
+  n ? navigator.setAppBadge(n).catch(() => {}) : navigator.clearAppBadge().catch(() => {});
+}
+function saveCache() {
+  if (S.me) localStorage.setItem(CACHE_KEY, JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } }));
+}
+function notifyAdmins(t) {
+  if (isAdmin()) return;
+  fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '✅ إنجاز جديد', body: 'أنجز المهمة «' + t.title + '»', to_admins: true, is_custom: true, sender_name: S.me.name }) }).catch(() => {});
+}
+const shrink = f => new Promise((ok, no) => { const i = new Image(); i.onload = () => { const k = Math.min(1, 1600 / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = i.width * k; c.height = i.height * k; c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); URL.revokeObjectURL(i.src); c.toBlob(b => b ? ok(b) : no(), 'image/jpeg', 0.8); }; i.onerror = no; i.src = URL.createObjectURL(f); });
+async function stor(method, path, body, type) {
+  return fetch(API + '/storage/v1/' + path, { method, headers: Object.assign({ apikey: KEY, Authorization: 'Bearer ' + await tok() }, type ? { 'Content-Type': type } : {}), body });
+}
+async function bindExtras(t) {
+  $('f_pg').oninput = () => { $('pg_v').textContent = $('f_pg').value + '%'; };
+  const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const drawC = async () => {
+    const { data, error } = await sb.from('task_comments').select('*').eq('task_id', t.id).order('created_at', { ascending: true });
+    $('cm_list').innerHTML = error ? 'تعذّر التحميل (شغّل features.sql أولاً)' : data.length ? data.map(c => '<div style="padding:6px 0;border-top:1px solid var(--line)"><b>' + esc(nm(c.author_email)) + '</b>' + (S.members.some(m => same(m.email, c.author_email) && m.role === 'admin') ? ' <span class="chip">إدارة</span>' : '') + ' <span style="font-size:12px">' + new Date(c.created_at).toLocaleString('ar') + '</span><div style="color:var(--ink);white-space:pre-wrap">' + esc(c.body) + '</div></div>').join('') : 'لا توجد تعليقات بعد.';
+  };
+  const drawF = async () => {
+    const { data, error } = await sb.from('task_files').select('*').eq('task_id', t.id).order('created_at', { ascending: true });
+    $('fl_list').innerHTML = error ? 'تعذّر التحميل (شغّل features.sql أولاً)' : data.length ? data.map(f => '<div class="bar" style="padding:4px 0">📎 <span>' + esc(f.name) + ' <span style="font-size:12px">(' + kb(f.size || 0) + ')</span></span><span><button class="s" data-of="' + esc(f.path) + '">فتح</button>' + (isAdmin() || same(f.uploaded_by, S.me.email) ? ' <button class="dng s" data-df="' + f.id + '" data-p="' + esc(f.path) + '">حذف</button>' : '') + '</span></div>').join('') : 'لا توجد مرفقات.';
+    document.querySelectorAll('[data-of]').forEach(b => b.onclick = async () => {
+      const r = await stor('POST', 'object/sign/task-files/' + b.dataset.of, JSON.stringify({ expiresIn: 300 }), 'application/json'), j = await r.json().catch(() => ({}));
+      if (!r.ok) return alert(j.message || 'تعذّر فتح الملف'); window.open(API + '/storage/v1' + j.signedURL, '_blank');
+    });
+    document.querySelectorAll('[data-df]').forEach(b => b.onclick = async () => {
+      if (!confirm('حذف المرفق؟')) return; await stor('DELETE', 'object/task-files/' + b.dataset.p); await sb.from('task_files').delete().eq('id', b.dataset.df); drawF();
+    });
+  };
+  $('cm_add').onclick = async () => {
+    const body = $('cm_in').value.trim(); if (!body) return;
+    const { error } = await sb.from('task_comments').insert({ task_id: t.id, author_email: S.me.email, body });
+    if (error) return alert('خطأ: ' + error.message);
+    $('cm_in').value = ''; drawC();
+    const to = same(S.me.email, t.assignee_email) ? t.created_by : t.assignee_email;
+    if (to && !same(to, S.me.email)) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '💬 تعليق على مهمة', body: t.title + ': ' + body.slice(0, 80), assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true }) }).catch(() => {});
+  };
+  $('fl_up').onclick = async () => {
+    const f = $('fl_in').files[0]; if (!f) return alert('اختر ملفاً أولاً');
+    if (f.size > 10485760) return alert('الحد الأقصى 10 ميجابايت');
+    if (!navigator.onLine) return alert('رفع المرفقات يحتاج اتصالاً بالإنترنت.');
+    $('fl_up').disabled = true; $('fl_up').textContent = '...';
+    try {
+      let blob = f, name = f.name;
+      if (/^image\/(jpe?g|png|webp)$/.test(f.type)) { try { blob = await shrink(f); name = name.replace(/\.\w+$/, '') + '.jpg'; } catch (e) { blob = f; } }
+      const path = t.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ((name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin');
+      const r = await stor('POST', 'object/task-files/' + path, blob, blob.type || 'application/octet-stream');
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || 'فشل الرفع');
+      const { error } = await sb.from('task_files').insert({ task_id: t.id, path, name, size: blob.size, uploaded_by: S.me.email });
+      if (error) throw new Error(error.message);
+      $('fl_in').value = ''; drawF();
+    } catch (e) { alert('خطأ: ' + e.message); }
+    $('fl_up').disabled = false; $('fl_up').textContent = 'رفع';
+  };
+  drawC(); drawF();
+}
+const EXTRA_HTML = t => '<div style="margin-top:14px"><label>نسبة الإنجاز: <b id="pg_v">' + (t.progress || 0) + '%</b><input id="f_pg" type="range" min="0" max="100" step="10" value="' + (t.progress || 0) + '"></label></div>' +
+  '<div style="margin-top:14px"><b>📎 المرفقات</b><div id="fl_list" class="m">...</div><div class="row" style="margin-top:6px"><input type="file" id="fl_in" accept="image/*,.pdf,.xls,.xlsx,.csv,.doc,.docx,.ppt,.pptx,.txt,.zip"><button class="s" id="fl_up">رفع</button></div></div>' +
+  '<div style="margin-top:14px"><b>💬 التعليقات والتحديثات</b><div id="cm_list" class="m">...</div><div class="row" style="margin-top:6px"><input id="cm_in" placeholder="اكتب عائقاً أو تحديثاً أو ملاحظة..."><button class="s" id="cm_add">إرسال</button></div></div>';
+
+// ===== المهام المتكررة (للأدمن) =====
+const WD = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const freqText = r => ({ daily: 'يومياً', weekly: 'كل ' + WD[r.weekday || 0], monthly: 'يوم ' + (r.day_of_month || 1) + ' من كل شهر', month_end: 'نهاية كل شهر' })[r.frequency];
+const recurHtml = () => '<div class="card"><h2>🔁 المهام المتكررة (للأدمن)</h2><div id="rc_list" class="m">جارٍ التحميل...</div>' +
+  '<h3 style="font-size:14px;margin-top:16px">إضافة مهمة متكررة:</h3>' +
+  '<div class="row"><input id="rc_ti" placeholder="عنوان المهمة"><select id="rc_as"><option value="__all">👥 لكل الأعضاء</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('') + '</select></div>' +
+  '<div class="row" style="margin-top:8px"><select id="rc_fr"><option value="daily">يومياً</option><option value="weekly">أسبوعياً</option><option value="monthly">شهرياً</option><option value="month_end">نهاية كل شهر</option></select>' +
+  '<select id="rc_wd" style="display:none">' + WD.map((d, i) => '<option value="' + i + '">' + d + '</option>').join('') + '</select><input id="rc_dm" type="number" min="1" max="31" placeholder="يوم الشهر (1-31)" style="display:none"></div>' +
+  '<div class="row" style="margin-top:8px"><input id="rc_du" type="number" min="0" max="30" placeholder="مهلة التنفيذ بالأيام (0 = نفس اليوم)"><button class="p s" id="rc_add">إضافة</button></div></div>';
+async function bindRecur() {
+  if (!$('rc_list')) return;
+  const draw = async () => {
+    const { data, error } = await sb.from('recurring_tasks').select('*').order('created_at', { ascending: true });
+    $('rc_list').innerHTML = error ? 'تعذّر التحميل (شغّل features.sql أولاً)' : data.length ? data.map(r => '<div class="bar" style="padding:4px 0"><span>🔁 <b>' + esc(r.title) + '</b> — ' + freqText(r) + ' — ' + (r.for_all ? 'الكل' : esc(nm(r.assignee_email))) + '</span><button class="dng s" data-rd="' + r.id + '">حذف</button></div>').join('') : 'لا توجد مهام متكررة.';
+    document.querySelectorAll('[data-rd]').forEach(b => b.onclick = async () => { if (confirm('حذف هذه المهمة المتكررة؟')) { await sb.from('recurring_tasks').delete().eq('id', b.dataset.rd); draw(); } });
+  };
+  $('rc_fr').onchange = () => { $('rc_wd').style.display = $('rc_fr').value === 'weekly' ? '' : 'none'; $('rc_dm').style.display = $('rc_fr').value === 'monthly' ? '' : 'none'; };
+  $('rc_add').onclick = async () => {
+    const title = $('rc_ti').value.trim(); if (!title) return $('rc_ti').focus();
+    const fr = $('rc_fr').value, all = $('rc_as').value === '__all';
+    const { error } = await sb.from('recurring_tasks').insert({ title, for_all: all, assignee_email: all ? null : $('rc_as').value, frequency: fr, weekday: fr === 'weekly' ? +$('rc_wd').value : null, day_of_month: fr === 'monthly' ? Math.min(31, Math.max(1, +$('rc_dm').value || 1)) : null, due_after_days: Math.max(0, +$('rc_du').value || 0), created_by: S.me.email });
+    if (error) return alert('خطأ: ' + error.message);
+    $('rc_ti').value = ''; draw();
+  };
+  draw();
+}
+
 async function init() {
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -228,7 +347,7 @@ async function init() {
     try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
 
     const { data: members, error } = await sb.from('members').select('*');
-    if (error) return showErrorBox('تعذر جلب الأعضاء: ' + error.message); 
+    if (error) { if (S.me) { render(); return; } return showErrorBox('تعذر جلب الأعضاء: ' + error.message); }
     
     const me = members.find(m => same(m.email, email));
     if (!members.length || !me) { 
@@ -237,7 +356,7 @@ async function init() {
         return; 
     }
     
-    S.members = members; S.me = me;
+    S.members = members; S.me = me; idbSet('cfg', { url: API, key: KEY, name: me.name });
     await load();
   } catch (err) { showErrorBox(err.message); }
 }
@@ -279,6 +398,7 @@ function loginView() {
 const logout = async () => { await sb.auth.signOut(); localStorage.clear(); location.reload(); };
 
 function render() {
+  try { updateBadge(); saveCache(); } catch (e) {}
   if (!S.me) return;
   const props = S.props || [];
   const openProps = props.filter(p => !isClosed(p)).length;
@@ -348,6 +468,7 @@ function card(t) {
 
   return '<div class="tk ' + st + '" draggable="true" data-id="' + t.id + '">' +
     '<div class="tt">' + esc(t.title) + '</div>' +
+    (t.progress > 0 && st !== 'done' ? '<div style="height:5px;background:var(--line);border-radius:3px;margin:6px 0"><div style="height:100%;width:' + t.progress + '%;background:var(--acc);border-radius:3px"></div></div>' : '') +
     renderNotesAndWorkflow(t.notes) +
     '<div class="meta" style="align-items:center;">' + metaAll + metaD + metaMt + waBtn + '</div>' +
     '<div class="acts">' + actsHtml + ' ' + handoffBtn + '</div>' +
@@ -438,7 +559,7 @@ function handoffDialog(tId) {
         fetch('/api/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: t.title, assignee_email: to, for_all: false, sender_name: S.me.name })
+            body: JSON.stringify({ title: t.title, assignee_email: to, for_all: false, sender_name: S.me.name, task_id: row.id })
         }).catch(e => console.error(e));
 
         dlg.close(); load();
@@ -454,7 +575,7 @@ async function moveTask(id, to) {
     if (to === 'doing') return;
     if (to === 'done') {
       S.done.push({ task_id: id, email: S.me.email }); render();
-      run(sb.from('task_done').upsert({ task_id: id, email: S.me.email }));
+      run(sb.from('task_done').upsert({ task_id: id, email: S.me.email })); notifyAdmins(t);
     } else {
       S.done = S.done.filter(d => !(d.task_id === id && same(d.email, S.me.email))); render();
       run(sb.from('task_done').delete().eq('task_id', id).eq('email', S.me.email));
@@ -463,7 +584,7 @@ async function moveTask(id, to) {
   }
   const prev = t.status; t.status = to; render();
   const { error } = await sb.from('tasks').update({ status: to }).eq('id', id);
-  if (error) { t.status = prev; alert('خطأ: ' + error.message); load(); }
+  if (error) { t.status = prev; alert('خطأ: ' + error.message); load(); } else if (to === 'done') notifyAdmins(t);
 }
 
 function taskDialog(t, pre = {}) {
@@ -493,6 +614,7 @@ function taskDialog(t, pre = {}) {
   '<p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة للكل:</b> تظهر لجميع الأعضاء، وكل عضو يعتمد إنجازها لنفسه بشكل منفصل.</p>' +
   '<div class="row dact">' + dlBtn + '<button id="f_cx" class="s">إلغاء</button><button class="p s" id="f_sv">حفظ</button></div>';
   
+  if (edit) { $('f_hint').insertAdjacentHTML('afterend', EXTRA_HTML(t)); bindExtras(t); }
   const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; };
   $('f_as').onchange = sync; sync();
   $('f_cx').onclick = () => dlg.close();
@@ -501,7 +623,7 @@ function taskDialog(t, pre = {}) {
     const all = $('f_as').value === '__all';
     const assignee = $('f_as').value;
     const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
-    if (!edit) row.created_by = S.me.email;
+    if (!edit) { row.created_by = S.me.email; row.id = crypto.randomUUID(); } else row.progress = +$('f_pg').value;
     
     $('f_sv').disabled = true; $('f_sv').textContent = '...';
     const { error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row);
@@ -759,12 +881,13 @@ function settingsView() {
     '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
-  adminHtml +
+  adminHtml + (isAdmin() ? recurHtml() : '') +
   '<div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>';
 }
 
 function bindSettings() {
   $('out').onclick = logout;
+  bindRecur();
 
   if ($('admin_remind')) {
     $('admin_remind').onclick = async () => {
