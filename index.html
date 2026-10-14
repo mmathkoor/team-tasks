@@ -756,10 +756,18 @@ function bindSettings() {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات (تأكد من إضافة التطبيق للشاشة الرئيسية).';
       if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح الصلاحية.';
       const reg = await navigator.serviceWorker.ready;
+      
+      // === كود الإصلاح التلقائي لإلغاء الاشتراك القديم ===
+      let existingSub = await reg.pushManager.getSubscription();
+      if (existingSub) {
+          await existingSub.unsubscribe(); // يمسح المفتاح القديم المعلق في المتصفح
+      }
+      // ===========================================
+
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">تم تفعيل الإشعارات بنجاح.</span>';
+      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">✅ تم تفعيل الإشعارات بنجاح.</span>';
     } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
   };
 
