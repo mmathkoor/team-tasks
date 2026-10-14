@@ -739,23 +739,24 @@ function settingsView() {
         return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span></div>' + rmBtn + '</div>';
     }).join('');
     
-    // قائمة الموظفين للإشعار المخصص
     let optMembers = '<option value="">-- اختر الموظف --</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
 
     adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء والتنبيهات</h2>' +
       '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon)">إرسال تذكير شامل للفريق 🔔</button>' +
       '<h3 style="font-size:14px;margin-top:16px;color:var(--acc)">إرسال إشعار مخصص لموظف:</h3>' +
-      '<div class="row" style="margin-bottom:16px"><select id="ping_to">' + optMembers + '</select><input id="ping_msg" placeholder="اكتب رسالة التنبيه..."><button class="p s" id="send_ping">إرسال 🔔</button></div>' +
+      '<div class="row" style="margin-bottom:8px"><select id="ping_to">' + optMembers + '</select></div>' +
+      '<div class="row" style="margin-bottom:8px"><input id="ping_msg" placeholder="اكتب رسالة التنبيه (اختياري)..."></div>' +
+      '<div class="row" style="margin-bottom:16px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين تذكير بمهامه غير المنجزة</label></div>' +
+      '<div class="row" style="margin-bottom:16px"><button class="p s" id="send_ping">إرسال الإشعار للموظف 🔔</button></div>' +
       '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
       memList + 
       '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
   }
 
   return '<div class="card" style="border-color:var(--oksoft)">' +
-    '<h2>🔔 إشعارات الجوال للأعضاء</h2>' +
-    '<div class="row"><button class="p s" id="push" style="background:var(--ok);border-color:var(--ok)">1. تفعيل الإشعارات أولاً</button></div>' +
-    '<p class="m" id="pm" style="margin-top:10px;font-weight:600"></p>' +
-    '<div class="row" style="margin-top:10px"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">2. تجربة الإشعار في جوالي الآن 🔔</button></div>' +
+    '<h2>🔔 إعدادات الإشعارات</h2>' +
+    '<p class="m" style="margin-bottom:10px;font-size:13px">الإشعارات تعمل تلقائياً في الخلفية. يمكنك اختبارها من هنا:</p>' +
+    '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
   adminHtml +
@@ -765,77 +766,58 @@ function settingsView() {
 function bindSettings() {
   $('out').onclick = logout;
 
-  // إرسال تذكير شامل
   if ($('admin_remind')) {
     $('admin_remind').onclick = async () => {
         $('admin_remind').textContent = 'جاري إرسال التذكيرات...';
         try {
             await fetch('/api/remind');
-            alert('تم إرسال تذكير بالمهام المتأخرة لجميع أعضاء الفريق!');
-        } catch(e) { alert('تأكد من رفع مجلد api إلى Vercel!'); }
+            alert('تم إرسال تذكير شامل لجميع أعضاء الفريق!');
+        } catch(e) {}
         $('admin_remind').textContent = 'إرسال تذكير شامل للفريق 🔔';
     };
   }
 
-  // إرسال إشعار مخصص لموظف
   if ($('send_ping')) {
       $('send_ping').onclick = async () => {
           const to = $('ping_to').value;
           const msg = $('ping_msg').value.trim();
+          const includeTasks = $('ping_tasks').checked;
+
           if (!to) return alert('الرجاء اختيار الموظف أولاً.');
-          if (!msg) return alert('الرجاء كتابة رسالة التنبيه.');
+          if (!msg && !includeTasks) return alert('يجب كتابة رسالة أو اختيار تضمين المهام.');
           
           $('send_ping').disabled = true; $('send_ping').textContent = '...';
+          
+          // تجميع نص الإشعار
+          let finalBody = msg;
+          if (includeTasks) {
+              const userTasks = S.tasks.filter(t => t.assignee_email === to && t.status !== 'done');
+              if (userTasks.length > 0) {
+                  const tasksList = userTasks.map(t => '🔸 ' + t.title).join('\n');
+                  finalBody += (finalBody ? '\n\n' : '') + 'المهام المفتوحة لديك:\n' + tasksList;
+              } else {
+                  finalBody += (finalBody ? '\n\n' : '') + '(ليس لديك أي مهام مفتوحة حالياً)';
+              }
+          }
+
           try {
               await fetch('/api/notify', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ title: 'تنبيه إداري 🔔', body: msg, assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true })
+                  body: JSON.stringify({ title: 'تنبيه إداري 🔔', body: finalBody, assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true })
               });
-              alert('تم إرسال التنبيه للموظف بنجاح.');
+              alert('تم إرسال الإشعار بنجاح.');
               $('ping_msg').value = '';
-          } catch(e) { alert('تأكد من رفع مجلد api إلى Vercel!'); }
-          $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال 🔔';
+          } catch(e) {}
+          $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار للموظف 🔔';
       };
   }
-  
-$('push').onclick = async () => {
-    const pm = $('pm');
-    pm.textContent = 'جاري التفعيل...';
-    try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات.';
-      if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح الصلاحية.';
-      
-      const reg = await navigator.serviceWorker.ready;
-      
-      // 1. الهجوم الأول: البحث عن أي اشتراك قديم وتدميره برمجياً
-      let existingSub = await reg.pushManager.getSubscription();
-      if (existingSub) {
-          await existingSub.unsubscribe(); // مسح الاشتراك القديم من المتصفح غصباً عنه
-      }
-
-      // 2. الهجوم الثاني: تنظيف قاعدة البيانات برمجياً من أي بقايا لإيميلك
-      await sb.from('push_subs').delete().eq('email', S.me.email);
-
-      // 3. البناء الجديد: إنشاء اشتراك نظيف بالمفتاح الجديد
-      const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-      
-      // 4. الحفظ في قاعدة البيانات
-      const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      
-      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">✅ تم قهر المتصفح وتفعيل الإشعارات بنجاح!</span>';
-    } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
-  };
 
   $('test_push').onclick = async () => {
     if (!('serviceWorker' in navigator)) return alert('المتصفح لا يدعم الإشعارات.');
-    if (Notification.permission !== 'granted') return alert('يجب تفعيل الإشعارات أولاً.');
     const reg = await navigator.serviceWorker.ready;
     alert('سيصلك الإشعار خلال 3 ثوانٍ.. اخرج من التطبيق الآن للشاشة الرئيسية لترى الإشعار.');
-    setTimeout(() => {
-      reg.showNotification('🔔 تذكير تجريبي', { body: 'هذا إشعار حقيقي! النظام يعمل بنجاح.', icon: '/icon-192.png', badge: '/icon-192.png', vibrate: [200, 100, 200] });
-    }, 3000);
+    setTimeout(() => { reg.showNotification('🔔 تذكير تجريبي', { body: 'النظام يعمل بنجاح تام.', icon: '/icon-192.png' }); }, 3000);
   };
 
   $('svp').onclick = async () => { 
@@ -851,6 +833,10 @@ $('push').onclick = async () => {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !dlg.open) load(); });
 init();
+  // تفعيل الإشعارات تلقائياً في الخلفية بعد تحميل التطبيق بثانيتين
+window.addEventListener('load', () => {
+    setTimeout(autoEnablePush, 2000);
+});
 </script>
 </body>
 </html>
