@@ -33,6 +33,7 @@ module.exports = async (req, res) => {
       .neq('status', 'done')
       .lte('due_on', dateString);
 
+    const { data: dn } = await supabase.from('task_done').select('*');
     const { data: proposals } = await supabase.from('proposals').select('*').eq('status', 'open');
 
     let sendPromises = [];
@@ -42,10 +43,14 @@ module.exports = async (req, res) => {
         const payload = JSON.stringify({
           title: '⏳ تذكير بمهمة تقترب',
           body: `المهمة: ${task.title}\nتاريخ التسليم: ${task.due_on}`,
-          icon: '/icon-192.png'
+          icon: '/icon-192.png',
+          task_id: task.id,
+          for_all: !!task.for_all,
+          actions: [{ action: 'done', title: 'إنجاز ✅' }, { action: 'open', title: 'عرض التفاصيل 🔍' }]
         });
 
         subs.forEach(subRow => {
+          if (task.for_all && (dn || []).some(d => d.task_id === task.id && d.email === subRow.email)) return;
           if (task.for_all || task.assignee_email === subRow.email) {
             sendPromises.push(webpush.sendNotification(subRow.sub, payload).catch(e => console.error(e)));
           }
