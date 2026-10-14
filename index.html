@@ -717,8 +717,14 @@ function settingsView() {
         return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span></div>' + rmBtn + '</div>';
     }).join('');
     
+    // قائمة الموظفين للإشعار المخصص
+    let optMembers = '<option value="">-- اختر الموظف --</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
+
     adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء والتنبيهات</h2>' +
       '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon)">إرسال تذكير شامل للفريق 🔔</button>' +
+      '<h3 style="font-size:14px;margin-top:16px;color:var(--acc)">إرسال إشعار مخصص لموظف:</h3>' +
+      '<div class="row" style="margin-bottom:16px"><select id="ping_to">' + optMembers + '</select><input id="ping_msg" placeholder="اكتب رسالة التنبيه..."><button class="p s" id="send_ping">إرسال 🔔</button></div>' +
+      '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
       memList + 
       '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
   }
@@ -737,33 +743,48 @@ function settingsView() {
 function bindSettings() {
   $('out').onclick = logout;
 
+  // إرسال تذكير شامل
   if ($('admin_remind')) {
     $('admin_remind').onclick = async () => {
         $('admin_remind').textContent = 'جاري إرسال التذكيرات...';
         try {
             await fetch('/api/remind');
-            alert('تم إرسال تذكير بالمهام المتأخرة والتصويتات المفتوحة لجميع أعضاء الفريق!');
-        } catch(e) {
-            alert('حدث خطأ في الإرسال.');
-        }
+            alert('تم إرسال تذكير بالمهام المتأخرة لجميع أعضاء الفريق!');
+        } catch(e) { alert('تأكد من رفع مجلد api إلى Vercel!'); }
         $('admin_remind').textContent = 'إرسال تذكير شامل للفريق 🔔';
     };
+  }
+
+  // إرسال إشعار مخصص لموظف
+  if ($('send_ping')) {
+      $('send_ping').onclick = async () => {
+          const to = $('ping_to').value;
+          const msg = $('ping_msg').value.trim();
+          if (!to) return alert('الرجاء اختيار الموظف أولاً.');
+          if (!msg) return alert('الرجاء كتابة رسالة التنبيه.');
+          
+          $('send_ping').disabled = true; $('send_ping').textContent = '...';
+          try {
+              await fetch('/api/notify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: 'تنبيه إداري 🔔', body: msg, assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true })
+              });
+              alert('تم إرسال التنبيه للموظف بنجاح.');
+              $('ping_msg').value = '';
+          } catch(e) { alert('تأكد من رفع مجلد api إلى Vercel!'); }
+          $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال 🔔';
+      };
   }
   
   $('push').onclick = async () => {
     const pm = $('pm');
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات (تأكد من إضافة التطبيق للشاشة الرئيسية).';
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return pm.textContent = 'جهازك لا يدعم الإشعارات.';
       if (await Notification.requestPermission() !== 'granted') return pm.textContent = 'لم تُمنح الصلاحية.';
       const reg = await navigator.serviceWorker.ready;
-      
-      // === كود الإصلاح التلقائي لإلغاء الاشتراك القديم ===
       let existingSub = await reg.pushManager.getSubscription();
-      if (existingSub) {
-          await existingSub.unsubscribe(); // يمسح المفتاح القديم المعلق في المتصفح
-      }
-      // ===========================================
-
+      if (existingSub) await existingSub.unsubscribe();
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
@@ -773,7 +794,7 @@ function bindSettings() {
 
   $('test_push').onclick = async () => {
     if (!('serviceWorker' in navigator)) return alert('المتصفح لا يدعم الإشعارات.');
-    if (Notification.permission !== 'granted') return alert('يجب تفعيل الإشعارات أولاً من الزر الأخضر.');
+    if (Notification.permission !== 'granted') return alert('يجب تفعيل الإشعارات أولاً.');
     const reg = await navigator.serviceWorker.ready;
     alert('سيصلك الإشعار خلال 3 ثوانٍ.. اخرج من التطبيق الآن للشاشة الرئيسية لترى الإشعار.');
     setTimeout(() => {
