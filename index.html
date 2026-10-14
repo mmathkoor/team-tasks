@@ -741,18 +741,14 @@ function settingsView() {
         let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
         return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span></div>' + rmBtn + '</div>';
     }).join('');
-    
-    adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء</h2>' + memList + 
-      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
+    adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء</h2>' + memList + '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
   }
 
   return '<div class="card" style="border-color:var(--oksoft)">' +
     '<h2>🔔 إشعارات الجوال للأعضاء</h2>' +
-    '<p class="m" style="margin-bottom:12px;color:var(--ink)">لضمان وصول الإشعارات لشركائك:<br>' +
-    '<b>أندرويد:</b> يفتح الموقع ويضغط تفعيل الإشعارات.<br>' +
-    '<b>آيفون (iOS):</b> يجب أن يفتح الموقع من سفاري ويضغط "مشاركة" > <b>إضافة للشاشة الرئيسية</b>، ثم يفتح التطبيق من الأيقونة ويضغط تفعيل.</p>' +
-    '<div class="row"><button class="p s" id="push" style="background:var(--ok);border-color:var(--ok)">تفعيل الإشعارات في جهازي</button></div>' +
+    '<div class="row"><button class="p s" id="push" style="background:var(--ok);border-color:var(--ok)">1. تفعيل الإشعارات أولاً</button></div>' +
     '<p class="m" id="pm" style="margin-top:10px;font-weight:600"></p>' +
+    '<div class="row" style="margin-top:10px"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">2. تجربة الإشعار في جوالي الآن 🔔</button></div>' +
   '</div>' +
   '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
   adminHtml +
@@ -761,6 +757,8 @@ function settingsView() {
 
 function bindSettings() {
   $('out').onclick = logout;
+  
+  // 1. زر تفعيل وربط الجهاز بقاعدة البيانات
   $('push').onclick = async () => {
     const pm = $('pm');
     try {
@@ -770,9 +768,28 @@ function bindSettings() {
       const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
       const { error } = await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
-      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">تم تفعيل الإشعارات بنجاح.</span>';
+      pm.innerHTML = error ? 'خطأ: ' + error.message : '<span style="color:var(--ok)">تم تفعيل الإشعارات بنجاح. يمكنك التجربة الآن.</span>';
     } catch (e) { pm.textContent = 'خطأ: ' + e.message; }
   };
+
+  // 2. زر إرسال إشعار تجريبي فوري
+  $('test_push').onclick = async () => {
+    if (!('serviceWorker' in navigator)) return alert('المتصفح لا يدعم الإشعارات.');
+    if (Notification.permission !== 'granted') return alert('يجب تفعيل الإشعارات أولاً من الزر الأخضر.');
+    const reg = await navigator.serviceWorker.ready;
+    
+    alert('ممتاز! سيصلك الإشعار خلال 3 ثوانٍ.. اخرج من التطبيق الآن للشاشة الرئيسية لترى الإشعار وهو يصلك.');
+    
+    setTimeout(() => {
+      reg.showNotification('🔔 تذكير تجريبي', {
+        body: 'هذا إشعار حقيقي من تطبيق المهام! النظام يعمل بنجاح.',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        vibrate: [200, 100, 200]
+      });
+    }, 3000);
+  };
+
   $('svp').onclick = async () => { 
     const v = $('np').value; if (v.length < 6) return alert('6 أحرف على الأقل'); 
     $('svp').textContent = '...';
