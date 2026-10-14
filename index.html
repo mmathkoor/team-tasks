@@ -6,8 +6,8 @@
 <title>مهام الفريق - نظام الإدارة المتقدم</title>
 <link rel="preconnect" href="https://wrmpyywosathqxrjuicx.supabase.co" crossorigin>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#4f46e5">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="theme-color" content="#0e2144">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
 /* نفس التنسيقات السابقة تماماً */
 :root { --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --mute: #64748b; --line: #e2e8f0; --acc: #4f46e5; --acc-hover: #4338ca; --accsoft: #e0e7ff; --late: #ef4444; --latesoft: #fee2e2; --soon: #f59e0b; --soonsoft: #fef3c7; --ok: #10b981; --oksoft: #d1fae5; --col: #f1f5f9; --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); --rad: 14px; }
@@ -112,6 +112,35 @@ dialog .dact button { min-width: 110px; padding: 10px; }
   .tools { flex-direction: column; align-items: stretch; }
   .tools .sp { display: none; }
 }
+
+/* ===== الهوية الفاخرة: كحلي + ذهبي ===== */
+:root{--bg:#f5f2ea;--card:#fff;--ink:#0e1a2f;--mute:#667086;--line:#e7e1d3;--acc:#14284c;--acc-hover:#0c1d3a;--accsoft:#e7ecf5;--gold:#b8923a;--goldlt:#f3d78a;--goldsoft:#f6edd3;--col:#eee9dd;--late:#b42318;--latesoft:#fde8e6;--soon:#a8741a;--soonsoft:#faf0d4;--ok:#1f7a55;--oksoft:#dcf3e8;--rad:16px;--shadow:0 1px 2px rgba(14,26,47,.05),0 8px 24px -12px rgba(14,26,47,.18);--shadow-hover:0 14px 34px -14px rgba(14,26,47,.35)}
+@media (prefers-color-scheme:dark){:root{--bg:#070d19;--card:#0f192b;--ink:#f4efe2;--mute:#94a1ba;--line:#1d2a43;--acc:#d9b968;--acc-hover:#ecd08a;--accsoft:#2a2314;--gold:#d9b968;--goldsoft:#2a2314;--col:#0a1322;--late:#f19088;--latesoft:#3d1815;--soon:#e6b85c;--soonsoft:#3a2a0d;--ok:#6fcf9f;--oksoft:#10301f;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);--shadow-hover:0 14px 34px -14px rgba(0,0,0,.9)}}
+body{background-image:radial-gradient(1100px 480px at 90% -10%,rgba(184,146,58,.12),transparent 60%)}
+.top{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b1a38 0%,#17305c 65%,#1f3f77 100%);color:#fff;border-radius:20px;padding:16px 20px;margin-bottom:14px;border-bottom:3px solid #c9a24e;box-shadow:0 14px 34px -14px rgba(11,26,56,.7)}
+.top::after{content:'';position:absolute;inset-inline-end:-50px;top:-60px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(243,215,138,.30),transparent 70%);pointer-events:none}
+.top h1{display:flex;align-items:center;gap:12px;color:#fff;font-size:22px}
+.top .chip,.top button{background:rgba(255,255,255,.10);color:#f6e3a8;border:1px solid rgba(255,255,255,.18)}
+.top button:hover{background:rgba(255,255,255,.18);border-color:#e3c486}
+button.p{background:linear-gradient(135deg,#1d3d72,#0e2144);border-color:#0e2144;color:#f6e3a8;box-shadow:0 6px 14px -6px rgba(14,33,68,.6)}
+button.p:hover:not(:disabled){background:linear-gradient(135deg,#244a88,#12295a);border-color:#c9a24e}
+@media (prefers-color-scheme:dark){button.p{background:linear-gradient(135deg,#ecd08a,#c9a24e);border-color:#c9a24e;color:#0b1426;box-shadow:0 6px 14px -6px rgba(201,162,78,.5)}button.p:hover:not(:disabled){background:linear-gradient(135deg,#f4dc9c,#d6af5b)}.nav button.on,.seg button.on,.ctabs button.on{color:#0b1426!important}}
+.nav{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px;box-shadow:var(--shadow);margin-bottom:18px;backdrop-filter:none;-webkit-backdrop-filter:none}
+.nav button{border-radius:11px}
+.nav button.on{background:var(--acc);color:#f6e3a8;box-shadow:none;border-radius:11px}
+.seg button.on,.ctabs button.on{background:var(--acc);color:#f6e3a8}
+.stat{position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;inset-inline:0;top:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--goldlt))}
+.col{border-radius:18px}
+.tk{border-radius:14px;border-inline-start:4px solid var(--line)}
+.tk:hover{border-inline-start-color:var(--gold);border-color:var(--line);border-inline-start-color:var(--gold)}
+.tk.doing{border-inline-start-color:var(--gold)}.tk.done{border-inline-start-color:var(--ok)}
+.chip.all{background:var(--goldsoft);color:var(--gold)}
+.acts button:hover{background:var(--goldsoft);color:var(--gold)}
+dialog{border-radius:22px;border-top:3px solid var(--gold)}
+dialog h2{color:var(--ink)}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--goldsoft)}
+#login{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:22px;padding:32px 24px;box-shadow:var(--shadow)}
 </style>
 </head>
 <body>
@@ -228,7 +257,24 @@ async function requestFlush() {
 }
 async function enqueue(it) {
   it.i = Date.now() + '' + Math.random();
-  await idbSet('q', ((await idbGet('q')) || []).concat(it)); updateNet(); requestFlush();
+  await idbSet('q', ((await idbGet('q')) || []).concat(it)); updateNet(); if (navigator.onLine) setTimeout(flushNow, 1200); requestFlush();
+}
+async function apiPost(path, body) { return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await tok() }, body }); }
+async function apiGet(path) { return fetch(path, { headers: { Authorization: 'Bearer ' + await tok() } }); }
+async function flushNow() {
+  const go = async () => {
+    const q = (await idbGet('q')) || []; if (!q.length) return;
+    const done = new Set();
+    for (const it of q) {
+      try {
+        const r = await fetch(API + it.path, { method: it.m, headers: Object.assign({ apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, it.pf ? { Prefer: it.pf } : {}), body: it.b || undefined });
+        if (r.ok || r.status < 500) done.add(it.i);
+      } catch (e) { break; }
+    }
+    await idbSet('q', ((await idbGet('q')) || []).filter(x => !done.has(x.i)));
+    updateNet(); if (done.size) load();
+  };
+  try { return navigator.locks ? await navigator.locks.request('flush-q', go) : await go(); } catch (e) {}
 }
 const netEl = document.createElement('div');
 netEl.style.cssText = 'position:fixed;bottom:12px;inset-inline:12px;margin:auto;max-width:440px;z-index:50;background:#b7791f;color:#fff;border-radius:10px;padding:8px 14px;text-align:center;font-size:14px;display:none';
@@ -238,7 +284,7 @@ async function updateNet() {
   netEl.style.display = off || n ? 'block' : 'none';
   netEl.textContent = (off ? 'غير متصل — تعمل على النسخة المحفوظة' : 'جارٍ المزامنة...') + (n ? ' · ' + n + ' تغيير بانتظار المزامنة' : '');
 }
-window.addEventListener('online', () => { updateNet(); if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('flush'); setTimeout(updateNet, 3000); });
+window.addEventListener('online', () => { updateNet(); flushNow(); setTimeout(updateNet, 3000); });
 window.addEventListener('offline', updateNet);
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data === 'synced') { updateNet(); load(); } });
 updateNet();
@@ -251,9 +297,18 @@ function updateBadge() {
 function saveCache() {
   if (S.me) localStorage.setItem(CACHE_KEY, JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } }));
 }
-function notifyAdmins(t) {
-  if (isAdmin()) return;
-  fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '✅ إنجاز جديد', body: 'أنجز المهمة «' + t.title + '»', to_admins: true, is_custom: true, sender_name: S.me.name }) }).catch(() => {});
+function notifyNext(t) {
+  const c = t.flow_step || 0, nx = Array.isArray(t.flow) && t.flow[c + 1]; if (!nx || !nx.email) return;
+  apiPost('/api/notify', JSON.stringify({ title: '🔗 دورك الآن في المسار', body: '«' + t.title + '»' + (nx.note ? ' — ' + nx.note : ''), assignee_email: nx.email, for_all: false, is_custom: true, task_id: t.id, task_title: t.title })).catch(() => {});
+}
+function flowLine(t) {
+  if (!Array.isArray(t.flow) || t.flow.length < 2) return '';
+  const c = t.flow_step || 0, fin = eff(t) === 'done';
+  const path = t.flow.map((z, i) => i < c || (fin && i === c) ? '<s>' + esc(nm(z.email)) + '</s>' : i === c ? '<b style="color:var(--acc)">' + esc(nm(z.email)) + '</b>' : esc(nm(z.email))).join(' ➜ ');
+  return '<div class="m" style="margin:6px 0;padding:8px 10px;background:var(--col);border-radius:10px">🔗 ' + path + (!fin && t.flow[c] && t.flow[c].note ? '<div style="margin-top:4px;color:var(--ink)">📌 ' + esc(t.flow[c].note) + '</div>' : '') + '</div>';
+}
+function notifyAdmins(t, msg) {
+  apiPost('/api/notify', JSON.stringify({ title: '✅ إنجاز جديد', body: msg || 'أنجز المهمة «' + t.title + '»', to_admins: true, is_custom: true, sender_name: S.me.name })).catch(() => {});
 }
 const shrink = f => new Promise((ok, no) => { const i = new Image(); i.onload = () => { const k = Math.min(1, 1600 / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = i.width * k; c.height = i.height * k; c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); URL.revokeObjectURL(i.src); c.toBlob(b => b ? ok(b) : no(), 'image/jpeg', 0.8); }; i.onerror = no; i.src = URL.createObjectURL(f); });
 async function stor(method, path, body, type) {
@@ -283,35 +338,38 @@ async function bindExtras(t) {
     if (error) return alert('خطأ: ' + error.message);
     $('cm_in').value = ''; drawC();
     const to = same(S.me.email, t.assignee_email) ? t.created_by : t.assignee_email;
-    if (to && !same(to, S.me.email)) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '💬 تعليق على مهمة', body: t.title + ': ' + body.slice(0, 80), assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true }) }).catch(() => {});
+    if (to && !same(to, S.me.email)) apiPost('/api/notify', JSON.stringify({ title: '💬 تعليق على مهمة', body: t.title + ': ' + body.slice(0, 80), assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true })).catch(() => {});
   };
-  $('fl_up').onclick = async () => {
-    const f = $('fl_in').files[0]; if (!f) return alert('اختر ملفاً أولاً');
-    if (f.size > 10485760) return alert('الحد الأقصى 10 ميجابايت');
-    if (!navigator.onLine) return alert('رفع المرفقات يحتاج اتصالاً بالإنترنت.');
-    $('fl_up').disabled = true; $('fl_up').textContent = '...';
+  $('fl_in').onchange = async () => {
+    const f = $('fl_in').files[0]; if (!f) return;
+    const msg = x => { $('fl_msg').textContent = x; };
+    if (f.size > 10485760) return msg('❌ الحد الأقصى 10 ميجابايت');
+    if (!navigator.onLine) return msg('❌ رفع المرفقات يحتاج اتصالاً بالإنترنت');
+    msg('⏳ جارٍ الرفع...');
     try {
       let blob = f, name = f.name;
       if (/^image\/(jpe?g|png|webp)$/.test(f.type)) { try { blob = await shrink(f); name = name.replace(/\.\w+$/, '') + '.jpg'; } catch (e) { blob = f; } }
       const path = t.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ((name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin');
       const r = await stor('POST', 'object/task-files/' + path, blob, blob.type || 'application/octet-stream');
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || 'فشل الرفع');
-      const { error } = await sb.from('task_files').insert({ task_id: t.id, path, name, size: blob.size, uploaded_by: S.me.email });
-      if (error) throw new Error(error.message);
-      $('fl_in').value = ''; drawF();
-    } catch (e) { alert('خطأ: ' + e.message); }
-    $('fl_up').disabled = false; $('fl_up').textContent = 'رفع';
+      const ins = await sb.from('task_files').insert({ task_id: t.id, path, name, size: blob.size, uploaded_by: S.me.email });
+      if (ins.error) throw new Error(ins.error.message);
+      if (ins.queued) { msg('⚠️ انقطع الاتصال، سيُسجَّل المرفق عند عودته'); return; }
+      const chk = await sb.from('task_files').select('id').eq('path', path);
+      if (!chk.data || !chk.data.length) throw new Error('رُفع الملف لكنه لم يُسجَّل في المهمة (تحقق من تشغيل features.sql)');
+      msg('✅ تم رفع المرفق وحفظه في المهمة'); $('fl_in').value = ''; drawF();
+    } catch (e) { msg('❌ ' + e.message); }
   };
   drawC(); drawF();
 }
 const EXTRA_HTML = t => '<div style="margin-top:14px"><label>نسبة الإنجاز: <b id="pg_v">' + (t.progress || 0) + '%</b><input id="f_pg" type="range" min="0" max="100" step="10" value="' + (t.progress || 0) + '"></label></div>' +
-  '<div style="margin-top:14px"><b>📎 المرفقات</b><div id="fl_list" class="m">...</div><div class="row" style="margin-top:6px"><input type="file" id="fl_in" accept="image/*,.pdf,.xls,.xlsx,.csv,.doc,.docx,.ppt,.pptx,.txt,.zip"><button class="s" id="fl_up">رفع</button></div></div>' +
+  '<div style="margin-top:14px"><b>📎 المرفقات</b><div id="fl_list" class="m">...</div><div style="margin-top:6px"><input type="file" id="fl_in" accept="image/*,.pdf,.xls,.xlsx,.csv,.doc,.docx,.ppt,.pptx,.txt,.zip"><div id="fl_msg" class="m" style="margin-top:4px"></div></div></div>' +
   '<div style="margin-top:14px"><b>💬 التعليقات والتحديثات</b><div id="cm_list" class="m">...</div><div class="row" style="margin-top:6px"><input id="cm_in" placeholder="اكتب عائقاً أو تحديثاً أو ملاحظة..."><button class="s" id="cm_add">إرسال</button></div></div>';
 
 // ===== المهام المتكررة (للأدمن) =====
 const WD = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const freqText = r => ({ daily: 'يومياً', weekly: 'كل ' + WD[r.weekday || 0], monthly: 'يوم ' + (r.day_of_month || 1) + ' من كل شهر', month_end: 'نهاية كل شهر' })[r.frequency];
-const recurHtml = () => '<div class="card"><h2>🔁 المهام المتكررة (للأدمن)</h2><div id="rc_list" class="m">جارٍ التحميل...</div>' +
+const recurHtml = () => '<div class="card"><h2>🔁 المهام المتكررة</h2><div id="rc_list" class="m">جارٍ التحميل...</div>' +
   '<h3 style="font-size:14px;margin-top:16px">إضافة مهمة متكررة:</h3>' +
   '<div class="row"><input id="rc_ti" placeholder="عنوان المهمة"><select id="rc_as"><option value="__all">👥 لكل الأعضاء</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('') + '</select></div>' +
   '<div class="row" style="margin-top:8px"><select id="rc_fr"><option value="daily">يومياً</option><option value="weekly">أسبوعياً</option><option value="monthly">شهرياً</option><option value="month_end">نهاية كل شهر</option></select>' +
@@ -343,6 +401,7 @@ async function init() {
       return loginView();
     }
     const email = session.user.email;
+    idbSet('sbs', session); idbSet('cfg', { url: API, key: KEY, name: (S.me && S.me.name) || email });
     
     try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
 
@@ -356,7 +415,7 @@ async function init() {
         return; 
     }
     
-    S.members = members; S.me = me; idbSet('cfg', { url: API, key: KEY, name: me.name });
+    S.members = members; S.me = me; idbSet('cfg', { url: API, key: KEY, name: me.name }); idbSet('sbs', AUTH.s);
     await load();
   } catch (err) { showErrorBox(err.message); }
 }
@@ -382,7 +441,7 @@ async function load() {
 }
 
 function loginView() {
-  $app.innerHTML = '<div class="card" id="login"><h1>مهام الفريق</h1><p class="m">سجّل الدخول للمتابعة</p>' +
+  $app.innerHTML = '<div class="card" id="login"><h1><svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><br>مدير المهام</h1><p class="m">سجّل الدخول للمتابعة</p>' +
   '<div class="row"><input id="em" type="email" placeholder="البريد الإلكتروني" dir="ltr" style="width:100%"></div>' +
   '<div class="row" style="margin-top:12px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr" style="width:100%"></div>' +
   '<button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button><p class="m" id="msg" style="margin-top:12px;color:var(--late)"></p></div>';
@@ -404,7 +463,7 @@ function render() {
   const openProps = props.filter(p => !isClosed(p)).length;
   const badge = openProps ? '<span class="n">' + openProps + '</span>' : '';
   
-  $app.innerHTML = '<div class="top"><h1>مدير المهام</h1><div class="row s"><span class="chip" style="font-size:14px">👤 ' + esc(S.me.name) + '</span><button id="rf" class="s">🔄 تحديث</button></div></div>' +
+  $app.innerHTML = '<div class="top"><h1><svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>مدير المهام</span></h1><div class="row s"><span class="chip" style="font-size:14px">👤 ' + esc(S.me.name) + '</span><button id="rf" class="s">🔄 تحديث</button></div></div>' +
   '<div class="nav">' +
     '<button data-nv="board" class="' + (S.view === 'board' ? 'on' : '') + '">المهام والمشاريع</button>' +
     '<button data-nv="props" class="' + (S.view === 'props' ? 'on' : '') + '">القرارات والتصويت' + badge + '</button>' +
@@ -469,6 +528,7 @@ function card(t) {
   return '<div class="tk ' + st + '" draggable="true" data-id="' + t.id + '">' +
     '<div class="tt">' + esc(t.title) + '</div>' +
     (t.progress > 0 && st !== 'done' ? '<div style="height:5px;background:var(--line);border-radius:3px;margin:6px 0"><div style="height:100%;width:' + t.progress + '%;background:var(--acc);border-radius:3px"></div></div>' : '') +
+    flowLine(t) +
     renderNotesAndWorkflow(t.notes) +
     '<div class="meta" style="align-items:center;">' + metaAll + metaD + metaMt + waBtn + '</div>' +
     '<div class="acts">' + actsHtml + ' ' + handoffBtn + '</div>' +
@@ -552,15 +612,11 @@ function handoffDialog(tId) {
         const newNotes = (t.notes || '') + noteAppend;
         
         $('hf_sv').disabled = true; $('hf_sv').textContent = 'جاري الإحالة...';
-        const { error } = await sb.from('tasks').update({ assignee_email: to, notes: newNotes, status: 'todo' }).eq('id', t.id);
+        const { error } = await sb.from('tasks').update(Object.assign({ assignee_email: to, notes: newNotes, status: 'todo' }, Array.isArray(t.flow) ? { flow: t.flow.map((z, i) => i === (t.flow_step || 0) ? Object.assign({}, z, { email: to }) : z) } : {})).eq('id', t.id);
         if(error) { alert('خطأ: ' + error.message); $('hf_sv').disabled = false; return; }
         
         // إشعار السيرفر بوجود مهمة جديدة أُحيلت لشخص
-        fetch('/api/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: t.title, assignee_email: to, for_all: false, sender_name: S.me.name, task_id: row.id })
-        }).catch(e => console.error(e));
+        apiPost('/api/notify', JSON.stringify({ title: t.title, assignee_email: to, for_all: false, sender_name: S.me.name, task_id: t.id })).catch(e => console.error(e));
 
         dlg.close(); load();
     };
@@ -582,9 +638,12 @@ async function moveTask(id, to) {
     }
     return;
   }
-  const prev = t.status; t.status = to; render();
+  const snap = Object.assign({}, t), adv = to === 'done' && Array.isArray(t.flow) && (t.flow_step || 0) < t.flow.length - 1;
+  if (adv) { const c = (t.flow_step || 0) + 1; t.flow_step = c; t.assignee_email = t.flow[c].email; t.status = 'todo'; } else t.status = to;
+  render();
   const { error } = await sb.from('tasks').update({ status: to }).eq('id', id);
-  if (error) { t.status = prev; alert('خطأ: ' + error.message); load(); } else if (to === 'done') notifyAdmins(t);
+  if (error) { Object.assign(t, snap); alert('خطأ: ' + error.message); load(); }
+  else if (to === 'done') { notifyAdmins(t, adv ? 'أنهى مرحلته في «' + t.title + '»' : null); if (adv) { notifyNext(snap); load(); } }
 }
 
 function taskDialog(t, pre = {}) {
@@ -611,11 +670,29 @@ function taskDialog(t, pre = {}) {
     '<label>الارتباط (قسم/مشروع)<select id="f_mt">' + mtOpts + '</select></label>' +
     '<label id="f_stw">الحالة<select id="f_st">' + stOpts + '</select></label>' +
   '</div>' +
+  '<div id="fw_box" style="margin-top:14px"></div>' +
   '<p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة للكل:</b> تظهر لجميع الأعضاء، وكل عضو يعتمد إنجازها لنفسه بشكل منفصل.</p>' +
   '<div class="row dact">' + dlBtn + '<button id="f_cx" class="s">إلغاء</button><button class="p s" id="f_sv">حفظ</button></div>';
   
   if (edit) { $('f_hint').insertAdjacentHTML('afterend', EXTRA_HTML(t)); bindExtras(t); }
-  const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; };
+  let fw = Array.isArray(x.flow) ? x.flow.map(z => ({ email: z.email, note: z.note || '' })) : [];
+  const cur = edit ? (x.flow_step || 0) : 0;
+  const drawFlow = () => {
+    const sel = i => '<select data-fe="' + i + '" style="flex:1 1 130px">' + S.members.map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, fw[i].email) ? 'selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select>';
+    $('fw_box').innerHTML = '<b>🔗 مسار العمل (اختياري)</b><div class="m" style="margin:2px 0 8px">حدّد من يستلم المهمة بعد إنجاز كل مرحلة؛ تنتقل إليه تلقائياً ويصله إشعار. زر «إحالة» يبقى متاحاً لأي تحويل طارئ.</div>' +
+      fw.map((z, i) => '<div class="row" style="align-items:center;margin-bottom:6px"><span class="chip s">' + (i + 1) + '</span>' +
+        (i === 0 && !edit ? '<span class="m" style="flex:1 1 130px">المسؤول الأول (المحدد أعلاه)</span>' : i <= cur ? '<b style="flex:1 1 130px">' + esc(nm(z.email)) + (i < cur ? ' ✓' : ' (الحالي)') + '</b>' : sel(i)) +
+        '<input data-fn="' + i + '" placeholder="المطلوب في هذه المرحلة (اختياري)" value="' + esc(z.note) + '" style="flex:2 1 160px">' +
+        (i > cur ? '<button class="s dng" type="button" data-fr="' + i + '">✕</button>' : '') + '</div>').join('') +
+      '<button class="s" type="button" id="fw_add">+ إضافة مرحلة تالية</button>' + (fw.length ? ' <button class="s dng" type="button" id="fw_clr">إلغاء المسار</button>' : '');
+    $('fw_box').querySelectorAll('[data-fe]').forEach(e => e.onchange = () => { fw[+e.dataset.fe].email = e.value; });
+    $('fw_box').querySelectorAll('[data-fn]').forEach(e => e.oninput = () => { fw[+e.dataset.fn].note = e.value; });
+    $('fw_box').querySelectorAll('[data-fr]').forEach(b => b.onclick = () => { fw.splice(+b.dataset.fr, 1); if (fw.length < 2) fw = []; drawFlow(); });
+    $('fw_add').onclick = () => { if (!fw.length) fw.push({ email: (edit && x.assignee_email) || '', note: '' }); fw.push({ email: S.members[0].email, note: '' }); drawFlow(); };
+    if ($('fw_clr')) $('fw_clr').onclick = () => { fw = []; drawFlow(); };
+  };
+  drawFlow();
+  const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; $('fw_box').style.display = a ? 'none' : ''; };
   $('f_as').onchange = sync; sync();
   $('f_cx').onclick = () => dlg.close();
   $('f_sv').onclick = async () => {
@@ -624,18 +701,22 @@ function taskDialog(t, pre = {}) {
     const assignee = $('f_as').value;
     const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
     if (!edit) { row.created_by = S.me.email; row.id = crypto.randomUUID(); } else row.progress = +$('f_pg').value;
+    let flow = !all && fw.length >= 2 ? fw.map(z => ({ email: z.email, note: (z.note || '').trim() })) : null;
+    if (flow) { flow[cur].email = assignee || flow[cur].email; flow = flow.filter(z => z.email); if (flow.length < 2) flow = null; }
+    if (flow || (edit && t.flow)) row.flow = flow;
+    if (flow && (!edit || !t.flow)) row.flow_step = 0;
     
     $('f_sv').disabled = true; $('f_sv').textContent = '...';
     const { error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row);
     if (error) { alert('خطأ: ' + error.message); $('f_sv').disabled = false; $('f_sv').textContent = 'حفظ'; return; }
     
+    if (edit && !all && row.status === 'done' && t.status !== 'done') {
+      const fl = row.flow !== undefined ? row.flow : t.flow, adv = Array.isArray(fl) && (t.flow_step || 0) < fl.length - 1;
+      notifyAdmins(t, adv ? 'أنهى مرحلته في «' + t.title + '»' : null); if (adv) notifyNext(Object.assign({}, t, { flow: fl }));
+    }
     // إرسال إشعار فوري عند الإضافة (ليست تعديلاً)
     if (!edit && (all || assignee)) {
-        fetch('/api/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: row.for_all, sender_name: S.me.name })
-        }).catch(e => console.error(e));
+        apiPost('/api/notify', JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: row.for_all, sender_name: S.me.name, task_id: row.id })).catch(e => console.error(e));
     }
 
     dlg.close(); load();
@@ -881,7 +962,7 @@ function settingsView() {
     '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
-  adminHtml + (isAdmin() ? recurHtml() : '') +
+  adminHtml + recurHtml() +
   '<div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>';
 }
 
@@ -893,8 +974,8 @@ function bindSettings() {
     $('admin_remind').onclick = async () => {
         $('admin_remind').textContent = 'جاري إرسال التذكيرات...';
         try {
-            await fetch('/api/remind');
-            alert('تم إرسال تذكير شامل لجميع أعضاء الفريق!');
+            const rr = await apiGet('/api/remind');
+            alert(rr.ok ? 'تم إرسال تذكير شامل لجميع أعضاء الفريق!' : 'تعذّر الإرسال (' + rr.status + ')');
         } catch(e) {}
         $('admin_remind').textContent = 'إرسال تذكير شامل للفريق 🔔';
     };
@@ -924,11 +1005,7 @@ function bindSettings() {
           }
 
           try {
-              await fetch('/api/notify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ title: 'تنبيه إداري 🔔', body: finalBody, assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true })
-              });
+              await apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري 🔔', body: finalBody, assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true }));
               alert('تم إرسال الإشعار بنجاح.');
               $('ping_msg').value = '';
           } catch(e) {}
@@ -954,7 +1031,8 @@ function bindSettings() {
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
-document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !dlg.open) load(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !dlg.open) { flushNow(); load(); } });
+setTimeout(flushNow, 4000);
 init();
   // تفعيل الإشعارات تلقائياً في الخلفية بعد تحميل التطبيق بثانيتين
 window.addEventListener('load', () => {
