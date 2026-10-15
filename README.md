@@ -15,3 +15,4 @@ GitHub ← New repo ← ارفع الملفات ← Vercel ← Import Project �
 - RESEND_API_KEY , MAIL_FROM (اختياري للإيميل)
 - MEETING_DAY (0 الأحد … 6 السبت) يوم الاجتماع: يصل الجميع ملخص كل المهام
 - CRON_SECRET (أي نص طويل عشوائي)
+- نقطة تجريبية
