@@ -1,19 +1,26 @@
-const C = 'tasks-v4';
+importScripts('/js/version.js');
+const C = 'tasks-' + VERSION;
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
 const kget = k => idb().then(d => new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(undefined); })).catch(() => undefined);
 const kset = (k, v) => idb().then(d => new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = () => ok(); })).catch(() => {});
 
-// ===== التخزين المؤقت: عرض فوري ثم تحديث بالخلفية =====
-self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => Promise.allSettled(['/', '/manifest.json', '/icon-192.png'].map(f => c.add(f))))); });
+// ===== التخزين المؤقت: نسخة كاملة متسقة لكل إصدار (الملفات تُقرأ من index.html تلقائياً) =====
+self.addEventListener('install', e => {
+  self.skipWaiting();
+  e.waitUntil((async () => {
+    const c = await caches.open(C);
+    const r = await fetch('/', { cache: 'reload' }); const html = await r.clone().text(); await c.put('/', r);
+    const urls = new Set(['/manifest.json', '/icon-192.png']);
+    for (const m of html.matchAll(/(?:src|href)="(\/[^"]+)"/g)) urls.add(m[1]);
+    await Promise.allSettled([...urls].map(u => fetch(u, { cache: 'reload' }).then(res => res.ok && c.put(u, res))));
+  })());
+});
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => clients.claim())));
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return;
-  e.respondWith(caches.open(C).then(async c => {
-    const hit = await c.match(e.request);
-    const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit);
-    return hit || net;
-  }));
+  e.respondWith(caches.open(C).then(async c => (await c.match(e.request, { ignoreSearch: true })) ||
+    fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; })));
 });
 
 // ===== الجلسة والمزامنة (تعمل حتى والتطبيق مغلق) =====
