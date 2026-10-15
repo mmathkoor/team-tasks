@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة المعلومات - مهام الفريق</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0e2144">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+:root{--bg:#f5f2ea;--card:#fff;--ink:#0e1a2f;--mute:#667086;--line:#e7e1d3;--acc:#14284c;--gold:#b8923a;--goldlt:#f3d78a;--goldsoft:#f6edd3;--col:#eee9dd;--late:#b42318;--latesoft:#fde8e6;--soon:#a8741a;--soonsoft:#faf0d4;--ok:#1f7a55;--oksoft:#dcf3e8;--doing:#2f5fa8;--todo:#9aa3b5;--shadow:0 1px 2px rgba(14,26,47,.05),0 8px 24px -12px rgba(14,26,47,.18)}
+@media (prefers-color-scheme:dark){:root{--bg:#070d19;--card:#0f192b;--ink:#f4efe2;--mute:#94a1ba;--line:#1d2a43;--acc:#d9b968;--gold:#d9b968;--goldsoft:#2a2314;--col:#0a1322;--late:#f19088;--latesoft:#3d1815;--soon:#e6b85c;--soonsoft:#3a2a0d;--ok:#6fcf9f;--oksoft:#10301f;--doing:#7fa6e6;--todo:#5d6a85;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7)}}
+*{box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6;background-image:radial-gradient(1100px 480px at 90% -10%,rgba(184,146,58,.12),transparent 60%)}
+main{max-width:1200px;margin:auto;padding:16px 16px 60px}
+.top{background:linear-gradient(135deg,#0b1a38,#17305c 65%,#1f3f77);color:#fff;border-radius:20px;padding:16px 20px;margin-bottom:18px;border-bottom:3px solid #c9a24e;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{margin:0;font-size:22px}
+.top .m{color:#f6e3a8;font-size:13px}
+a.btn,button,select{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.top a.btn,.top button{background:rgba(255,255,255,.10);color:#f6e3a8;border-color:rgba(255,255,255,.2)}
+a.btn:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.bar .sp{flex:1}
+.m{font-size:13.5px;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.card h2{margin:0 0 14px;font-size:16px;font-weight:800}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
+.kpi{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+.kpi::before{content:'';position:absolute;inset-inline:0;top:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--goldlt))}
+.kpi b{display:block;font-size:28px;line-height:1.2;font-weight:800}
+.kpi span{font-size:13px;color:var(--mute);font-weight:600}
+.kpi.late b{color:var(--late)}.kpi.soon b{color:var(--soon)}.kpi.ok b{color:var(--ok)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.donutwrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center}
+.donutwrap svg{width:170px;height:170px;flex:none}
+.leg{display:flex;flex-direction:column;gap:8px;font-weight:600}
+.leg i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-inline-end:8px;vertical-align:-1px}
+.row{margin-bottom:14px}
+.row:last-child{margin-bottom:0}
+.rh{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px;margin-bottom:5px}
+.stack{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--col)}
+.stack i{display:block;height:100%}
+.li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.li:first-of-type{border-top:0}
+.chip{font-size:12px;border-radius:20px;padding:3px 10px;font-weight:700;white-space:nowrap;background:var(--col)}
+.chip.late{background:var(--latesoft);color:var(--late)}.chip.soon{background:var(--soonsoft);color:var(--soon)}
+.empty{text-align:center;color:var(--mute);padding:18px 0;font-weight:600}
+#msg{text-align:center;padding:60px 16px}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div><h1>لوحة المعلومات</h1><div class="m" id="who"></div></div>
+    <div style="display:flex;gap:8px"><button id="rf">🔄 تحديث</button><a class="btn" href="/">← المهام</a></div>
+  </div>
+  <div id="msg" class="card m">جارٍ تحميل البيانات...</div>
+  <div id="dash" hidden></div>
+</main>
+<script>
+const URL_ = 'https://wrmpyywosathqxrjuicx.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybXB5eXdvc2F0aHF4cmp1aWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2NDQsImV4cCI6MjEwNzQ4NDY0NH0.CoSwCocuTVWlVU6QBNpp_bZiuykVkMHSHpT11KC1uvU';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+const today = () => new Date().toISOString().slice(0, 10);
+const daysTo = d => Math.round((new Date(d) - new Date(today())) / 864e5);
+const D = { members: [], tasks: [], done: [], meetings: [], props: [] };
+let F = '', session = null;
+try { session = JSON.parse(localStorage.getItem('sbs') || 'null'); } catch (e) {}
+
+function stop(text) {
+  $('dash').hidden = true; $('msg').hidden = false;
+  $('msg').innerHTML = esc(text) + '<br><br><a class="btn" href="/">العودة إلى التطبيق</a>';
+}
+async function get(table, query) {
+  const r = await fetch(URL_ + '/rest/v1/' + table + '?' + query, { headers: { apikey: KEY, Authorization: 'Bearer ' + session.access_token } });
+  if (!r.ok) throw new Error(table);
+  return r.json();
+}
+async function load() {
+  if (!session || !session.access_token) return location.replace('/');
+  // لا نجدد الجلسة هنا؛ التطبيق الرئيسي هو المسؤول عن تجديدها
+  if (session.expires_at && session.expires_at - 30 < Date.now() / 1000) return stop('انتهت صلاحية الجلسة. افتح التطبيق الرئيسي مرة واحدة ثم ارجع إلى هذه الصفحة.');
+  try {
+    const [m, t, d, mt] = await Promise.all([get('members', 'select=*'), get('tasks', 'select=*'), get('task_done', 'select=*'), get('meetings', 'select=*&order=held_on.desc')]);
+    Object.assign(D, { members: m, tasks: t, done: d, meetings: mt });
+    try { D.props = await get('proposals', 'select=id,status'); } catch (e) { D.props = []; }
+  } catch (e) { return stop('تعذّر تحميل البيانات (' + e.message + '). تحقق من الاتصال أو سجّل الدخول من التطبيق.'); }
+  const me = D.members.find(x => same(x.email, session.user && session.user.email));
+  $('who').textContent = me ? '👤 ' + me.name : '';
+  $('msg').hidden = true; $('dash').hidden = false;
+  render();
+}
+
+const nm = e => (D.members.find(m => same(m.email, e)) || {}).name || 'غير مُسند';
+function st(t) {
+  if (t.for_all) {
+    const n = D.done.filter(x => x.task_id === t.id).length, tot = D.members.length || 1;
+    return n >= tot ? 'done' : n > 0 ? 'doing' : 'todo';
+  }
+  return t.status;
+}
+const isLate = t => st(t) !== 'done' && t.due_on && t.due_on < today();
+
+function donut(parts) {
+  const tot = parts.reduce((a, p) => a + p.v, 0), R = 54, C = 2 * Math.PI * R;
+  let off = 0;
+  const segs = tot ? parts.filter(p => p.v).map(p => {
+    const len = p.v / tot * C;
+    const s = '<circle r="' + R + '" cx="70" cy="70" fill="none" style="stroke:' + p.c + '" stroke-width="18" stroke-dasharray="' + len + ' ' + (C - len) + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 70 70)"/>';
+    off += len; return s;
+  }).join('') : '';
+  const pct = tot ? Math.round(parts[2].v / tot * 100) : 0;
+  return '<svg viewBox="0 0 140 140" role="img" aria-label="نسبة الإنجاز ' + pct + '%"><circle r="' + R + '" cx="70" cy="70" fill="none" style="stroke:var(--col)" stroke-width="18"/>' + segs +
+    '<text x="70" y="76" text-anchor="middle" style="fill:var(--ink);font-size:26px;font-weight:800">' + pct + '%</text></svg>';
+}
+const stack = (a, b, c, tot) => tot ? '<div class="stack"><i style="width:' + a / tot * 100 + '%;background:var(--ok)"></i><i style="width:' + b / tot * 100 + '%;background:var(--doing)"></i><i style="width:' + c / tot * 100 + '%;background:var(--late)"></i></div>' : '<div class="stack"></div>';
+const listRow = (t, chip, cls) => '<div class="li"><div><b>' + esc(t.title) + '</b><div class="m">' + (t.for_all ? '👥 الفريق' : '👤 ' + esc(nm(t.assignee_email))) + '</div></div><span class="chip ' + cls + '">' + esc(chip) + '</span></div>';
+
+function render() {
+  const T = D.tasks.filter(t => !F || t.meeting_id === F);
+  const cnt = { todo: 0, doing: 0, done: 0 };
+  T.forEach(t => { const s = st(t); cnt[s] = (cnt[s] || 0) + 1; });
+  const open = T.filter(t => st(t) !== 'done'), late = open.filter(isLate);
+  const soon = open.filter(t => t.due_on && t.due_on >= today() && daysTo(t.due_on) <= 3);
+  const rate = T.length ? Math.round(cnt.done / T.length * 100) : 0;
+  const openProps = D.props.filter(p => p.status === 'open').length;
+
+  const members = D.members.map(m => {
+    const mine = T.filter(t => !t.for_all && same(t.assignee_email, m.email));
+    const dn = mine.filter(t => st(t) === 'done').length, lt = mine.filter(isLate).length, op = mine.length - dn;
+    const g = T.filter(t => t.for_all), gd = g.filter(t => D.done.some(x => x.task_id === t.id && same(x.email, m.email))).length;
+    return '<div class="row"><div class="rh"><span>' + esc(m.name) + '</span><span class="m">' + dn + ' منجزة · ' + op + ' مفتوحة' + (lt ? ' · ' + lt + ' متأخرة' : '') + (g.length ? ' · جماعية ' + gd + '/' + g.length : '') + '</span></div>' + stack(dn, op - lt, lt, mine.length) + '</div>';
+  }).join('') || '<div class="empty">لا يوجد أعضاء.</div>';
+
+  const groups = D.meetings.map(m => ({ n: m.title, id: m.id })).concat([{ n: 'بدون مشروع', id: null }]).map(g => {
+    const a = T.filter(t => (t.meeting_id || null) === g.id), d = a.filter(t => st(t) === 'done').length;
+    return { n: g.n, tot: a.length, d };
+  }).filter(g => g.tot).map(g => {
+    const p = Math.round(g.d / g.tot * 100);
+    return '<div class="row"><div class="rh"><span>' + esc(g.n) + '</span><span class="m">' + g.d + '/' + g.tot + ' (' + p + '%)</span></div><div class="stack"><i style="width:' + p + '%;background:var(--ok)"></i></div></div>';
+  }).join('') || '<div class="empty">لا توجد مهام.</div>';
+
+  const byDue = (a, b) => a.due_on.localeCompare(b.due_on);
+  const lateList = late.slice().sort(byDue).slice(0, 8).map(t => listRow(t, 'متأخرة ' + (-daysTo(t.due_on)) + ' يوم', 'late')).join('') || '<div class="empty">لا توجد مهام متأخرة 🎉</div>';
+  const upList = open.filter(t => t.due_on && !isLate(t) && daysTo(t.due_on) <= 7).sort(byDue).slice(0, 8).map(t => { const n = daysTo(t.due_on); return listRow(t, n === 0 ? 'اليوم' : n === 1 ? 'غداً' : 'بعد ' + n + ' أيام', n <= 1 ? 'soon' : ''); }).join('') || '<div class="empty">لا توجد مهام قريبة.</div>';
+
+  $('dash').innerHTML =
+    '<div class="bar"><select id="fm" aria-label="تصفية حسب المشروع"><option value="">كل المشاريع والاجتماعات</option>' + D.meetings.map(m => '<option value="' + esc(m.id) + '"' + (F === m.id ? ' selected' : '') + '>' + esc(m.title) + '</option>').join('') + '</select><span class="sp"></span><span class="m">آخر تحديث: ' + new Date().toLocaleTimeString('ar') + '</span></div>' +
+    '<div class="kpis">' +
+      '<div class="kpi"><b>' + T.length + '</b><span>إجمالي المهام</span></div>' +
+      '<div class="kpi ok"><b>' + cnt.done + '</b><span>منجزة</span></div>' +
+      '<div class="kpi"><b>' + cnt.doing + '</b><span>قيد العمل</span></div>' +
+      '<div class="kpi late"><b>' + late.length + '</b><span>متأخرة</span></div>' +
+      '<div class="kpi soon"><b>' + soon.length + '</b><span>خلال 3 أيام</span></div>' +
+      '<div class="kpi"><b>' + openProps + '</b><span>تصويتات مفتوحة</span></div>' +
+    '</div>' +
+    '<div class="grid">' +
+      '<div class="card"><h2>توزيع حالات المهام</h2><div class="donutwrap">' + donut([{ v: cnt.todo, c: 'var(--todo)' }, { v: cnt.doing, c: 'var(--doing)' }, { v: cnt.done, c: 'var(--ok)' }]) +
+        '<div class="leg"><span><i style="background:var(--ok)"></i>منجزة ' + cnt.done + '</span><span><i style="background:var(--doing)"></i>قيد العمل ' + cnt.doing + '</span><span><i style="background:var(--todo)"></i>للتنفيذ ' + cnt.todo + '</span><span class="m">نسبة الإنجاز ' + rate + '%</span></div></div></div>' +
+      '<div class="card"><h2>تقدم المشاريع</h2>' + groups + '</div>' +
+    '</div>' +
+    '<div class="card" style="margin-bottom:16px"><h2>حمل العمل لكل عضو</h2>' + members + '<div class="m" style="margin-top:12px"><span style="color:var(--ok)">■</span> منجزة &nbsp;<span style="color:var(--doing)">■</span> مفتوحة &nbsp;<span style="color:var(--late)">■</span> متأخرة</div></div>' +
+    '<div class="grid"><div class="card"><h2>⚠️ مهام متأخرة</h2>' + lateList + '</div><div class="card"><h2>📅 قادمة هذا الأسبوع</h2>' + upList + '</div></div>';
+  $('fm').onchange = e => { F = e.target.value; render(); };
+}
+
+$('rf').onclick = () => { $('rf').textContent = '⏳'; load().finally(() => { $('rf').textContent = '🔄 تحديث'; }); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+load();
+</script>
+</body>
+</html>
