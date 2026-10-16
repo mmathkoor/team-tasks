@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
   if (!me) return res.status(401).json({ error: 'unauthorized' });
 
   try {
-    const { title, body, assignee_email, for_all, is_custom, task_id, task_title, to_admins } = req.body || {};
+    const { title, body, assignee_email, for_all, is_custom, task_id, task_title, to_admins, priority } = req.body || {};
     const sender = me.name;                            // الاسم من قاعدة البيانات لا من الطلب (منع الانتحال)
     const { data: members } = await supabase.from('members').select('email,role');
 
@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
     const list = (subs || []).filter(s => targets.includes(lc(s.email)));
 
     const payload = JSON.stringify({
-      title: is_custom ? cut(title, 80) : '🆕 مهمة جديدة',
+      title: is_custom ? cut(title, 80) : (priority === 'urgent' ? '🔴 مهمة عاجلة جديدة' : priority === 'important' ? '🟠 مهمة مهمة جديدة' : '🆕 مهمة جديدة'),
       body: is_custom ? `من ${sender}: ${cut(body, 400)}` : `تم تكليفك بمهمة جديدة من ${sender}:\n"${cut(title, 120)}"`,
       icon: '/icon-192.png',
       task_id: task_id || undefined,
