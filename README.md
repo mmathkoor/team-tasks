@@ -1,18 +1,34 @@
-# مهام الفريق
+# منصة مهام الفريق — هيكل المشروع
 
-## 1) قاعدة البيانات (Supabase – مجاني)
-1. أنشئ مشروعاً في supabase.com
-2. SQL Editor ← الصق محتوى `supabase.sql` (بعد تعديل الإيميلات الأربعة) ← Run
-3. Project Settings ← API: انسخ Project URL و anon key وضعهما أعلى `index.html`
-4. Authentication ← URL Configuration: ضع رابط vercel.app في Site URL
+```
+index.html          هيكل الصفحة فقط (يستدعي ملفات css و js)
+css/theme.css       التصميم
+js/version.js       رقم النسخة (المكان الوحيد الذي يُعدَّل عند كل إصدار)
+js/config.js        مفاتيح Supabase العامة وإعدادات التطبيق
+js/core.js          الاتصال بقاعدة البيانات والدخول والحالة العامة
+js/sync.js          العمل دون اتصال وطابور المزامنة وشريط الاتصال
+js/helpers.js       أدوات صغيرة (الشارة، التخزين المحلي، ضغط الصور)
+js/tasks.js         اللوحة وبطاقات المهام ونافذة المهمة والإحالة والمسار
+js/task-extras.js   المرفقات والتعليقات داخل المهمة
+js/checklist.js     القائمة الفرعية
+js/activity.js      سجل النشاط
+js/dashboard.js     لوحة الأرقام والرسوم (SVG) وتصدير CSV والطباعة
+js/tools.js         فحص النظام والنسخة الاحتياطية
+js/recurring.js     المهام المتكررة
+js/proposals.js     المقترحات والتصويت
+js/settings.js      الإعدادات والإشعارات
+js/app.js           الدخول وتحميل البيانات والعرض الرئيسي
+js/main.js          تشغيل التطبيق وتحديثاته
+sw.js               عامل الخدمة (التخزين المؤقت، المزامنة، الإشعارات)
+api/                دوال Vercel (notify, remind, recur)
+lib/auth.js         التحقق من العضو (مشترك بين دوال api)
+sql/                تعديلات قاعدة البيانات مرقّمة (تُشغَّل بالترتيب مرة واحدة لكل ملف)
+```
 
-## 2) الرفع
-GitHub ← New repo ← ارفع الملفات ← Vercel ← Import Project ← Deploy
+## عند كل إصدار جديد
+1. ارفع الملفات التي تغيّرت فقط.
+2. غيّر رقم النسخة في `js/version.js` (مثلاً 3.0.1). بدون ذلك لن يظهر للأعضاء شريط «تتوفر نسخة جديدة».
+3. إن كان هناك ملف في `sql/` جديد، شغّله في Supabase قبل رفع الملفات.
 
-## 3) التذكيرات (Vercel ← Settings ← Environment Variables)
-- SUPABASE_URL , SUPABASE_SERVICE_KEY (service_role، سرّي، لا تضعه في index.html)
-- TELEGRAM_BOT_TOKEN (من @BotFather) — كل عضو يراسل البوت ويأخذ Chat ID من @userinfobot ثم يحفظه في الصفحة
-- RESEND_API_KEY , MAIL_FROM (اختياري للإيميل)
-- MEETING_DAY (0 الأحد … 6 السبت) يوم الاجتماع: يصل الجميع ملخص كل المهام
-- CRON_SECRET (أي نص طويل عشوائي)
-- نقطة تجريبية
+## إضافة ملف جديد
+أضف سطر `<script src="/js/اسم.js"></script>` في `index.html` قبل `main.js`. عامل الخدمة يقرأ القائمة من `index.html` تلقائياً.
