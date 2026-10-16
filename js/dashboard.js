@@ -107,7 +107,7 @@ function dashView() {
     '<div class="dsh-card"><h2>أُنجزت مؤخراً</h2>' + (D.recent.length ? D.recent.map(dshRow).join('') : '<div class="m" style="padding:8px 0">ستظهر هنا المهام المنجزة بعد تفعيل تسجيل الوقت.</div>') + '</div></div>';
 }
 function dashCsv(units) {
-  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const q = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };   // يمنع تنفيذ صيغ Excel من نص المهمة
   const rows = [['العنوان', 'المسؤول', 'الحالة', 'الموعد', 'تاريخ الإنشاء', 'تاريخ الإنجاز', 'الاجتماع', 'جماعية'].map(q).join(',')];
   units.forEach(u => rows.push([u.t.title, u.who ? nm(u.who) : 'غير مُسند', u.done ? 'منجزة' : (ST[u.t.status] || u.t.status), u.due_on || '', (u.created_at || '').slice(0, 10), (u.completed_at || '').slice(0, 10), (S.meetings.find(m => m.id === u.meeting_id) || {}).title || '', u.t.for_all ? 'نعم' : 'لا'].map(q).join(',')));
   return '\ufeff' + rows.join('\r\n');
