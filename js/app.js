@@ -26,19 +26,21 @@ async function init() {
 }
 
 async function load() {
-  const [m, t, p, v, d, ci] = await Promise.all([
+  const [m, t, p, v, d, ci, nt] = await Promise.all([
     sb.from('meetings').select('*').order('held_on', { ascending: false }),
     sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
     sb.from('proposals').select('*').order('created_at', { ascending: false }),
     sb.from('votes').select('*'),
     sb.from('task_done').select('*'),
-    sb.from('task_items').select('task_id,done')
+    sb.from('task_items').select('id,task_id,text,done,pos'),
+    sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)
   ]);
   
   if (!m.error) S.meetings = m.data || [];
   if (!t.error) S.tasks = t.data || [];
   if (!d.error) S.done = d.data || [];
-  if (!ci.error) { S.itemStats = {}; (ci.data || []).forEach(r => { const z = S.itemStats[r.task_id] || (S.itemStats[r.task_id] = [0, 0]); z[1]++; if (r.done) z[0]++; }); }
+  if (!nt.error) S.notes = nt.data || [];
+  if (!ci.error) { S.items = (ci.data || []).slice().sort((a, b) => (a.pos || 0) - (b.pos || 0)); S.itemStats = {}; (ci.data || []).forEach(r => { const z = S.itemStats[r.task_id] || (S.itemStats[r.task_id] = [0, 0]); z[1]++; if (r.done) z[0]++; }); }
   S.propsErr = !!(p.error || v.error);
   if (!p.error) S.props = p.data || [];
   if (!v.error) S.votes = v.data || [];
@@ -46,6 +48,7 @@ async function load() {
   if (!m.error && !t.error && S.me) try { localStorage.setItem(CACHE_KEY, JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
   if (typeof rtStart === 'function') rtStart();
+  inboxAfterLoad(); recurPing();
 }
 
 function loginView() {
@@ -78,7 +81,7 @@ function render() {
   '</div>' + (S.view === 'board' ? '<button class="fab" id="fab" aria-label="مهمة جديدة">＋</button>' : '');
   
   if (S.view === 'set') $app.insertAdjacentHTML('beforeend', '<p class="m" style="text-align:center;margin-top:20px">النسخة ' + VERSION + '</p>');
-  $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
+  bindHeader();
   if ($('fab')) $('fab').onclick = () => taskDialog(null);
   document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
   if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();

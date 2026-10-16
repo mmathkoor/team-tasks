@@ -1,6 +1,6 @@
 // ===== التحديث اللحظي (Supabase Realtime عبر WebSocket بدون مكتبات) =====
 const RT = { ws: null, ref: 0, hb: null, tk: null, retry: 0, timer: null, rc: null, dirty: false };
-const RT_TABLES = ['tasks', 'task_done', 'proposals', 'votes', 'meetings', 'members'];
+const RT_TABLES = ['tasks', 'task_done', 'proposals', 'votes', 'meetings', 'members', 'notifications'];
 function rtStart() {
   if (RT.ws || !S.me || !AUTH.s || !navigator.onLine) return;
   let ws;

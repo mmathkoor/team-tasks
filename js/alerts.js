@@ -32,6 +32,7 @@ function closeAlertOs(a) {
   if (!a || !a.tag || !('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(r => r.getNotifications({ tag: a.tag }).then(l => l.forEach(n => n.close()))).catch(() => {});
 }
+function ackAlert(a) { if (!a) return; if (a.nid && typeof markRead === 'function') markRead([a.nid]); if (a.nids && typeof markRead === 'function') markRead(a.nids); }
 function showAlert(a) { ALERT.q.push(a); if (!ALERT.cur) nextAlert(); }
 function nextAlert() {
   const a = ALERT.q.shift(); ALERT.cur = a || null;
@@ -41,14 +42,15 @@ function nextAlert() {
   const t = a.task_id && S.tasks.find(x => x.id === a.task_id);
   ov.innerHTML = '<div class="al-box"><div class="al-bell">🔔</div><h2>' + esc(a.title || 'تنبيه') + '</h2><p>' + esc(a.body || '') + '</p>' +
     (ALERT.q.length ? '<div class="al-more">+ ' + ALERT.q.length + ' تنبيهات أخرى بانتظارك</div>' : '') +
-    '<div class="al-act">' + (t && eff(t) !== 'done' ? '<button class="al-ok" id="al_done">إنجاز ✓</button>' : '') + (t ? '<button id="al_open">عرض المهمة</button>' : '') + '<button id="al_x">إغلاق</button></div></div>';
+    '<div class="al-act">' + (a.summary ? '<button class="al-ok" id="al_inbox">فتح صندوق التنبيهات</button>' : '') + (t && eff(t) !== 'done' ? '<button class="al-ok" id="al_done">إنجاز ✓</button>' : '') + (t ? '<button id="al_open">عرض المهمة</button>' : '') + '<button id="al_x">إغلاق</button></div></div>';
   startRing(); closeAlertOs(a);
-  document.getElementById('al_x').onclick = nextAlert;
-  if (t) document.getElementById('al_open').onclick = () => { ALERT.q = []; nextAlert(); S.view = 'board'; render(); taskDialog(S.tasks.find(x => x.id === t.id)); };
-  if (document.getElementById('al_done')) document.getElementById('al_done').onclick = () => { moveTask(t.id, 'done'); nextAlert(); };
+  document.getElementById('al_x').onclick = () => { ackAlert(a); nextAlert(); };
+  if (document.getElementById('al_inbox')) document.getElementById('al_inbox').onclick = () => { ackAlert(a); ALERT.q = []; nextAlert(); inboxDialog(); };
+  if (t) document.getElementById('al_open').onclick = () => { ackAlert(a); ALERT.q = []; nextAlert(); S.view = 'board'; render(); taskDialog(S.tasks.find(x => x.id === t.id)); };
+  if (document.getElementById('al_done')) document.getElementById('al_done').onclick = () => { ackAlert(a); moveTask(t.id, 'done'); nextAlert(); };
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ALERT.cur) startRing(); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const m = e.data; if (m && typeof m === 'object' && m.type === 'alert') showAlert(m); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const m = e.data; if (m && typeof m === 'object' && m.type === 'alert') { if (m.nid) { if (INBOX.alerted.has(m.nid)) return; INBOX.alerted.add(m.nid); } showAlert(m); } });
 
 function alertSettingsHtml() {
   return '<div class="card"><h2>🚨 نافذة التنبيه المنبثقة</h2>' +

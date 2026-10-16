@@ -34,9 +34,9 @@ function settingsView() {
     adminHtml = '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء والتنبيهات</h2>' +
       '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon)">إرسال تذكير شامل للفريق 🔔</button>' +
       '<h3 style="font-size:14px;margin-top:16px;color:var(--acc)">إرسال إشعار مخصص لموظف:</h3>' +
-      '<div class="row" style="margin-bottom:8px"><select id="ping_to">' + optMembers + '</select></div>' +
+      '<div class="row" style="margin-bottom:8px"><select id="ping_to"><option value="__all">👥 الكل (جميع الأعضاء)</option>' + optMembers + '</select></div>' +
       '<div class="row" style="margin-bottom:8px"><input id="ping_msg" placeholder="اكتب رسالة التنبيه (اختياري)..."></div>' +
-      '<div class="row" style="margin-bottom:16px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين تذكير بمهامه غير المنجزة</label></div>' +
+      '<div class="row" style="margin-bottom:16px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين تذكير بالمهام غير المنجزة (لكل شخص مهامه هو)</label></div>' +
       '<div class="row" style="margin-bottom:16px"><button class="p s" id="send_ping">إرسال الإشعار للموظف 🔔</button></div>' +
       '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
       memList + 
@@ -81,22 +81,12 @@ function bindSettings() {
           
           $('send_ping').disabled = true; $('send_ping').textContent = '...';
           
-          // تجميع نص الإشعار
-          let finalBody = msg;
-          if (includeTasks) {
-              const userTasks = S.tasks.filter(t => t.assignee_email === to && t.status !== 'done');
-              if (userTasks.length > 0) {
-                  const tasksList = userTasks.map(t => '🔸 ' + t.title).join('\n');
-                  finalBody += (finalBody ? '\n\n' : '') + 'المهام المفتوحة لديك:\n' + tasksList;
-              } else {
-                  finalBody += (finalBody ? '\n\n' : '') + '(ليس لديك أي مهام مفتوحة حالياً)';
-              }
-          }
-
+          const all = to === '__all';
           try {
-              await apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري 🔔', body: finalBody, assignee_email: to, for_all: false, sender_name: S.me.name, is_custom: true }));
-              alert('تم إرسال الإشعار بنجاح.');
-              $('ping_msg').value = '';
+              const rr = await apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري 🔔', body: msg, assignee_email: all ? undefined : to, for_all: all, is_custom: true, include_tasks: includeTasks }));
+              const j = await rr.json().catch(() => ({}));
+              alert(rr.ok ? 'تم الإرسال ✅ وحُفظ في صندوق ' + (j.stored || 0) + ' عضو، ووصل إشعار الجوال إلى ' + (j.sent || 0) + ' جهاز.\nمن لم يصله إشعار الجوال سيرى التنبيه فور فتحه التطبيق.' : 'تعذّر الإرسال (' + (j.error || rr.status) + ')');
+              if (rr.ok) $('ping_msg').value = '';
           } catch(e) {}
           $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار للموظف 🔔';
       };

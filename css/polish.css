@@ -127,3 +127,46 @@ label.chk input{width:18px;height:18px;margin:0;accent-color:var(--gold)}
 .al-act button{min-height:52px;font-size:17px;border-radius:14px;background:rgba(255,255,255,.1);color:#f4efe2;border:1px solid rgba(255,255,255,.2)}
 .al-act button.al-ok{background:linear-gradient(135deg,#ecd08a,#b8923a);color:#0b1426;border:0}
 @media print{#alert_ov{display:none!important}}
+
+/* ===== v3.4: مؤشراتي، بطاقة المجموعة، البنود على البطاقة، صندوق التنبيهات ===== */
+.hbtns{display:flex;gap:8px;position:relative;z-index:1}
+.top .iconbtn{position:relative}
+.bn{position:absolute;top:-5px;inset-inline-start:-5px;min-width:19px;height:19px;border-radius:10px;background:var(--late);color:#fff;font-size:11px;font-weight:700;line-height:19px;padding:0 5px;text-align:center;box-shadow:0 0 0 2px var(--card)}
+.bn[hidden]{display:none}
+#bell.has{animation:ttRing 2.4s ease-in-out infinite;transform-origin:50% 8%}
+
+.stats.kpis{grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px}
+.stat.btn{text-align:start;cursor:pointer;font:inherit;transition:transform .15s,box-shadow .15s,border-color .15s}
+.stat.btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
+.stat.btn.on{border-color:var(--gold);box-shadow:0 0 0 2px var(--goldsoft)}
+.stat.ok b{color:var(--ok)}
+.wk{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}
+.wkb{height:8px;background:var(--col);border-radius:5px;margin-top:8px;overflow:hidden}
+.wkb i{display:block;height:100%;background:linear-gradient(90deg,#c9a24e,#ecd08a);border-radius:5px;transition:width .5s ease}
+.kpi-tag{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13.5px}
+.kpi-tag button{padding:2px 10px;font-size:12.5px}
+@media (max-width:768px){
+  .stats.kpis{display:flex;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:4px;margin-inline:-12px;padding-inline:12px;scrollbar-width:none}
+  .stats.kpis::-webkit-scrollbar{display:none}
+  .stats.kpis .stat{flex:0 0 118px;scroll-snap-align:start}
+}
+
+.ckrows{margin:8px 0 2px;display:flex;flex-direction:column;gap:2px}
+.ckrow{display:flex;align-items:center;gap:9px;padding:5px 4px;border-radius:8px;cursor:pointer;font-size:14px}
+.ckrow:hover{background:var(--col)}
+.ckrow input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--gold);cursor:pointer}
+.ckrow .dn{text-decoration:line-through;color:var(--mute)}
+.dnote{margin-top:6px;padding:7px 10px;background:var(--oksoft);color:var(--ok);border-radius:10px;font-size:13px;white-space:pre-wrap}
+.grp-box{margin:12px 0 0;padding:10px 12px;background:var(--accsoft);border-radius:12px;font-size:14px}
+
+.inbox{display:flex;flex-direction:column;gap:8px;max-height:58vh;overflow:auto;margin-bottom:6px}
+.inb-i{padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--card)}
+.inb-i.new{border-color:var(--gold);background:var(--goldsoft)}
+.inb-i .inb-b{font-size:13.5px;color:var(--mute);white-space:pre-wrap;margin-top:3px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+
+/* لمسات عامة */
+.card,.dsh-card{border-radius:16px}
+.tk{border-radius:14px}
+.top .brand h1{letter-spacing:-.2px}
+button,select,input,textarea{transition:border-color .15s,box-shadow .15s,background .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--goldsoft);outline:none}

@@ -65,17 +65,15 @@ function card(t) {
     '<div class="tt">' + esc(t.title) + '</div>' +
     (t.progress > 0 && st !== 'done' ? '<div style="height:5px;background:var(--line);border-radius:3px;margin:6px 0"><div style="height:100%;width:' + t.progress + '%;background:var(--acc);border-radius:3px"></div></div>' : '') +
     flowLine(t) +
-    renderNotesAndWorkflow(t.notes) +
-    '<div class="meta" style="align-items:center;">' + prioChip(t) + metaAll + metaD + metaMt + ckChip(t) + waBtn + '</div>' +
+    renderNotesAndWorkflow(t.notes) + ckRows(t) + doneNoteLine(t) +
+    '<div class="meta" style="align-items:center;">' + prioChip(t) + metaAll + groupChip(t) + metaD + metaMt + ckChip(t) + waBtn + '</div>' +
     '<div class="acts">' + actsHtml + ' ' + handoffBtn + '</div>' +
   '</div>';
 }
 
 function boardView() {
-  const all = S.tasks.filter(t => (!S.meeting || t.meeting_id === S.meeting) && (S.filter === 'all' || mine(t)));
-  const open = all.filter(t => eff(t) !== 'done');
-  const late = open.filter(t => t.due_on && t.due_on < today()).length;
-  const soon = open.filter(t => t.due_on && t.due_on >= today() && daysTo(t.due_on) <= 1).length;
+  let all = S.tasks.filter(t => (!S.meeting || t.meeting_id === S.meeting) && (S.filter === 'all' || mine(t)));
+  if (S.kpi && KPI_TEST[S.kpi]) all = all.filter(KPI_TEST[S.kpi]);
   
   const cols = Object.keys(ST).map(k => {
     const items = all.filter(t => eff(t) === k).sort(taskCmp);
@@ -86,14 +84,10 @@ function boardView() {
   }).join('');
   
   let mtOpts = '<option value="">كل المشاريع/الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
-  let adminBtn = isAdmin() ? '<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>' : '';
+  let adminBtn = '<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>';
   let cTabs = Object.keys(ST).map(k => '<button data-c="' + k + '" class="' + (S.col === k ? 'on' : '') + '">' + ST[k] + ' (' + all.filter(t => eff(t) === k).length + ')</button>').join('');
 
-  return '<div class="stats">' +
-    '<div class="stat"><b>' + open.length + '</b><span>قيد العمل</span></div>' +
-    '<div class="stat late"><b>' + late + '</b><span>متأخرة</span></div>' +
-    '<div class="stat soon"><b>' + soon + '</b><span>اليوم/غداً</span></div>' +
-  '</div>' +
+  return kpiHtml() +
   '<div class="tools">' +
     '<div class="seg"><button data-f="mine" class="' + (S.filter === 'mine' ? 'on' : '') + '">مهامي فقط</button><button data-f="all" class="' + (S.filter === 'all' ? 'on' : '') + '">كل الفريق</button></div>' +
     '<select id="fm" style="border-radius:6px">' + mtOpts + '</select>' +
@@ -106,6 +100,9 @@ function boardView() {
 
 function bindBoard() {
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+  document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { S.kpi = S.kpi === b.dataset.kpi ? '' : b.dataset.kpi; S.filter = 'mine'; render(); });
+  if ($('kpi_x')) $('kpi_x').onclick = () => { S.kpi = ''; render(); };
+  document.querySelectorAll('[data-ci]').forEach(c => c.onchange = () => ckToggle(c.dataset.ci, c.checked));
   document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.col = b.dataset.c; render(); });
   $('fm').onchange = e => { S.meeting = e.target.value; render(); };
   $('nt').onclick = () => taskDialog(null);
@@ -115,7 +112,7 @@ function bindBoard() {
   document.querySelectorAll('[data-hf]').forEach(b => { b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); }; });
 
   document.querySelectorAll('.tk').forEach(el => {
-    el.onclick = () => taskDialog(S.tasks.find(t => t.id === el.dataset.id));
+    el.onclick = e => { if (e.target.closest('.ckrows')) return; taskDialog(S.tasks.find(t => t.id === el.dataset.id)); };
     el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag'); };
     el.ondragend = () => el.classList.remove('drag');
   });
@@ -159,7 +156,7 @@ function handoffDialog(tId) {
     dlg.showModal();
 }
 
-async function moveTask(id, to) {
+async function moveTask(id, to, note) {
   const t = S.tasks.find(x => x.id === id);
   if (!t || eff(t) === to || !S.me) return;
   S.col = to;
@@ -174,12 +171,15 @@ async function moveTask(id, to) {
     }
     return;
   }
+  if (to === 'done' && t.group_id && note === undefined) return askDone(t, n => moveTask(id, 'done', n));
   const snap = Object.assign({}, t), adv = to === 'done' && Array.isArray(t.flow) && (t.flow_step || 0) < t.flow.length - 1;
   if (adv) { const c = (t.flow_step || 0) + 1; t.flow_step = c; t.assignee_email = t.flow[c].email; t.status = 'todo'; } else t.status = to;
+  const patch = { status: to }; if (to === 'done' && note) patch.done_note = note; else if (to !== 'done' && t.done_note) patch.done_note = null;
+  if ('done_note' in patch) t.done_note = patch.done_note;
   render();
-  const { error } = await sb.from('tasks').update({ status: to }).eq('id', id);
+  const { error } = await sb.from('tasks').update(patch).eq('id', id);
   if (error) { Object.assign(t, snap); alert('خطأ: ' + error.message); load(); }
-  else if (to === 'done') { notifyAdmins(t, adv ? 'أنهى مرحلته في «' + t.title + '»' : null); if (adv) { notifyNext(snap); load(); } }
+  else if (to === 'done') { notifyAdmins(t, adv ? 'أنهى مرحلته في «' + t.title + '»' : (note ? 'أنجز «' + t.title + '»: ' + note : null)); if (adv) { notifyNext(snap); load(); } }
 }
 
 function taskDialog(t, pre = {}) {
@@ -207,11 +207,18 @@ function taskDialog(t, pre = {}) {
     '<label id="f_stw">الحالة<select id="f_st">' + stOpts + '</select></label>' +
     '<label>الأولوية<select id="f_pr">' + prioOptions(prioOf(x)) + '</select></label>' +
   '</div>' +
+  '<label id="f_dnw" style="display:none;margin-top:10px">ما الذي أُنجز؟ (يظهر في التقارير)<textarea id="f_dn" rows="2">' + esc(x.done_note || '') + '</textarea></label>' +
   '<div id="ck_box" style="margin-top:14px"></div>' +
   '<div id="fw_box" style="margin-top:14px"></div>' +
-  '<p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة للكل:</b> تظهر لجميع الأعضاء، وكل عضو يعتمد إنجازها لنفسه بشكل منفصل.</p>' +
+  '<p class="m" id="f_hint" style="margin:12px 0 0;padding:10px;background:var(--accsoft);color:var(--acc);border-radius:8px">ℹ️ <b>مهمة جماعية:</b> تُنشأ نسخة مستقلة لكل عضو؛ يكمل كلٌّ نسخته ويكتب ما أنجزه، وتظهر نتائج الجميع في التقارير.</p>' +
   '<div class="row dact">' + dlBtn + '<button id="f_cx" class="s">إلغاء</button><button class="p s" id="f_sv">حفظ</button></div>';
   
+  if (edit && t.group_id) {
+    const g = groupOf(t), dn = g.filter(x => x.status === 'done');
+    $('f_hint').insertAdjacentHTML('afterend', '<div class="grp-box">👥 <b>هذه نسختك من مهمة جماعية</b> — أنجز ' + dn.length + ' من ' + g.length + '<div class="m" style="margin-top:4px">' + g.map(x => (x.status === 'done' ? '✓ ' : '○ ') + esc(nm(x.assignee_email))).join(' · ') + '</div>' +
+      (canDel(t) ? '<label class="chk" style="margin-top:8px"><input type="checkbox" id="f_ga"> طبّق العنوان والتفاصيل والموعد والأولوية على نسخ الجميع</label><button class="dng s" type="button" id="f_dla" style="margin-top:8px">حذف المهمة للجميع</button>' : '') + '</div>');
+    if ($('f_dla')) $('f_dla').onclick = () => { if (confirm('سيُحذف ' + g.length + ' نسخ لهذه المهمة عند الجميع. متأكد؟')) { dlg.close(); run(sb.from('tasks').delete().eq('group_id', t.group_id)); } };
+  }
   if (edit) { $('f_hint').insertAdjacentHTML('afterend', EXTRA_HTML(t)); bindExtras(t); }
   const ck = ckInit(edit ? t : null);
   let fw = Array.isArray(x.flow) ? x.flow.map(z => ({ email: z.email, note: z.note || '' })) : [];
@@ -231,7 +238,8 @@ function taskDialog(t, pre = {}) {
     if ($('fw_clr')) $('fw_clr').onclick = () => { fw = []; drawFlow(); };
   };
   drawFlow();
-  const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; $('fw_box').style.display = a ? 'none' : ''; $('ck_box').style.display = a ? 'none' : ''; };
+  const sync = () => { const a = $('f_as').value === '__all'; $('f_stw').style.display = a ? 'none' : ''; $('f_hint').style.display = a ? '' : 'none'; $('fw_box').style.display = a ? 'none' : ''; $('ck_box').style.display = a && edit ? 'none' : ''; $('f_dnw').style.display = !a && $('f_st').value === 'done' ? '' : 'none'; };
+  $('f_st').onchange = sync;
   $('f_as').onchange = sync; sync();
   $('f_cx').onclick = () => dlg.close();
   $('f_sv').onclick = async () => {
@@ -246,9 +254,19 @@ function taskDialog(t, pre = {}) {
     if (flow && (!edit || !t.flow)) row.flow_step = 0;
     
     $('f_sv').disabled = true; $('f_sv').textContent = '...';
-    const { error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row);
+    row.done_note = row.status === 'done' ? ($('f_dn').value.trim() || null) : null;
+    let gmap = null, error;
+    if (!edit && all) {            // مهمة جماعية: نسخة مستقلة لكل عضو
+      const gid = crypto.randomUUID(); delete row.done_note;
+      const rows = S.members.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
+      ({ error } = await sb.from('tasks').insert(rows));
+      if (!error) { await Promise.all(rows.map(r => ck.flush(r.id))); gmap = {}; rows.forEach(r => { gmap[String(r.assignee_email).toLowerCase()] = r.id; }); }
+    } else {
+      ({ error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row));
+      if (!error && !edit && !all) await ck.flush(row.id);
+      if (!error && edit && t.group_id && $('f_ga') && $('f_ga').checked) await sb.from('tasks').update({ title: row.title, notes: row.notes, due_on: row.due_on, priority: row.priority, meeting_id: row.meeting_id }).eq('group_id', t.group_id);
+    }
     if (error) { alert('خطأ: ' + error.message); $('f_sv').disabled = false; $('f_sv').textContent = 'حفظ'; return; }
-    if (!edit && !all) await ck.flush(row.id);
     
     if (edit && !all && row.status === 'done' && t.status !== 'done') {
       const fl = row.flow !== undefined ? row.flow : t.flow, adv = Array.isArray(fl) && (t.flow_step || 0) < fl.length - 1;
@@ -256,7 +274,7 @@ function taskDialog(t, pre = {}) {
     }
     // إرسال إشعار فوري عند الإضافة (ليست تعديلاً)
     if (!edit && (all || assignee)) {
-        apiPost('/api/notify', JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: row.for_all, sender_name: S.me.name, task_id: row.id, priority: row.priority })).catch(e => console.error(e));
+        apiPost('/api/notify', JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: all, sender_name: S.me.name, task_id: gmap ? undefined : row.id, task_map: gmap || undefined, priority: row.priority })).catch(e => console.error(e));
     }
 
     dlg.close(); load();

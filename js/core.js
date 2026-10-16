@@ -25,6 +25,8 @@ class Q {
   delete() { this.m = 'DELETE'; return this; }
   limit(n) { this.p.set('limit', n); return this; }
   offset(n) { this.p.set('offset', n); return this; }
+  is(c, v) { this.p.append(c, 'is.' + v); return this; }
+  in(c, arr) { this.p.append(c, 'in.(' + arr.join(',') + ')'); return this; }
   lt(c, v) { this.p.append(c, 'lt.' + v); return this; }
   ilike(c, v) { this.p.append(c, 'ilike.' + v); return this; }
   then(res, rej) { return this.run().then(res, rej); }
