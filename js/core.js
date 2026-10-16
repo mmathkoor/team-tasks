@@ -24,6 +24,7 @@ class Q {
   update(o) { this.m = 'PATCH'; this.b = o; return this; }
   delete() { this.m = 'DELETE'; return this; }
   limit(n) { this.p.set('limit', n); return this; }
+  offset(n) { this.p.set('offset', n); return this; }
   lt(c, v) { this.p.append(c, 'lt.' + v); return this; }
   ilike(c, v) { this.p.append(c, 'ilike.' + v); return this; }
   then(res, rej) { return this.run().then(res, rej); }

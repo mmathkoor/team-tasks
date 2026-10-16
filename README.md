@@ -12,6 +12,8 @@ js/tasks.js         اللوحة وبطاقات المهام ونافذة الم
 js/task-extras.js   المرفقات والتعليقات داخل المهمة
 js/checklist.js     القائمة الفرعية
 js/activity.js      سجل النشاط
+js/dashboard.js     لوحة الأرقام والرسوم (SVG) وتصدير CSV والطباعة
+js/tools.js         فحص النظام والنسخة الاحتياطية
 js/recurring.js     المهام المتكررة
 js/proposals.js     المقترحات والتصويت
 js/settings.js      الإعدادات والإشعارات

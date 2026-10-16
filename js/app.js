@@ -73,14 +73,15 @@ function render() {
   $app.innerHTML = '<div class="top"><h1><svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>مدير المهام</span></h1><div class="row s"><span class="chip" style="font-size:14px">👤 ' + esc(S.me.name) + '</span><button id="rf" class="s">🔄 تحديث</button></div></div>' +
   '<div class="nav">' +
     '<button data-nv="board" class="' + (S.view === 'board' ? 'on' : '') + '">المهام والمشاريع</button>' +
+    '<button data-nv="dash" class="' + (S.view === 'dash' ? 'on' : '') + '">لوحة الأرقام</button>' +
     '<button data-nv="props" class="' + (S.view === 'props' ? 'on' : '') + '">القرارات والتصويت' + badge + '</button>' +
     '<button data-nv="log" class="' + (S.view === 'log' ? 'on' : '') + '">سجل النشاط</button>' +
     '<button data-nv="set" class="' + (S.view === 'set' ? 'on' : '') + '">الإعدادات</button>' +
   '</div>' +
-  (S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : S.view === 'log' ? logView() : settingsView());
+  (S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : S.view === 'log' ? logView() : S.view === 'dash' ? dashView() : settingsView());
   
   if (S.view === 'set') $app.insertAdjacentHTML('beforeend', '<p class="m" style="text-align:center;margin-top:20px">النسخة ' + VERSION + '</p>');
   $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
   document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
-  if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else bindSettings();
+  if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();
 }
