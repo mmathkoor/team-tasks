@@ -1,4 +1,5 @@
 function showErrorBox(msg) {
+    msg = String(msg == null ? '' : msg).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const a = document.getElementById('app');
     if (a) a.innerHTML = '<div class="card" style="margin:40px auto;max-width:400px;text-align:center">' +
         '<h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال مؤقتاً</h2>' +
