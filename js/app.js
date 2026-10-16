@@ -45,6 +45,7 @@ async function load() {
   
   if (!m.error && !t.error && S.me) try { localStorage.setItem(CACHE_KEY, JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
+  if (typeof rtStart === 'function') rtStart();
 }
 
 function loginView() {

@@ -61,12 +61,12 @@ function card(t) {
   let metaD = d ? '<span class="chip ' + d.c + '">' + esc(d.t) + '</span>' : '';
   let metaMt = mt ? '<span class="chip">📌 ' + esc(mt.title) + '</span>' : '';
 
-  return '<div class="tk ' + st + '" draggable="true" data-id="' + t.id + '">' +
+  return '<div class="tk ' + st + (prioOf(t) !== 'normal' ? ' pr-' + prioOf(t) : '') + '" draggable="true" data-id="' + t.id + '">' +
     '<div class="tt">' + esc(t.title) + '</div>' +
     (t.progress > 0 && st !== 'done' ? '<div style="height:5px;background:var(--line);border-radius:3px;margin:6px 0"><div style="height:100%;width:' + t.progress + '%;background:var(--acc);border-radius:3px"></div></div>' : '') +
     flowLine(t) +
     renderNotesAndWorkflow(t.notes) +
-    '<div class="meta" style="align-items:center;">' + metaAll + metaD + metaMt + ckChip(t) + waBtn + '</div>' +
+    '<div class="meta" style="align-items:center;">' + prioChip(t) + metaAll + metaD + metaMt + ckChip(t) + waBtn + '</div>' +
     '<div class="acts">' + actsHtml + ' ' + handoffBtn + '</div>' +
   '</div>';
 }
@@ -78,7 +78,7 @@ function boardView() {
   const soon = open.filter(t => t.due_on && t.due_on >= today() && daysTo(t.due_on) <= 1).length;
   
   const cols = Object.keys(ST).map(k => {
-    const items = all.filter(t => eff(t) === k);
+    const items = all.filter(t => eff(t) === k).sort(taskCmp);
     return '<div class="col ' + (S.col === k ? 'on' : '') + '" data-st="' + k + '">' +
       '<div class="ch"><span>' + ST[k] + '</span><i>' + items.length + '</i></div>' +
       (items.length ? items.map(card).join('') : '<div class="empty">لا يوجد مهام</div>') +
@@ -205,6 +205,7 @@ function taskDialog(t, pre = {}) {
   '<div class="row" style="margin-top:10px">' +
     '<label>الارتباط (قسم/مشروع)<select id="f_mt">' + mtOpts + '</select></label>' +
     '<label id="f_stw">الحالة<select id="f_st">' + stOpts + '</select></label>' +
+    '<label>الأولوية<select id="f_pr">' + prioOptions(prioOf(x)) + '</select></label>' +
   '</div>' +
   '<div id="ck_box" style="margin-top:14px"></div>' +
   '<div id="fw_box" style="margin-top:14px"></div>' +
@@ -237,7 +238,7 @@ function taskDialog(t, pre = {}) {
     const title = $('f_ti').value.trim(); if (!title) return $('f_ti').focus();
     const all = $('f_as').value === '__all';
     const assignee = $('f_as').value;
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, status: all ? 'todo' : $('f_st').value };
+    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: all ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: all ? 'todo' : $('f_st').value };
     if (!edit) { row.created_by = S.me.email; row.id = crypto.randomUUID(); } else row.progress = +$('f_pg').value;
     let flow = !all && fw.length >= 2 ? fw.map(z => ({ email: z.email, note: (z.note || '').trim() })) : null;
     if (flow) { flow[cur].email = assignee || flow[cur].email; flow = flow.filter(z => z.email); if (flow.length < 2) flow = null; }
@@ -255,7 +256,7 @@ function taskDialog(t, pre = {}) {
     }
     // إرسال إشعار فوري عند الإضافة (ليست تعديلاً)
     if (!edit && (all || assignee)) {
-        apiPost('/api/notify', JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: row.for_all, sender_name: S.me.name, task_id: row.id })).catch(e => console.error(e));
+        apiPost('/api/notify', JSON.stringify({ title: row.title, assignee_email: row.assignee_email, for_all: row.for_all, sender_name: S.me.name, task_id: row.id, priority: row.priority })).catch(e => console.error(e));
     }
 
     dlg.close(); load();

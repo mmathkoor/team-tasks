@@ -49,13 +49,14 @@ function settingsView() {
     '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
-  adminHtml + recurHtml() + toolsHtml() +
+  alertSettingsHtml() + adminHtml + recurHtml() + toolsHtml() +
   '<div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>';
 }
 
 function bindSettings() {
   $('out').onclick = logout;
   bindRecur();
+  bindAlertSettings();
   bindTools();
 
   if ($('admin_remind')) {

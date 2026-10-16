@@ -89,3 +89,41 @@ dialog[open]{animation:ttPop .22s cubic-bezier(.2,.8,.2,1)}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
 @media print{.fab,.nav{display:none!important}}
+
+/* ===== الأولوية على البطاقات ===== */
+.tk{position:relative}
+.tk.pr-urgent::after,.tk.pr-important::after{content:'';position:absolute;top:14px;inset-inline-end:14px;width:9px;height:9px;border-radius:50%}
+.tk.pr-urgent::after{background:var(--late);box-shadow:0 0 0 4px var(--latesoft)}
+.tk.pr-important::after{background:var(--soon);box-shadow:0 0 0 4px var(--soonsoft)}
+.tk.pr-urgent:not(.done){border-color:color-mix(in srgb,var(--late) 35%,var(--line))}
+.tk .tt{padding-inline-end:22px}
+.chip.pr-chip.urgent{background:var(--latesoft);color:var(--late)}
+.chip.pr-chip.important{background:var(--soonsoft);color:var(--soon)}
+label.chk{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
+label.chk input{width:18px;height:18px;margin:0;accent-color:var(--gold)}
+
+/* ===== شاشة التحميل الهيكلية ===== */
+@keyframes ttShimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.sk{border-radius:16px;background:linear-gradient(90deg,var(--col) 25%,var(--card) 50%,var(--col) 75%);background-size:200% 100%;animation:ttShimmer 1.4s linear infinite;border:1px solid var(--line)}
+.sk-wrap{display:block}
+.sk-top{height:74px;border-radius:20px;margin-bottom:14px}
+.sk-nav{height:54px;margin-bottom:18px}
+.sk-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.sk-stat{height:74px}
+.sk-card{height:120px;margin-bottom:12px}
+@media (max-width:768px){.sk-nav{display:none}}
+
+/* ===== نافذة التنبيه المنبثقة ===== */
+#alert_ov{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(900px 500px at 50% 0,rgba(201,162,78,.28),transparent 60%),rgba(7,13,25,.94);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:ttFadeUp .25s ease both}
+.al-box{width:min(440px,100%);text-align:center;color:#f4efe2}
+.al-bell{font-size:64px;line-height:1;display:inline-block;transform-origin:50% 8%;animation:ttRing 1.1s ease-in-out infinite}
+@keyframes ttRing{0%,100%{transform:rotate(0)}10%{transform:rotate(16deg)}20%{transform:rotate(-14deg)}30%{transform:rotate(12deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(6deg)}60%,90%{transform:rotate(0)}}
+.al-box h2{color:#f6e3a8;font-size:24px;margin:14px 0 8px;border:0;padding:0}
+.al-box p{white-space:pre-wrap;font-size:17px;line-height:1.7;margin:0 0 6px;color:#e8e2d2;max-height:38vh;overflow:auto}
+.al-more{font-size:13px;color:#c9a24e;margin-top:8px}
+.al-act{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.al-act button{min-height:52px;font-size:17px;border-radius:14px;background:rgba(255,255,255,.1);color:#f4efe2;border:1px solid rgba(255,255,255,.2)}
+.al-act button.al-ok{background:linear-gradient(135deg,#ecd08a,#b8923a);color:#0b1426;border:0}
+@media print{#alert_ov{display:none!important}}

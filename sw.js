@@ -57,10 +57,17 @@ self.addEventListener('message', e => { if (e.data === 'flush') e.waitUntil(flus
 self.addEventListener('push', e => {
   if (!e.data) return;
   const d = e.data.json();
-  e.waitUntil(self.registration.showNotification(d.title, {
-    body: d.body, icon: d.icon || '/icon-192.png', badge: '/badge-96.png', vibrate: [200, 100, 200],
-    actions: d.actions || [], data: { url: '/', task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
-  }));
+  const tag = d.task_id ? 'task-' + d.task_id : 'msg-' + Date.now();
+  e.waitUntil((async () => {
+    await self.registration.showNotification(d.title, {
+      body: d.body, icon: d.icon || '/icon-192.png', badge: '/badge-96.png',
+      vibrate: [400, 150, 400, 150, 800, 200, 800], requireInteraction: true, tag, renotify: true, timestamp: Date.now(),
+      actions: d.actions || [], data: { url: '/', task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
+    });
+    // إن كان التطبيق مفتوحاً تظهر نافذة تنبيه كاملة مع نغمة
+    const l = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    l.forEach(c => c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag }));
+  })());
 });
 async function markDone(d) {
   const a = await auth();
