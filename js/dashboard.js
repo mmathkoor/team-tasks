@@ -12,7 +12,7 @@ function dashUnits(tasks, done, members) {
         const d = (done || []).find(x => x.task_id === t.id && same(x.email, m.email));
         out.push({ t, who: m.email, done: !!d, doing: false, completed_at: d ? d.done_at || null : null, created_at: t.created_at, due_on: t.due_on, meeting_id: t.meeting_id });
       }
-    } else out.push({ t, who: t.assignee_email || '', done: t.status === 'done', doing: t.status === 'doing', completed_at: t.completed_at || null, created_at: t.created_at, due_on: t.due_on, meeting_id: t.meeting_id });
+    } else out.push({ t, who: t.assignee_email || '', done: t.status === 'done', doing: t.status === 'doing', completed_at: t.completed_at || null, note: t.done_note || null, group: t.group_id || null, created_at: t.created_at, due_on: t.due_on, meeting_id: t.meeting_id });
   }
   return out;
 }
@@ -51,7 +51,7 @@ function dashCompute(units, f, now, members) {
     noTime: done.filter(u => !u.completed_at).length, weeks, people, meets, age,
     oldest: open.slice().sort((a, b) => ts(a.created_at) - ts(b.created_at)).slice(0, 5),
     attention: late.slice().sort((a, b) => (a.due_on < b.due_on ? -1 : 1)).slice(0, 5),
-    recent: done.filter(u => u.completed_at).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).slice(0, 5)
+    recent: done.filter(u => u.completed_at).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).slice(0, 8)
   };
 }
 
@@ -74,7 +74,7 @@ function svgTrend(weeks) {
 const pct = (a, b) => (b ? Math.round(100 * a / b) : 0);
 const seg = (n, tot, c) => n ? '<i style="width:' + (100 * n / tot).toFixed(1) + '%;background:' + c + '" title="' + n + '"></i>' : '';
 const kpi = (v, l, hint, cls) => '<div class="dsh-kpi ' + (cls || '') + '"><b>' + v + '</b><span>' + l + '</span>' + (hint ? '<small>' + hint + '</small>' : '') + '</div>';
-const dshRow = x => { const t = x.t, d = x.due_on ? ' · الموعد ' + x.due_on : ''; return '<div class="dsh-li" data-open="' + t.id + '"><b>' + esc(t.title) + '</b><span class="m">' + esc(x.who ? nm(x.who) : 'غير مُسند') + d + '</span></div>'; };
+const dshRow = x => { const t = x.t, d = x.due_on ? ' · الموعد ' + x.due_on : ''; return '<div class="dsh-li" data-open="' + t.id + '"><b>' + esc(t.title) + '</b><span class="m">' + esc(x.who ? nm(x.who) : 'غير مُسند') + d + '</span>' + (x.note ? '<div class="dnote">📝 ' + esc(x.note) + '</div>' : '') + '</div>'; };
 const ageDays = x => x.created_at ? Math.max(0, Math.floor((Date.now() - new Date(x.created_at)) / DAY)) + ' يوماً' : '—';
 
 function dashView() {
@@ -98,6 +98,7 @@ function dashView() {
     '<div class="dsh-card"><h2>توزيع الحالات</h2>' + (D.total ? '<div class="dsh-flex">' + svgDonut([{ l: 'منجزة', n: D.done, c: 'var(--c-done)' }, { l: 'قيد العمل', n: D.doingOk, c: 'var(--c-doing)' }, { l: 'للتنفيذ', n: D.todoOk, c: 'var(--c-todo)' }, { l: 'متأخرة', n: D.late, c: 'var(--c-late)' }], D.rate + '%', 'منجزة') +
       '<div class="dsh-legend">' + [['منجزة', D.done, 'var(--c-done)'], ['قيد العمل', D.doingOk, 'var(--c-doing)'], ['للتنفيذ', D.todoOk, 'var(--c-todo)'], ['متأخرة', D.late, 'var(--c-late)']].map(([l, n, c]) => '<div><i style="background:' + c + '"></i>' + l + ' <b>' + n + '</b></div>').join('') + '</div></div>' : empty) + '</div>' +
     '<div class="dsh-card"><h2>الاتجاه الأسبوعي (8 أسابيع)</h2>' + svgTrend(D.weeks) + '<div class="dsh-legend row-l"><div><i style="background:var(--c-todo)"></i>مهام جديدة</div><div><i style="background:var(--c-done)"></i>مهام منجزة</div></div></div>' +
+    '<div class="dsh-card"><h2>🏆 ترتيب الأعضاء (نسبة الإنجاز)</h2>' + (D.people.some(p => p.total) ? D.people.filter(p => p.total && p.email).map(p => ({ p, r: pct(p.done, p.total) })).sort((a, b) => b.r - a.r || b.p.done - a.p.done).map((x, i) => '<div class="dsh-rw"><span>' + ['🥇', '🥈', '🥉'][i] + ' ' + esc(nm(x.p.email)) + '</span><div class="dsh-bar" style="width:100%"><i style="width:' + x.r + '%;background:var(--c-done)"></i></div><small>' + x.r + '% · ' + x.p.done + '/' + x.p.total + (x.p.late ? ' · <span style="color:var(--c-late)">' + x.p.late + ' متأخرة</span>' : '') + '</small></div>').join('') : empty) + '</div>' +
     '<div class="dsh-card"><h2>توزيع حمل العمل</h2>' + (D.people.some(p => p.total) ? D.people.filter(p => p.total).map(p => '<div class="dsh-rw"><span>' + esc(p.email ? nm(p.email) : 'غير مُسند') + '</span><div class="dsh-bar" style="width:' + (100 * p.total / mx).toFixed(1) + '%">' + seg(p.done, p.total, 'var(--c-done)') + seg(p.open, p.total, 'var(--c-todo)') + seg(p.late, p.total, 'var(--c-late)') + '</div><small>' + p.done + '/' + p.total + '</small></div>').join('') +
       '<div class="dsh-legend row-l"><div><i style="background:var(--c-done)"></i>منجزة</div><div><i style="background:var(--c-todo)"></i>مفتوحة</div><div><i style="background:var(--c-late)"></i>متأخرة</div></div>' : empty) + '</div>' +
     '<div class="dsh-card"><h2>الإنجاز حسب الاجتماع</h2>' + (D.meets.length ? D.meets.map(r => '<div class="dsh-rw"><span>' + esc(mname(r.id)) + '</span><div class="dsh-bar" style="width:100%">' + seg(r.done, r.total || 1, 'var(--c-done)') + '</div><small>' + pct(r.done, r.total) + '%</small></div>').join('') : empty) + '</div>' +
@@ -108,8 +109,8 @@ function dashView() {
 }
 function dashCsv(units) {
   const q = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };   // يمنع تنفيذ صيغ Excel من نص المهمة
-  const rows = [['العنوان', 'المسؤول', 'الحالة', 'الموعد', 'تاريخ الإنشاء', 'تاريخ الإنجاز', 'الاجتماع', 'جماعية'].map(q).join(',')];
-  units.forEach(u => rows.push([u.t.title, u.who ? nm(u.who) : 'غير مُسند', u.done ? 'منجزة' : (ST[u.t.status] || u.t.status), u.due_on || '', (u.created_at || '').slice(0, 10), (u.completed_at || '').slice(0, 10), (S.meetings.find(m => m.id === u.meeting_id) || {}).title || '', u.t.for_all ? 'نعم' : 'لا'].map(q).join(',')));
+  const rows = [['العنوان', 'المسؤول', 'الحالة', 'الموعد', 'تاريخ الإنشاء', 'تاريخ الإنجاز', 'الاجتماع', 'جماعية', 'ما أُنجز'].map(q).join(',')];
+  units.forEach(u => rows.push([u.t.title, u.who ? nm(u.who) : 'غير مُسند', u.done ? 'منجزة' : (ST[u.t.status] || u.t.status), u.due_on || '', (u.created_at || '').slice(0, 10), (u.completed_at || '').slice(0, 10), (S.meetings.find(m => m.id === u.meeting_id) || {}).title || '', (u.t.for_all || u.group) ? 'نعم' : 'لا', u.note || ''].map(q).join(',')));
   return '\ufeff' + rows.join('\r\n');
 }
 function downloadText(name, text, type) {

@@ -66,7 +66,7 @@ self.addEventListener('push', e => {
     });
     // إن كان التطبيق مفتوحاً تظهر نافذة تنبيه كاملة مع نغمة
     const l = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    l.forEach(c => c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag }));
+    l.forEach(c => c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag, nid: d.nid }));
   })());
 });
 async function markDone(d) {
