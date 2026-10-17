@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
       (r.frequency === 'monthly' && Math.min(r.day_of_month || 1, lastDay) === dom) ||
       (r.frequency === 'month_end' && dom === lastDay)));
     if (!due.length) return res.status(200).json({ created: 0 });
-    const { data: members } = await supabase.from('members').select('email');
+    const { data: members } = await supabase.from('members').select('email').neq('role', 'rep');
     const made = [];
     for (const r of due) {
       // حجز القاعدة لهذا اليوم بشكل ذري كي لا تتكرر المهمة لو فتح تطبيقين معاً

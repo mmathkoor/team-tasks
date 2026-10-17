@@ -24,9 +24,9 @@ async function autoEnablePush() {
 function settingsView() {
   let adminHtml = '';
   if (isAdmin()) {
-    let memList = S.members.map(m => {
+    let memList = (S.allMembers || S.members).map(m => {
         let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
-        return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span></div>' + rmBtn + '</div>';
+        return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span> <span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '">' + ({ admin: 'مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span></div>' + rmBtn + '</div>';
     }).join('');
     
     let optMembers = '<option value="">-- اختر الموظف --</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
@@ -40,7 +40,7 @@ function settingsView() {
       '<div class="row" style="margin-bottom:16px"><button class="p s" id="send_ping">إرسال الإشعار للموظف 🔔</button></div>' +
       '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
       memList + 
-      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><button class="p s" id="addm">إضافة للفريق</button></div></div>';
+      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو:</h3><div class="row"><input id="nn" placeholder="اسم العضو"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني"><select id="nr"><option value="member">عضو فريق</option><option value="rep">🛵 مندوب توصيل (يرى الطلبات المسندة له فقط)</option></select><button class="p s" id="addm">إضافة</button></div><p class="m" style="margin-top:6px">بعد الإضافة أنشئ حساب الدخول له من Supabase ← Authentication ← Add user بنفس البريد.</p></div>';
   }
 
   return '<div class="card" style="border-color:var(--oksoft)">' +
@@ -106,5 +106,5 @@ function bindSettings() {
     alert(error ? error.message : 'تم التغيير.'); $('np').value = ''; $('svp').textContent = 'حفظ التغيير';
   };
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
-  if ($('addm')) $('addm').onclick = () => { const e = $('ne').value.trim(), n = $('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n })); };
+  if ($('addm')) $('addm').onclick = () => { const e = $('ne').value.trim(), n = $('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n, role: $('nr') ? $('nr').value : 'member' })); };
 }

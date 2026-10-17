@@ -1,5 +1,10 @@
 // ===== صندوق التنبيهات: يحفظ ما فاتك ويعرضه فور فتح التطبيق =====
 const INBOX = { alerted: new Set() };
+function gotoOrder(id) {
+  if (S.me.role === 'rep') return repFocus(id);
+  S.view = 'orders'; render();
+  const o = (S.orders || []).find(x => x.id === id); if (o) orderDialog(o);
+}
 const unreadNotes = () => (S.notes || []).filter(n => !n.read_at);
 function updateBell() {
   const b = $('bell'); if (!b) return;
@@ -18,12 +23,13 @@ const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000);
 function inboxDialog() {
   const L = S.notes || [];
   dlg.innerHTML = '<h2>🔔 صندوق التنبيهات</h2>' +
-    (L.length ? '<div class="inbox">' + L.map(n => '<div class="inb-i' + (n.read_at ? '' : ' new') + '" data-nid="' + n.id + '" data-tid="' + esc(n.task_id || '') + '"><div class="bar"><b>' + esc(n.title) + '</b><span class="m">' + ago(n.created_at) + '</span></div><div class="inb-b">' + esc(n.body || '') + '</div></div>').join('') + '</div>' : '<div class="empty">لا توجد تنبيهات.</div>') +
+    (L.length ? '<div class="inbox">' + L.map(n => '<div class="inb-i' + (n.read_at ? '' : ' new') + '" data-nid="' + n.id + '" data-tid="' + esc(n.task_id || '') + '" data-oid="' + esc(n.order_id || '') + '"><div class="bar"><b>' + esc(n.title) + '</b><span class="m">' + ago(n.created_at) + '</span></div><div class="inb-b">' + esc(n.body || '') + '</div></div>').join('') + '</div>' : '<div class="empty">لا توجد تنبيهات.</div>') +
     '<div class="row dact"><button class="s" id="inb_all">تعليم الكل كمقروء</button><button class="p s" id="inb_x">إغلاق</button></div>';
   $('inb_x').onclick = () => dlg.close();
   $('inb_all').onclick = () => { markRead(unreadNotes().map(n => n.id)); inboxDialog(); };
   dlg.querySelectorAll('.inb-i').forEach(el => el.onclick = () => {
     markRead([el.dataset.nid]);
+    if (el.dataset.oid) { dlg.close(); return gotoOrder(el.dataset.oid); }
     const t = el.dataset.tid && S.tasks.find(x => x.id === el.dataset.tid);
     if (t) { dlg.close(); S.view = 'board'; render(); taskDialog(S.tasks.find(x => x.id === t.id)); } else el.classList.remove('new');
   });
@@ -36,11 +42,12 @@ function inboxAfterLoad() {
   const fresh = unreadNotes().filter(n => !INBOX.alerted.has(n.id) && Date.now() - new Date(n.created_at) < 48 * 3600e3);
   if (!fresh.length) return;
   fresh.forEach(n => INBOX.alerted.add(n.id));
-  if (fresh.length === 1) { const n = fresh[0]; showAlert({ title: n.title, body: n.body, task_id: n.task_id, nid: n.id }); }
+  if (fresh.length === 1) { const n = fresh[0]; showAlert({ title: n.title, body: n.body, task_id: n.task_id, order_id: n.order_id, nid: n.id }); }
   else showAlert({ title: '🔔 لديك ' + fresh.length + ' تنبيهات جديدة', body: fresh.slice(0, 4).map(n => '• ' + n.title).join('\n') + (fresh.length > 4 ? '\n…' : ''), nids: fresh.map(n => n.id), summary: true });
 }
 // توليد المهام المتكررة المستحقة عند فتح التطبيق (مرة يومياً لكل جهاز) دون الاعتماد على الجدولة وحدها
 function recurPing() {
+  if (S.me && S.me.role === 'rep') return;
   const d = new Date().toISOString().slice(0, 10);
   if (localStorage.getItem('rp') === d || !navigator.onLine) return;
   localStorage.setItem('rp', d);

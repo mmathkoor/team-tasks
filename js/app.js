@@ -20,21 +20,31 @@ async function init() {
         return; 
     }
     
-    S.members = members; S.me = me; idbSet('cfg', { url: API, key: KEY, name: me.name }); idbSet('sbs', AUTH.s);
+    S.allMembers = members; S.members = members.filter(m => m.role !== 'rep'); S.reps = members.filter(m => m.role === 'rep'); S.me = me; idbSet('cfg', { url: API, key: KEY, name: me.name }); idbSet('sbs', AUTH.s);
+    if (me.role === 'rep') { S.view = 'rep'; return await repLoad(); }
     await load();
   } catch (err) { showErrorBox(err.message); }
 }
 
 async function load() {
-  const [m, t, p, v, d, ci, nt] = await Promise.all([
+  if (S.me && S.me.role === 'rep') return repLoad();
+  const none = Promise.resolve({ data: null, error: { message: 'x' } });
+  const [m, t, p, v, d, ci, nt, mb, oo, oi, op] = await Promise.all([
     sb.from('meetings').select('*').order('held_on', { ascending: false }),
     sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
     sb.from('proposals').select('*').order('created_at', { ascending: false }),
     sb.from('votes').select('*'),
     sb.from('task_done').select('*'),
     sb.from('task_items').select('id,task_id,text,done,pos'),
-    sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)
+    sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40),
+    sb.from('members').select('*'),
+    sb.from('ord_orders').select('*').order('order_no', { ascending: false }).limit(600),
+    sb.from('ord_items').select('*'),
+    sb.from('ord_payments').select('*')
   ]);
+  if (!mb.error && mb.data && mb.data.length) { S.allMembers = mb.data; S.members = mb.data.filter(x => x.role !== 'rep'); S.reps = mb.data.filter(x => x.role === 'rep'); S.me = mb.data.find(x => same(x.email, S.me.email)) || S.me; }
+  S.ordErr = !!(oo.error || oi.error || op.error);
+  if (!oo.error) S.orders = oo.data || []; if (!oi.error) S.oitems = oi.data || []; if (!op.error) S.opay = op.data || [];
   
   if (!m.error) S.meetings = m.data || [];
   if (!t.error) S.tasks = t.data || [];
@@ -68,6 +78,7 @@ function loginView() {
 const logout = async () => { await sb.auth.signOut(); localStorage.clear(); location.reload(); };
 
 function render() {
+  if (S.me && S.me.role === 'rep') return repRender();
   try { updateBadge(); saveCache(); } catch (e) {}
   if (!S.me) return;
   const props = S.props || [];
@@ -77,12 +88,12 @@ function render() {
   const enter = S._rv !== S.view; S._rv = S.view;
   $app.innerHTML = headerHtml() + navHtml(S.view, badge) +
   '<div class="view' + (enter ? ' enter' : '') + '">' +
-  (S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : S.view === 'log' ? logView() : S.view === 'dash' ? dashView() : settingsView()) +
+  (S.view === 'orders' ? ordersView() : S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : S.view === 'log' ? logView() : S.view === 'dash' ? dashView() : settingsView()) +
   '</div>' + (S.view === 'board' ? '<button class="fab" id="fab" aria-label="مهمة جديدة">＋</button>' : '');
   
   if (S.view === 'set') $app.insertAdjacentHTML('beforeend', '<p class="m" style="text-align:center;margin-top:20px">النسخة ' + VERSION + '</p>');
   bindHeader();
   if ($('fab')) $('fab').onclick = () => taskDialog(null);
-  document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { S.view = b.dataset.nv; render(); });
-  if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();
+  document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { if (b.dataset.nv === 'more') return moreDialog(); S.view = b.dataset.nv; render(); });
+  if (S.view === 'orders') bindOrders(); else if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();
 }

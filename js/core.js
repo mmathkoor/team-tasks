@@ -46,6 +46,13 @@ class Q {
 
 const sb = {
   from: t => new Q(t),
+  rpc: async (fn, args) => {
+    try {
+      const r = await fetch(API + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) });
+      const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) {}
+      return r.ok ? { data: j, error: null } : { data: null, error: { message: (j && j.message) || r.statusText } };
+    } catch (e) { return { data: null, error: { message: 'تعذّر الاتصال بالإنترنت' } }; }
+  },
   auth: {
     getSession: async () => ({ data: { session: AUTH.s } }),
     signInWithPassword: async ({ email, password }) => {

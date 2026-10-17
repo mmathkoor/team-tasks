@@ -1,0 +1,53 @@
+/* ===== الطلبات + المندوب + الفاتورة ===== */
+.ob{grid-template-columns:repeat(4,1fr)}
+.oc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.oc:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
+.oc.preparing{border-inline-start:4px solid var(--c-doing)}.oc.delivered{border-inline-start:4px solid var(--c-done)}
+.oc.cancelled,.oc.returned{border-inline-start:4px solid var(--c-late);opacity:.85}
+.oc-n{font-weight:700;font-size:16px;margin-top:2px}.oc-a{font-size:13px;color:var(--mute);margin-top:2px}
+.oc-i{font-size:13.5px;margin:6px 0 2px}
+@media (max-width:1100px){.ob{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:768px){.ob{display:block}.ob .col{display:none}.ob .col.on{display:block}}
+.irow{display:grid;grid-template-columns:1fr 70px 90px 36px;gap:6px;margin-bottom:6px}
+.irow input{width:100%;padding:8px}.irow button{padding:0}
+@media (max-width:480px){.irow{grid-template-columns:1fr 58px 78px 34px}}
+.oh{font-size:14px;margin:14px 0 6px;color:var(--mute)}
+.otot{margin-top:10px;background:var(--col);border-radius:12px;padding:8px 12px}
+.otot>div,.inv-s>div{display:flex;justify-content:space-between;padding:2px 0}
+.otot .tt,.inv-s .tt{font-weight:700;font-size:16px;border-top:1px dashed var(--line);margin-top:3px;padding-top:4px}
+.obox{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.pr-r{padding:4px 0}
+.msgp{white-space:pre-wrap;font:inherit;background:var(--col);border-radius:12px;padding:12px;line-height:1.9;max-height:55vh;overflow:auto;margin:0}
+
+/* المندوب */
+.rcard{padding:16px}.rcard.flash{box-shadow:0 0 0 3px var(--gold)}
+.rno{font-size:18px}.rn{font-size:20px;font-weight:700;margin:4px 0 8px}
+.rcall{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.btnl{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:10px;background:var(--accsoft);color:var(--acc);text-decoration:none;font-weight:700;font-size:14px}
+.ra{margin-bottom:8px;line-height:2}
+.rlist{background:var(--col);border-radius:12px;padding:10px 12px;margin:8px 0}
+.ritem{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line);font-size:16px}.ritem:last-child{border:0}
+.rcol{background:var(--goldsoft);border-radius:10px;padding:8px 12px;margin:8px 0;font-size:16px}
+.ract button{flex:1;min-height:48px;font-size:16px}.ract button:last-child{flex:0 0 52px}
+.rdone{padding:10px 14px}.rdone.cancelled{opacity:.8}
+.rep-k{grid-template-columns:repeat(2,1fr)!important}
+@media (max-width:768px){.rep-k{display:grid!important}.rep-k .stat{flex:initial}}
+
+/* الفاتورة */
+.inv-h{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--gold);padding-bottom:10px;margin-bottom:10px}
+.inv-h h2{margin:0;font-size:20px}.inv-no{margin-inline-start:auto;text-align:end}
+.inv-c{margin-bottom:10px;line-height:1.9}
+.inv-t{width:100%;border-collapse:collapse;margin-bottom:10px}
+.inv-t th,.inv-t td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:start}
+.inv-t th{background:var(--col);font-size:13px}
+.inv-s{max-width:320px;margin-inline-start:auto}
+.inv-f{text-align:center;color:var(--mute);margin:14px 0 0}
+.more{display:flex;flex-direction:column;gap:8px}
+.more-i{display:flex;align-items:center;gap:12px;padding:14px;font-size:16px;font-weight:600;border-radius:14px;text-align:start;position:relative}
+.more-i .n{margin-inline-start:auto;background:var(--late);color:#fff;font-style:normal;border-radius:10px;padding:0 8px;font-size:12px;line-height:20px}
+@media print{
+  body.pinv #app,body.pinv .fab,body.pinv .nav,body.pinv #net{display:none!important}
+  body.pinv dialog{position:static;inset:auto;box-shadow:none;border:0;width:100%;max-width:100%;max-height:none;overflow:visible;animation:none;margin:0;padding:0}
+  body.pinv dialog::before{display:none}.no-print{display:none!important}
+  body.pinv .inv-t th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

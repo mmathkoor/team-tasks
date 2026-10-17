@@ -1,6 +1,8 @@
 // ===== التحديث اللحظي (Supabase Realtime عبر WebSocket بدون مكتبات) =====
 const RT = { ws: null, ref: 0, hb: null, tk: null, retry: 0, timer: null, rc: null, dirty: false };
-const RT_TABLES = ['tasks', 'task_done', 'proposals', 'votes', 'meetings', 'members', 'notifications'];
+const RT_BASE = ['tasks', 'task_done', 'proposals', 'votes', 'meetings', 'members', 'notifications'];
+const RT_ORD = ['ord_orders', 'ord_items', 'ord_payments'];
+const rtTables = () => (S.me && S.me.role === 'rep') ? ['notifications'] : RT.safe ? RT_BASE.slice(0, 6) : RT_BASE.concat(RT_ORD);
 function rtStart() {
   if (RT.ws || !S.me || !AUTH.s || !navigator.onLine) return;
   let ws;
@@ -9,11 +11,12 @@ function rtStart() {
   const send = (topic, event, payload) => { if (ws.readyState === 1) ws.send(JSON.stringify({ topic, event, payload, ref: String(++RT.ref) })); };
   ws.onopen = async () => {
     RT.retry = 0;
-    send('realtime:public', 'phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: RT_TABLES.map(table => ({ event: '*', schema: 'public', table })) }, access_token: await tok() });
+    send('realtime:public', 'phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: rtTables().map(table => ({ event: '*', schema: 'public', table })) }, access_token: await tok() });
     RT.hb = setInterval(() => send('phoenix', 'heartbeat', {}), 25000);
     RT.tk = setInterval(async () => send('realtime:public', 'access_token', { access_token: await tok() }), 10 * 60 * 1000);
   };
-  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } if (m.event === 'postgres_changes') rtChanged(); };
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } if (m.event === 'postgres_changes') rtChanged();
+    else if (m.event === 'phx_reply' && m.topic === 'realtime:public' && m.payload && m.payload.status === 'error' && !RT.safe) { RT.safe = true; try { ws.close(); } catch (_) {} } };
   ws.onclose = () => {
     clearInterval(RT.hb); clearInterval(RT.tk); RT.ws = null;
     clearTimeout(RT.rc); RT.rc = setTimeout(rtStart, Math.min(30000, 1500 * Math.pow(2, RT.retry++)));

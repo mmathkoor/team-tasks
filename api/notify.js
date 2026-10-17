@@ -8,7 +8,8 @@ module.exports = async (req, res) => {
   try {
     const { title, body, assignee_email, for_all, is_custom, task_id, task_title, to_admins, priority, task_map, include_tasks } = req.body || {};
     const sender = me.name;                            // الاسم من قاعدة البيانات لا من الطلب (منع الانتحال)
-    const { data: members } = await supabase.from('members').select('email,role');
+    const { data: all } = await supabase.from('members').select('email,role');
+    const members = (all || []).filter(m => m.role !== 'rep');   // المندوبون خارج تطبيق الفريق
     let rec;
     if (to_admins) rec = members.filter(m => m.role === 'admin' && lc(m.email) !== lc(me.email));
     else if (for_all) rec = members.filter(m => lc(m.email) !== lc(me.email));

@@ -13,6 +13,7 @@ async function bindRecur() {
   const draw = async () => {
     const { data: d0, error } = await sb.from('recurring_tasks').select('*');
     const data = (d0 || []).slice().sort((a, b) => String(a.created_at || '') < String(b.created_at || '') ? -1 : 1);
+    if (!$('rc_list')) return;   // المستخدم غادر الصفحة قبل وصول الرد
     $('rc_list').innerHTML = error ? 'تعذّر التحميل: ' + esc(error.message) : data.length ? data.map(r => '<div class="bar" style="padding:4px 0"><span>🔁 <b>' + esc(r.title) + '</b> — ' + freqText(r) + ' — ' + (r.for_all ? 'الكل' : esc(nm(r.assignee_email))) + '</span><button class="dng s" data-rd="' + r.id + '">حذف</button></div>').join('') : 'لا توجد مهام متكررة.';
     document.querySelectorAll('[data-rd]').forEach(b => b.onclick = async () => { if (confirm('حذف هذه المهمة المتكررة؟')) { await sb.from('recurring_tasks').delete().eq('id', b.dataset.rd); draw(); } });
   };
