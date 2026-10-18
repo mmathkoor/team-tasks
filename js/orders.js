@@ -166,21 +166,56 @@ function payDialog(o) {
   $('pm_ok').onclick = async () => { const a = +$('pm_a').value; if (!(a > 0)) return $('pm_a').focus(); const { error } = await sb.from('ord_payments').insert({ order_id: o.id, amount: a, method: $('pm_m').value, note: $('pm_n').value.trim() || null, created_by: S.me.email }); if (error) return alert('تعذّر الحفظ: ' + error.message); dlg.close(); load(); };
   dlg.showModal(); $('pm_a').focus();
 }
-function invoiceDialog(o) {
+// ===== الفاتورة: محتوى واحد يُستخدم للمعاينة والطباعة (بسعر البيع فقط: بلا سعر شراء وبلا اسم التاجر) =====
+function invoiceInner(o) {
   const its = oItems(o.id), pays = oPays(o.id);
-  dlg.innerHTML = '<div class="inv"><div class="inv-h"><img src="' + esc(BRAND.logo) + '" alt="" width="54" height="54"><div><h2>' + esc(bn()) + '</h2><div class="m">' + esc([bphone(), baddr()].filter(Boolean).join(' · ')) + '</div></div><div class="inv-no"><b>فاتورة #' + o.order_no + '</b><div class="m">' + esc(o.order_date) + '</div></div></div>' +
+  const logo = BRAND.logo && BRAND.logo.startsWith('/') ? location.origin + BRAND.logo : BRAND.logo;
+  return '<div class="inv"><div class="inv-h"><img src="' + esc(logo) + '" alt="" width="54" height="54"><div><h2>' + esc(bn()) + '</h2><div class="m">' + esc([bphone(), baddr()].filter(Boolean).join(' · ')) + '</div></div><div class="inv-no"><b>فاتورة #' + o.order_no + '</b><div class="m">' + esc(o.order_date) + '</div></div></div>' +
     '<div class="inv-c"><b>العميل:</b> ' + esc(o.customer_name) + (o.phone ? ' · <span dir="ltr">' + esc(o.phone) + '</span>' : '') + (o.address ? '<br><b>العنوان:</b> ' + esc(o.address) : '') + '</div>' +
     '<table class="inv-t"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>' + its.map(i => '<tr><td>' + esc(i.name) + '</td><td>' + (+i.qty) + '</td><td>' + money(i.price) + '</td><td>' + money(i.line_total) + '</td></tr>').join('') + '</tbody></table>' +
     '<div class="inv-s"><div><span>المجموع</span><b>' + money(o.subtotal) + '</b></div>' + (+o.delivery_fee ? '<div><span>رسوم التوصيل</span><b>' + money(o.delivery_fee) + '</b></div>' : '') + (+o.discount ? '<div><span>الخصم</span><b>-' + money(o.discount) + '</b></div>' : '') +
     '<div class="tt"><span>الإجمالي</span><b>' + money(o.total) + ' ' + BRAND.currency + '</b></div><div><span>المدفوع</span><b>' + money(o.paid) + '</b></div><div class="tt"><span>المتبقي</span><b>' + money(o.balance) + ' ' + BRAND.currency + '</b></div></div>' +
-    (pays.length ? '<div class="m" style="margin-top:8px">الدفعات: ' + pays.map(p => money(p.amount) + ' (' + esc(p.paid_on) + ')').join(' · ') + '</div>' : '') + '<p class="inv-f">شكراً لتعاملكم معنا 🌹</p></div>' +
-    '<div class="row dact no-print"><button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' + (o.phone ? '<button class="s" id="iv_w">📲 إرسال الفاتورة للعميل</button>' : '') + '<button class="s" id="iv_x">إغلاق</button></div>';
+    (pays.length ? '<div class="m" style="margin-top:8px">الدفعات: ' + pays.map(p => money(p.amount) + ' (' + esc(p.paid_on) + ')').join(' · ') + '</div>' : '') + '<p class="inv-f">شكراً لتعاملكم معنا 🌹</p></div>';
+}
+// صفحة مستقلة تماماً للطباعة (لا تتأثر بتنسيقات التطبيق) — تعمل مع «حفظ كـ PDF» في المتصفح
+function invoiceDoc(o, toolbar) {
+  const O = location.origin, F = (f, w, r) => "@font-face{font-family:'IBM Plex Sans Arabic';font-weight:" + w + ";src:url(" + O + "/fonts/ibm-plex-sans-arabic-" + f + "-" + w + "-normal.woff2) format('woff2');unicode-range:" + r + "}";
+  const AR = 'U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC';
+  const LA = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2212,U+FEFF,U+FFFD';
+  const css = F('arabic', 400, AR) + F('arabic', 700, AR) + F('latin', 400, LA) + F('latin', 700, LA) +
+    "@page{size:A4;margin:12mm}*{box-sizing:border-box}html,body{margin:0;background:#fff}body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif;color:#111;font-size:14px;line-height:1.7;padding:18px;direction:rtl}" +
+    ".inv{max-width:760px;margin:0 auto}.inv-h{display:flex;align-items:center;gap:12px;border-bottom:2px solid #c9a24e;padding-bottom:10px;margin-bottom:12px}.inv-h h2{margin:0;font-size:22px}.inv-h img{border-radius:10px}.inv-no{margin-inline-start:auto;text-align:end}.m{color:#666;font-size:13px}" +
+    ".inv-c{margin-bottom:12px;line-height:1.9}.inv-t{width:100%;border-collapse:collapse;margin-bottom:12px}.inv-t th,.inv-t td{padding:7px 9px;border-bottom:1px solid #ddd;text-align:start}.inv-t th{background:#f1ede2;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
+    ".inv-s{width:300px;margin-inline-start:auto}.inv-s>div{display:flex;justify-content:space-between;padding:2px 0}.inv-s .tt{font-weight:700;font-size:16px;border-top:1px dashed #bbb;margin-top:3px;padding-top:4px}.inv-f{text-align:center;color:#666;margin:18px 0 0}" +
+    ".tb{position:sticky;top:0;background:#fff;padding:10px 0 14px;text-align:center}.tb button{font:inherit;padding:10px 22px;border-radius:10px;border:0;background:#0b1426;color:#f6e3a8;cursor:pointer}@media print{.tb{display:none}}";
+  return '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>فاتورة #' + o.order_no + '</title><style>' + css + '</style></head><body>' +
+    (toolbar ? '<div class="tb"><button onclick="window.print()">🖨 طباعة / حفظ PDF</button></div>' : '') + invoiceInner(o) + '</body></html>';
+}
+function printInvoice(o) {
+  const f = document.createElement('iframe');
+  f.setAttribute('aria-hidden', 'true'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(f);
+  const w = f.contentWindow, d = w.document;
+  d.open(); d.write(invoiceDoc(o, false)); d.close();
+  const ready = Promise.all([(d.fonts && d.fonts.ready) || Promise.resolve()].concat([...d.images].map(im => im.complete ? 1 : new Promise(r => { im.onload = im.onerror = r; }))));
+  Promise.race([ready, new Promise(r => setTimeout(r, 2500))]).then(() => setTimeout(() => {
+    try { w.focus(); w.print(); } catch (e) { f.remove(); return openInvoice(o); }
+    setTimeout(() => f.remove(), 120000);
+  }, 200));
+}
+function openInvoice(o) {   // بديل: صفحة فاتورة في نافذة جديدة فيها زر الطباعة
+  const w = window.open('', '_blank');
+  if (!w) return alert('اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة');
+  w.document.open(); w.document.write(invoiceDoc(o, true)); w.document.close();
+}
+function invoiceDialog(o) {
+  dlg.innerHTML = invoiceInner(o) + '<div class="row dact no-print"><button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button><button class="s" id="iv_o">↗ فتح في نافذة</button>' + (o.phone ? '<button class="s" id="iv_w">📲 إرسال للعميل</button>' : '') + '<button class="s" id="iv_x">إغلاق</button></div>';
   $('iv_x').onclick = () => dlg.close();
-  $('iv_p').onclick = () => { document.body.classList.add('pinv'); window.print(); setTimeout(() => document.body.classList.remove('pinv'), 500); };
+  $('iv_p').onclick = () => printInvoice(o);
+  $('iv_o').onclick = () => openInvoice(o);
   if ($('iv_w')) $('iv_w').onclick = () => window.open('https://wa.me/' + waPhone(o.phone) + '?text=' + encodeURIComponent(invoiceText(o)), '_blank');
   dlg.showModal();
 }
-
 /* ---------- نافذة الطلب (إنشاء / تعديل) ---------- */
 function orderDialog(o) {
   const edit = !!o, x = o || {}, cc = canCost();
