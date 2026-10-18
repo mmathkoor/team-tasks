@@ -26,7 +26,7 @@ function settingsView() {
   if (isAdmin()) {
     let memList = S.members.map(m => {
         let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
-        return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span> <span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '">' + ({ admin: 'مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span></div>' + rmBtn + '</div>';
+        return '<div class="bar" style="background:var(--col);padding:8px 12px;border-radius:8px;margin-bottom:6px"><div><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span> <span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '">' + ({ admin: 'مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span></div><div class="row" style="flex:1 1 100%;margin-top:6px"><input data-mt="' + esc(m.email) + '" value="' + esc(m.title || '') + '" placeholder="المسمى الوظيفي (مثال: مسؤول التسويق)"><button class="s" data-mts="' + esc(m.email) + '">حفظ المسمى</button></div>' + rmBtn + '</div>';
     }).join('');
     
     let optMembers = '<option value="">-- اختر الموظف --</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
@@ -106,6 +106,7 @@ function bindSettings() {
     const { error } = await sb.auth.updateUser({ password: v }); 
     alert(error ? error.message : 'تم التغيير.'); $('np').value = ''; $('svp').textContent = 'حفظ التغيير';
   };
+  document.querySelectorAll('[data-mts]').forEach(b => b.onclick = () => { const i = document.querySelector('[data-mt="' + b.dataset.mts + '"]'); run(sb.from('members').update({ title: i.value.trim() || null }).eq('email', b.dataset.mts)); });
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
   if ($('addm')) $('addm').onclick = () => { const e = $('ne').value.trim(), n = $('nn').value.trim(); if (e && n) run(sb.from('members').insert({ email: e, name: n, role: $('nr') ? $('nr').value : 'member' })); };
 }

@@ -17,7 +17,15 @@ function ordSettingsHtml() {
     '<label style="margin-top:8px">عنوان المتجر<input id="os_a" value="' + esc(s.store_address || '') + '"></label>' +
     '<label class="chk" style="margin-top:12px"><input type="checkbox" id="os_c" ' + (s.staff_can_cost ? 'checked' : '') + '> يرى الموظفون سعر الشراء ويدخلونه (افتراضياً: للمدير فقط)</label>' +
     '<label style="margin-top:10px">حذف صور الأصناف بعد انتهاء الطلب<select id="os_k">' + [[0, 'فوراً عند التسليم/الإلغاء'], [1, 'بعد يوم'], [2, 'بعد يومين'], [3, 'بعد 3 أيام'], [7, 'بعد أسبوع']].map(([v, l]) => '<option value="' + v + '"' + ((s.image_keep_days == null ? 1 : s.image_keep_days) === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
-    '<div class="row" style="margin-top:10px"><button class="p s" id="os_sv">حفظ الإعدادات</button></div></div>';
+    '<div class="row" style="margin-top:10px"><button class="p s" id="os_sv">حفظ الإعدادات</button></div></div>' + viewsCardHtml();
+}
+const VIEW_LIST = [['board', 'المهام والمشاريع'], ['orders', 'إدارة الطلبات'], ['dash', 'لوحة الأرقام'], ['props', 'القرارات والتصويت'], ['log', 'سجل النشاط']];
+function viewsCardHtml() {
+  const s = S.ordSet || {}, hid = s.hidden_views || [];
+  return '<div class="card"><h2>🧩 الشاشات واسم التطبيق</h2><p class="m" style="margin-bottom:8px">أخفِ ما لا تحتاجه في هذا النشاط (يختفي من كل الأعضاء). الإعدادات تبقى دائماً.</p>' +
+    VIEW_LIST.map(([k, l]) => '<label class="chk" style="margin-bottom:6px"><input type="checkbox" data-vw="' + k + '" ' + (hid.includes(k) ? '' : 'checked') + '> ' + l + '</label>').join('') +
+    '<label style="margin-top:10px">اسم التطبيق (يظهر في الأعلى)<input id="vw_n" value="' + esc(s.app_name || '') + '" placeholder="مدير المهام"></label>' +
+    '<div class="row" style="margin-top:10px"><button class="p s" id="vw_sv">حفظ</button></div></div>';
 }
 function credsDialog(name, phone, pw) {
   const msg = 'مرحباً ' + name + ' 👋\nحسابك في ' + (typeof bn === 'function' ? bn() : BRAND.name) + ':\nالرابط: ' + location.origin + '\nرقم الدخول: ' + phone + '\nكلمة المرور: ' + pw + '\nبعد الدخول فعّل الإشعارات من ⚙ الإعدادات.';
@@ -26,7 +34,18 @@ function credsDialog(name, phone, pw) {
   $('cr_wa').onclick = () => window.open('https://wa.me/' + (typeof waPhone === 'function' ? waPhone(phone) : phone) + '?text=' + encodeURIComponent(msg), '_blank');
   dlg.showModal();
 }
+function bindViewsCard() {
+  if (!$('vw_sv')) return;
+  $('vw_sv').onclick = async () => {
+    const hidden = [...document.querySelectorAll('[data-vw]')].filter(c => !c.checked).map(c => c.dataset.vw);
+    if (hidden.length >= VIEW_LIST.length) return alert('أبقِ شاشة واحدة على الأقل ظاهرة');
+    const { error } = await sb.from('ord_settings').update({ hidden_views: hidden, app_name: $('vw_n').value.trim() || null }).eq('id', true);
+    if (error) return alert('تعذّر الحفظ: ' + error.message + '\n(شغّل sql/011_titles_views.sql أولاً)');
+    await load();
+  };
+}
 function bindOrdAdmin() {
+  bindViewsCard();
   $('rp_g').onclick = () => { $('rp_w').value = genPw(); };
   $('rp_add').onclick = async () => {
     const n = $('rp_n').value.trim(), p = $('rp_p').value.trim(), w = $('rp_w').value;

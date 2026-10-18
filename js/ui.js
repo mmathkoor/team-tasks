@@ -11,8 +11,16 @@ const MORE_ITEMS = [
   { id: 'log', long: 'سجل النشاط', ic: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
   { id: 'set', long: 'الإعدادات', ic: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>' }
 ];
+ // إخفاء/إظهار الشاشات (إعداد المدير). الإعدادات لا تُخفى أبداً.
+const viewHidden = id => id !== 'set' && !!(S.ordSet && (S.ordSet.hidden_views || []).includes(id));
+const visNav = () => NAV_ITEMS.filter(n => n.id === 'more' || !viewHidden(n.id));
+const visMore = () => MORE_ITEMS.filter(m => !viewHidden(m.id));
+const firstView = () => (visNav().find(n => n.id !== 'more') || { id: 'set' }).id;
+const appName = () => (S.ordSet && S.ordSet.app_name) || (window.__CFG && window.__CFG.name) || 'مدير المهام';
+const titleOf = e => ((S.allMembers || S.members || []).find(m => same(m.email, e)) || {}).title || '';
+const nmt = e => { const m = (S.allMembers || S.members || []).find(x => same(x.email, e)); return m ? m.name + (m.title ? ' — ' + m.title : '') : 'غير مُسند'; };
 function navHtml(view, propsBadge) {
-  return '<nav class="nav" aria-label="التنقل">' + NAV_ITEMS.map(n => {
+  return '<nav class="nav" aria-label="التنقل">' + visNav().map(n => {
     const on = n.id === 'more' ? MORE_ITEMS.some(m => m.id === view) : view === n.id;
     return '<button data-nv="' + n.id + '" class="' + (on ? 'on' : '') + '" aria-label="' + n.long + '"' + (on ? ' aria-current="page"' : '') + '>' +
       svgIc(n.ic) + '<span class="lb">' + n.short + '</span><span class="lb-l">' + n.long + '</span>' + (n.id === 'more' ? propsBadge : '') + '</button>';
@@ -20,7 +28,7 @@ function navHtml(view, propsBadge) {
 }
 function moreDialog() {
   const op = (S.props || []).filter(p => !isClosed(p)).length;
-  dlg.innerHTML = '<h2>المزيد</h2><div class="more">' + MORE_ITEMS.map(m => '<button class="more-i" data-go="' + m.id + '">' + svgIc(m.ic) + '<span>' + m.long + '</span>' + (m.id === 'props' && op ? '<i class="n">' + op + '</i>' : '') + '</button>').join('') + '</div>' +
+  dlg.innerHTML = '<h2>المزيد</h2><div class="more">' + visMore().map(m => '<button class="more-i" data-go="' + m.id + '">' + svgIc(m.ic) + '<span>' + m.long + '</span>' + (m.id === 'props' && op ? '<i class="n">' + op + '</i>' : '') + '</button>').join('') + '</div>' +
     '<p class="m" style="text-align:center;margin:14px 0 0">النسخة ' + VERSION + '</p>';
   dlg.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { S.view = b.dataset.go; dlg.close(); render(); });
   dlg.showModal();
@@ -43,7 +51,7 @@ function headerHtml() {
   try { d = new Date().toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) {}
   return '<div class="top"><div class="brand">' +
     '<svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-    '<div class="bt"><h1>مدير المهام</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
+    '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (S.me.title ? ' (' + esc(S.me.title) + ')' : '') + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
     '<div class="hbtns"><button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
     '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
     '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button></div></div>';

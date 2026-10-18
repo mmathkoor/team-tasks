@@ -92,7 +92,8 @@ const logout = async () => { await sb.auth.signOut(); localStorage.clear(); loca
 
 function render() {
   if (S.me && S.me.role === 'rep') return repRender();
-  try { updateBadge(); saveCache(); } catch (e) {}
+  if (typeof viewHidden === 'function' && viewHidden(S.view)) S.view = firstView();
+  try { document.title = appName(); updateBadge(); saveCache(); } catch (e) {}
   if (!S.me) return;
   const props = S.props || [];
   const openProps = props.filter(p => !isClosed(p)).length;
