@@ -16,12 +16,29 @@ function waPhone(p) {      // رقم يمني محلي ← صيغة دولية �
   return d;
 }
 function orderMsg(o) {
-  const L = oItems(o.id).map(i => '▫️ ' + i.name + ' × ' + (+i.qty)).join('\n') || '—';
+  const L = oItems(o.id).map(i => '▫️ ' + i.name + ' × ' + (+i.qty) + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '')).join('\n') || '—';
   return ['مرحباً كابتن *' + (o.rep_email ? repName(o.rep_email) : '...') + '* 🛵', '📦 معك طلب جديد من النظام (#' + o.order_no + ')', '',
     '🧑‍💼 مسجل الطلب: ' + creatorName(o.created_by), '🙍 العميل: ' + o.customer_name, '📞 الهاتف: ' + (o.phone || '—'), '📍 العنوان: ' + (o.address || '—'),
     '💵 المطلوب تحصيله: ' + money(o.balance) + ' ' + BRAND.currency, '', '----------------', '📋 *قائمة التجهيز:*', L, '----------------']
     .concat(o.notes ? ['⚠️ *ملاحظات هامة:* ' + o.notes] : []).concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
+// فاتورة العميل: أسعار البيع فقط — بدون التاجر وبدون سعر الشراء
+function invoiceText(o) {
+  const its = oItems(o.id);
+  return ['🧾 *فاتورة #' + o.order_no + '* — ' + bn(), 'التاريخ: ' + o.order_date, '', '👤 ' + o.customer_name, '', '*الأصناف:*']
+    .concat(its.map(i => '▫️ ' + i.name + ' × ' + (+i.qty) + ' = ' + money(i.line_total))).concat([''])
+    .concat(['المجموع: ' + money(o.subtotal)]).concat(+o.delivery_fee ? ['رسوم التوصيل: ' + money(o.delivery_fee)] : []).concat(+o.discount ? ['الخصم: -' + money(o.discount)] : [])
+    .concat(['*الإجمالي: ' + money(o.total) + ' ' + BRAND.currency + '*', 'المدفوع: ' + money(o.paid), '*المتبقي: ' + money(o.balance) + ' ' + BRAND.currency + '*'])
+    .concat(bphone() ? ['', '📞 ' + bphone()] : []).concat(['', 'شكراً لتعاملكم معنا 🌹']).join('\n');
+}
+const bn = () => (S.ordSet && S.ordSet.store_name) || BRAND.name;
+const bphone = () => (S.ordSet && S.ordSet.store_phone) || BRAND.phone;
+const baddr = () => (S.ordSet && S.ordSet.store_address) || BRAND.address;
+const canCost = () => isAdmin() || !!(S.ordSet && S.ordSet.staff_can_cost);
+const costOf = id => (S.ocost || {})[id] || 0;
+const oCostTotal = o => oItems(o.id).reduce((a, i) => a + (+i.qty) * costOf(i.id), 0);
+const oProfit = o => (+o.subtotal) - (+o.discount) - oCostTotal(o);
+const repPhone = e => ((S.reps || []).find(r => same(r.email, e)) || {}).phone || '';
 const sameDay = o => o.order_date === today();
 function oKpis() {
   const O = S.orders || [], live = O.filter(o => o.status !== 'cancelled' && o.status !== 'returned'), m = today().slice(0, 7);
@@ -36,7 +53,7 @@ function ordersFiltered() {
 function ocard(o) {
   const its = oItems(o.id), names = its.slice(0, 2).map(i => esc(i.name) + (+i.qty > 1 ? ' ×' + (+i.qty) : '')).join('، ') + (its.length > 2 ? ' +' + (its.length - 2) : '');
   const bal = +o.balance, closed = o.status === 'cancelled' || o.status === 'returned';
-  const A = { new: [['assign', '🛵 إسناد وتجهيز', 'p']], preparing: [['wa', '📲 للمندوب'], ['eye', '👁'], ['deliver', '✅ تم التوصيل'], ['cancel', '❌']],
+  const A = { new: [['assign', '🛵 إسناد وتجهيز', 'p'], ['inv', '🧾']], preparing: [['wa', '📲 للمندوب'], ['eye', '👁'], ['deliver', '✅ تم التوصيل'], ['inv', '🧾'], ['cancel', '❌']],
     delivered: (bal > 0 ? [['pay', '💰 دفعة']] : []).concat([['inv', '🧾 فاتورة']]), cancelled: [['reopen', '↩ إعادة فتح']], returned: [['reopen', '↩ إعادة فتح']] }[o.status] || [];
   return '<div class="oc ' + o.status + '" data-oid="' + o.id + '"><div class="bar"><b>#' + o.order_no + '</b><span class="m">' + esc(o.order_date) + '</span></div>' +
     '<div class="oc-n">' + esc(o.customer_name) + '</div>' +
@@ -46,7 +63,7 @@ function ocard(o) {
     '<div class="meta"><span class="chip all">' + money(o.total) + ' ' + BRAND.currency + '</span>' +
     (!closed && bal > 0 ? '<span class="chip late">متبقي ' + money(bal) + '</span>' : !closed && +o.total > 0 ? '<span class="chip ok">مسدّد ✓</span>' : '') +
     (o.rep_email ? '<span class="chip">🛵 ' + esc(repName(o.rep_email)) + '</span>' : (!closed && o.status !== 'delivered' ? '<span class="chip soon">بدون مندوب</span>' : '')) +
-    (o.channel ? '<span class="chip">' + esc(o.channel) + '</span>' : '') + '</div>' +
+    (o.channel ? '<span class="chip">' + esc(o.channel) + '</span>' : '') + (canCost() && !closed ? '<span class="chip ' + (oProfit(o) >= 0 ? 'ok' : 'late') + '">ربح ' + money(oProfit(o)) + '</span>' : '') + '</div>' +
     (closed && o.cancel_reason ? '<div class="dnote" style="background:var(--latesoft);color:var(--late)">السبب: ' + esc(o.cancel_reason) + '</div>' : '') +
     (A.length ? '<div class="acts">' + A.map(a => '<button class="' + (a[2] || '') + '" data-oa="' + a[0] + '" data-id="' + o.id + '">' + a[1] + '</button>').join('') + '</div>' : '') + '</div>';
 }
@@ -61,16 +78,20 @@ function oBoardHtml() {
     }).join('') + '</div>';
 }
 function ordersView() {
-  if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملف <code dir="ltr">sql/008_orders.sql</code> في Supabase ← SQL Editor ثم اضغط تحديث.</p></div>';
-  S.of = S.of || { q: '', rep: '', all: false }; S.ocol = S.ocol || 'new';
+  if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات <code dir="ltr">sql/008_orders.sql</code> ثم <code>009</code> ثم <code>010</code> في Supabase ← SQL Editor ثم اضغط تحديث.</p></div>';
+  S.of = S.of || { q: '', rep: '', all: false }; S.ocol = S.ocol || 'new'; S.otab = S.otab || 'orders';
+  const tabs = '<div class="seg otabs"><button data-otab="orders" class="' + (S.otab === 'orders' ? 'on' : '') + '">🛒 الطلبات</button><button data-otab="reports" class="' + (S.otab === 'reports' ? 'on' : '') + '">📊 التقارير</button></div>';
+  if (S.otab === 'reports') return tabs + reportsHtml();
   const K = oKpis(), kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
-  return '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + kc(money(K.sales), 'مبيعات الشهر (' + BRAND.currency + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
+  return tabs + '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + kc(money(K.sales), 'مبيعات الشهر (' + BRAND.currency + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
     '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب…" value="' + esc(S.of.q) + '" style="flex:2 1 220px">' +
     '<select id="o_fr"><option value="">كل المندوبين</option><option value="_none"' + (S.of.rep === '_none' ? ' selected' : '') + '>بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(S.of.rep, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select>' +
     '<button class="p" id="o_new">＋ طلب جديد</button></div><div id="o_board">' + oBoardHtml() + '</div><button class="fab" id="o_fab" aria-label="طلب جديد">＋</button>';
 }
 function bindOrders() {
   if (S.ordErr) return;
+  document.querySelectorAll('[data-otab]').forEach(b => b.onclick = () => { S.otab = b.dataset.otab; render(); });
+  if (S.otab === 'reports') return bindReports();
   $('o_q').oninput = e => { S.of.q = e.target.value; drawOBoard(); };
   $('o_fr').onchange = e => { S.of.rep = e.target.value; drawOBoard(); };
   $('o_new').onclick = $('o_fab').onclick = () => orderDialog(null);
@@ -94,7 +115,7 @@ async function oUpdate(id, patch) {
 }
 function oAction(a, id) {
   const o = oOf(id); if (!o) return;
-  if (a === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(orderMsg(o)), '_blank');
+  if (a === 'wa') window.open('https://wa.me/' + (repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '') + '?text=' + encodeURIComponent(orderMsg(o)), '_blank');
   else if (a === 'eye') previewDialog(o);
   else if (a === 'assign') assignDialog(o);
   else if (a === 'deliver') deliverDialog(o);
@@ -107,7 +128,7 @@ function previewDialog(o) {
   dlg.innerHTML = '<h2>👁 معاينة رسالة المندوب</h2><pre class="msgp">' + esc(orderMsg(o)) + '</pre><div class="row dact"><button class="s" id="pv_cp">نسخ</button><button class="p s" id="pv_wa">إرسال عبر واتساب</button><button class="s" id="pv_x">إغلاق</button></div>';
   $('pv_x').onclick = () => dlg.close();
   $('pv_cp').onclick = async () => { try { await navigator.clipboard.writeText(orderMsg(o)); $('pv_cp').textContent = 'تم النسخ ✓'; } catch (e) { alert('تعذّر النسخ'); } };
-  $('pv_wa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(orderMsg(o)), '_blank');
+  $('pv_wa').onclick = () => window.open('https://wa.me/' + (repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '') + '?text=' + encodeURIComponent(orderMsg(o)), '_blank');
   dlg.showModal();
 }
 function assignDialog(o) {
@@ -147,32 +168,34 @@ function payDialog(o) {
 }
 function invoiceDialog(o) {
   const its = oItems(o.id), pays = oPays(o.id);
-  dlg.innerHTML = '<div class="inv"><div class="inv-h"><img src="' + esc(BRAND.logo) + '" alt="" width="54" height="54"><div><h2>' + esc(BRAND.name) + '</h2><div class="m">' + esc([BRAND.phone, BRAND.address].filter(Boolean).join(' · ')) + '</div></div><div class="inv-no"><b>فاتورة #' + o.order_no + '</b><div class="m">' + esc(o.order_date) + '</div></div></div>' +
+  dlg.innerHTML = '<div class="inv"><div class="inv-h"><img src="' + esc(BRAND.logo) + '" alt="" width="54" height="54"><div><h2>' + esc(bn()) + '</h2><div class="m">' + esc([bphone(), baddr()].filter(Boolean).join(' · ')) + '</div></div><div class="inv-no"><b>فاتورة #' + o.order_no + '</b><div class="m">' + esc(o.order_date) + '</div></div></div>' +
     '<div class="inv-c"><b>العميل:</b> ' + esc(o.customer_name) + (o.phone ? ' · <span dir="ltr">' + esc(o.phone) + '</span>' : '') + (o.address ? '<br><b>العنوان:</b> ' + esc(o.address) : '') + '</div>' +
     '<table class="inv-t"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>' + its.map(i => '<tr><td>' + esc(i.name) + '</td><td>' + (+i.qty) + '</td><td>' + money(i.price) + '</td><td>' + money(i.line_total) + '</td></tr>').join('') + '</tbody></table>' +
     '<div class="inv-s"><div><span>المجموع</span><b>' + money(o.subtotal) + '</b></div>' + (+o.delivery_fee ? '<div><span>رسوم التوصيل</span><b>' + money(o.delivery_fee) + '</b></div>' : '') + (+o.discount ? '<div><span>الخصم</span><b>-' + money(o.discount) + '</b></div>' : '') +
     '<div class="tt"><span>الإجمالي</span><b>' + money(o.total) + ' ' + BRAND.currency + '</b></div><div><span>المدفوع</span><b>' + money(o.paid) + '</b></div><div class="tt"><span>المتبقي</span><b>' + money(o.balance) + ' ' + BRAND.currency + '</b></div></div>' +
     (pays.length ? '<div class="m" style="margin-top:8px">الدفعات: ' + pays.map(p => money(p.amount) + ' (' + esc(p.paid_on) + ')').join(' · ') + '</div>' : '') + '<p class="inv-f">شكراً لتعاملكم معنا 🌹</p></div>' +
-    '<div class="row dact no-print"><button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' + (o.phone ? '<button class="s" id="iv_w">إرسال للعميل واتساب</button>' : '') + '<button class="s" id="iv_x">إغلاق</button></div>';
+    '<div class="row dact no-print"><button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' + (o.phone ? '<button class="s" id="iv_w">📲 إرسال الفاتورة للعميل</button>' : '') + '<button class="s" id="iv_x">إغلاق</button></div>';
   $('iv_x').onclick = () => dlg.close();
   $('iv_p').onclick = () => { document.body.classList.add('pinv'); window.print(); setTimeout(() => document.body.classList.remove('pinv'), 500); };
-  if ($('iv_w')) $('iv_w').onclick = () => window.open('https://wa.me/' + waPhone(o.phone) + '?text=' + encodeURIComponent('فاتورة #' + o.order_no + ' — ' + BRAND.name + '\nالإجمالي: ' + money(o.total) + ' ' + BRAND.currency + '\nالمدفوع: ' + money(o.paid) + '\nالمتبقي: ' + money(o.balance) + ' ' + BRAND.currency + '\nشكراً لتعاملكم 🌹'), '_blank');
+  if ($('iv_w')) $('iv_w').onclick = () => window.open('https://wa.me/' + waPhone(o.phone) + '?text=' + encodeURIComponent(invoiceText(o)), '_blank');
   dlg.showModal();
 }
 
 /* ---------- نافذة الطلب (إنشاء / تعديل) ---------- */
 function orderDialog(o) {
-  const edit = !!o, x = o || {};
-  let items = edit ? oItems(o.id).map(i => ({ id: i.id, name: i.name, qty: +i.qty, price: +i.price })) : [{ name: '', qty: 1, price: '' }];
-  const origIds = items.map(i => i.id);
-  const names = [...new Set((S.orders || []).map(r => r.customer_name))].slice(0, 80), pnames = [...new Set((S.oitems || []).map(i => i.name))].slice(0, 120);
-  const lastPrice = n => { const L = (S.oitems || []).filter(i => i.name === n); return L.length ? +L[L.length - 1].price : ''; };
+  const edit = !!o, x = o || {}, cc = canCost();
+  const blank = () => ({ id: crypto.randomUUID(), name: '', supplier: '', qty: 1, price: '', cost: '', img: '', blob: null, url: '', rmImg: false });
+  let items = edit ? oItems(o.id).map(i => ({ id: i.id, name: i.name, supplier: i.supplier || '', qty: +i.qty, price: +i.price, cost: cc ? (costOf(i.id) || '') : '', img: i.image_path || '', blob: null, url: '', rmImg: false })) : [blank()];
+  const origIds = items.map(i => i.id), origImgs = items.map(i => i.img).filter(Boolean);
+  let urls = {};
+  const names = [...new Set((S.orders || []).map(r => r.customer_name))].slice(0, 80), pnames = [...new Set((S.oitems || []).map(i => i.name))].slice(0, 120), sups = [...new Set((S.oitems || []).map(i => i.supplier).filter(Boolean))].slice(0, 80);
+  const lastOf = n => { const L = (S.oitems || []).filter(i => i.name === n); return L.length ? L[L.length - 1] : null; };
   dlg.innerHTML = '<h2>' + (edit ? 'طلب #' + o.order_no : '🛒 طلب جديد') + '</h2><div id="o_info" class="m"></div>' +
     '<div class="row"><label>اسم العميل<input id="o_nm" list="o_names" value="' + esc(x.customer_name || '') + '"></label><label>رقم الهاتف<input id="o_ph" dir="ltr" inputmode="tel" value="' + esc(x.phone || '') + '"></label></div>' +
-    '<datalist id="o_names">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="o_pn">' + pnames.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>' +
+    '<datalist id="o_names">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="o_pn">' + pnames.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="o_sup">' + sups.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>' +
     '<label style="margin-top:8px">العنوان<input id="o_ad" value="' + esc(x.address || '') + '"></label>' +
     '<div class="row" style="margin-top:8px"><label>قناة الطلب<select id="o_ch"><option value="">—</option>' + OCH.map(c => '<option' + (x.channel === c ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label><label>تاريخ الطلب<input id="o_dt" type="date" value="' + esc(x.order_date || today()) + '"></label></div>' +
-    '<h3 class="oh">📋 بنود الطلب</h3><div id="o_items"></div><button class="s" id="o_addi" type="button">＋ إضافة بند</button>' +
+    '<h3 class="oh">📋 الأصناف</h3><div id="o_items"></div><button class="s" id="o_addi" type="button">＋ إضافة صنف</button>' +
     '<div class="row" style="margin-top:10px"><label>رسوم التوصيل<input id="o_fee" type="number" min="0" step="any" value="' + (+x.delivery_fee || '') + '"></label><label>خصم<input id="o_dc" type="number" min="0" step="any" value="' + (+x.discount || '') + '"></label></div>' +
     '<div class="otot" id="o_tot"></div>' +
     '<div class="row" style="margin-top:10px"><label>المندوب<select id="o_rep"><option value="">بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(x.rep_email, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select></label><label>الحالة<select id="o_st">' + Object.entries(OST).map(([k, v]) => '<option value="' + k + '"' + ((x.status || 'new') === k ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></label></div>' +
@@ -182,19 +205,36 @@ function orderDialog(o) {
     '<div class="row dact"><button class="p" id="o_sv">حفظ</button>' + (edit ? '<button class="s" id="o_iv">🧾 فاتورة</button>' : '') + (edit && isAdmin() ? '<button class="dng s" id="o_dl">حذف</button>' : '') + '<button class="s" id="o_cx">إلغاء</button></div>';
   const calc = () => {
     const sub = items.reduce((a, i) => a + (+i.qty || 0) * (+i.price || 0), 0), fee = +$('o_fee').value || 0, dc = +$('o_dc').value || 0, tot = sub + fee - dc;
-    const paid = edit ? oPays(o.id).reduce((a, p) => a + +p.amount, 0) : 0;
-    $('o_tot').innerHTML = '<div><span>المجموع</span><b>' + money(sub) + '</b></div><div class="tt"><span>الإجمالي</span><b>' + money(tot) + ' ' + BRAND.currency + '</b></div>' + (edit ? '<div><span>المدفوع</span><b>' + money(paid) + '</b></div><div class="tt"><span>المتبقي</span><b>' + money(tot - paid) + '</b></div>' : '');
+    const paid = edit ? oPays(o.id).reduce((a, p) => a + +p.amount, 0) : 0, cost = cc ? items.reduce((a, i) => a + (+i.qty || 0) * (+i.cost || 0), 0) : 0;
+    $('o_tot').innerHTML = '<div><span>المجموع</span><b>' + money(sub) + '</b></div><div class="tt"><span>الإجمالي</span><b>' + money(tot) + ' ' + BRAND.currency + '</b></div>' + (edit ? '<div><span>المدفوع</span><b>' + money(paid) + '</b></div><div class="tt"><span>المتبقي</span><b>' + money(tot - paid) + '</b></div>' : '') +
+      (cc ? '<div class="prof"><span>تكلفة الشراء</span><b>' + money(cost) + '</b></div><div class="prof"><span>ربح البضاعة</span><b>' + money(sub - dc - cost) + '</b></div>' : '');
   };
   const drawItems = () => {
-    $('o_items').innerHTML = items.map((it, k) => '<div class="irow"><input class="in" data-k="' + k + '" list="o_pn" placeholder="اسم الصنف" value="' + esc(it.name) + '"><input class="iq" data-k="' + k + '" type="number" min="0" step="any" value="' + (it.qty === '' ? '' : it.qty) + '" aria-label="الكمية"><input class="ip" data-k="' + k + '" type="number" min="0" step="any" placeholder="السعر" value="' + (it.price === '' ? '' : it.price) + '" aria-label="السعر"><button class="s" type="button" data-rm="' + k + '" aria-label="حذف البند">✕</button></div>').join('');
-    $('o_items').querySelectorAll('.in').forEach(e => { e.oninput = () => { items[e.dataset.k].name = e.value; }; e.onchange = () => { const it = items[e.dataset.k]; if (it.price === '' && lastPrice(e.value) !== '') { it.price = lastPrice(e.value); drawItems(); calc(); } }; });
-    $('o_items').querySelectorAll('.iq').forEach(e => e.oninput = () => { items[e.dataset.k].qty = e.value; calc(); });
-    $('o_items').querySelectorAll('.ip').forEach(e => e.oninput = () => { items[e.dataset.k].price = e.value; calc(); });
-    $('o_items').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { items.splice(+b.dataset.rm, 1); if (!items.length) items.push({ name: '', qty: 1, price: '' }); drawItems(); calc(); });
+    $('o_items').innerHTML = items.map((it, k) => {
+      const src = it.url || (it.img && !it.rmImg ? urls[it.img] : '');
+      return '<div class="irow2"><div class="ir-top"><input class="in" data-k="' + k + '" list="o_pn" placeholder="اسم الصنف" value="' + esc(it.name) + '"><button class="s" type="button" data-rm="' + k + '" aria-label="حذف الصنف">✕</button></div>' +
+        '<div class="ir-grid"><input class="isup" data-k="' + k + '" list="o_sup" placeholder="🏪 التاجر (من أين يُشترى)" value="' + esc(it.supplier) + '"><input class="iq" data-k="' + k + '" type="number" min="0" step="any" value="' + (it.qty === '' ? '' : it.qty) + '" aria-label="الكمية" placeholder="الكمية"><input class="ip" data-k="' + k + '" type="number" min="0" step="any" placeholder="سعر البيع" value="' + (it.price === '' ? '' : it.price) + '" aria-label="سعر البيع">' +
+        (cc ? '<input class="ic" data-k="' + k + '" type="number" min="0" step="any" placeholder="سعر الشراء" value="' + (it.cost === '' ? '' : it.cost) + '" aria-label="سعر الشراء">' : '') + '</div>' +
+        '<div class="ir-img">' + (src ? '<img class="thumb" src="' + esc(src) + '" alt="صورة الصنف" data-big="' + k + '">' : '') + '<label class="imgbtn">📷 ' + (src ? 'تغيير الصورة' : 'صورة توضيحية للمندوب') + '<input class="ifile" data-k="' + k + '" type="file" accept="image/*" hidden></label>' + (src ? '<button class="s" type="button" data-rmi="' + k + '">حذف الصورة</button>' : '') + '</div></div>';
+    }).join('');
+    const E = q => $('o_items').querySelectorAll(q);
+    E('.in').forEach(e => { e.oninput = () => { items[e.dataset.k].name = e.value; }; e.onchange = () => { const it = items[e.dataset.k], l = lastOf(e.value); if (l) { let ch = false; if (it.price === '') { it.price = +l.price; ch = true; } if (!it.supplier && l.supplier) { it.supplier = l.supplier; ch = true; } if (cc && it.cost === '' && costOf(l.id)) { it.cost = costOf(l.id); ch = true; } if (ch) { drawItems(); calc(); } } }; });
+    E('.isup').forEach(e => e.oninput = () => { items[e.dataset.k].supplier = e.value; });
+    E('.iq').forEach(e => e.oninput = () => { items[e.dataset.k].qty = e.value; calc(); });
+    E('.ip').forEach(e => e.oninput = () => { items[e.dataset.k].price = e.value; calc(); });
+    E('.ic').forEach(e => e.oninput = () => { items[e.dataset.k].cost = e.value; calc(); });
+    E('[data-rm]').forEach(b => b.onclick = () => { items.splice(+b.dataset.rm, 1); if (!items.length) items.push(blank()); drawItems(); calc(); });
+    E('[data-rmi]').forEach(b => b.onclick = () => { const it = items[b.dataset.rmi]; it.blob = null; it.url = ''; if (it.img) it.rmImg = true; drawItems(); });
+    E('[data-big]').forEach(im => im.onclick = () => window.open(im.src, '_blank'));
+    E('.ifile').forEach(f => f.onchange = async () => {
+      const file = f.files && f.files[0]; if (!file) return;
+      try { const b = await compressImage(file), it = items[f.dataset.k]; it.blob = b; it.url = URL.createObjectURL(b); it.rmImg = false; drawItems(); } catch (e) { alert(e.message); }
+    });
   };
   const syncSt = () => { $('o_rsw').style.display = $('o_st').value === 'cancelled' ? '' : 'none'; };
   drawItems(); calc(); syncSt();
-  $('o_addi').onclick = () => { items.push({ name: '', qty: 1, price: '' }); drawItems(); calc(); const r = $('o_items').querySelectorAll('.in'); r[r.length - 1].focus(); };
+  if (origImgs.length) imgSign(origImgs).then(m => { urls = m; if ($('o_items')) drawItems(); });
+  $('o_addi').onclick = () => { items.push(blank()); drawItems(); calc(); const r = $('o_items').querySelectorAll('.in'); r[r.length - 1].focus(); };
   $('o_fee').oninput = $('o_dc').oninput = calc;
   $('o_st').onchange = syncSt;
   $('o_rep').onchange = () => { if ($('o_rep').value && $('o_st').value === 'new') $('o_st').value = 'preparing'; };
@@ -223,24 +263,33 @@ function orderDialog(o) {
   }
   $('o_cx').onclick = () => dlg.close();
   if (edit) $('o_iv').onclick = () => invoiceDialog(oOf(o.id) || o);
-  if ($('o_dl')) $('o_dl').onclick = async () => { if (confirm('حذف الطلب #' + o.order_no + ' نهائياً مع بنوده ودفعاته؟')) { dlg.close(); await sb.from('ord_orders').delete().eq('id', o.id); load(); } };
+  if ($('o_dl')) $('o_dl').onclick = async () => { if (confirm('حذف الطلب #' + o.order_no + ' نهائياً مع أصنافه ودفعاته وصوره؟')) { dlg.close(); await imgRemove(oItems(o.id).map(i => i.image_path)); await sb.from('ord_orders').delete().eq('id', o.id); load(); } };
   $('o_sv').onclick = async () => {
     const name = $('o_nm').value.trim(); if (!name) return $('o_nm').focus();
-    const its = items.filter(i => String(i.name).trim()); if (!its.length) return alert('أضف بنداً واحداً على الأقل');
+    const its = items.filter(i => String(i.name).trim()); if (!its.length) return alert('أضف صنفاً واحداً على الأقل');
     const st = $('o_st').value, rep = $('o_rep').value || null, rs = $('o_rs').value.trim();
     if (st === 'cancelled' && rs.length < 3) { $('o_rsw').style.display = ''; return $('o_rs').focus(); }
     if (st === 'preparing' && !rep) return alert('اختر المندوب قبل تحويل الطلب إلى «قيد التجهيز»');
     const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: $('o_nt').value.trim() || null, cancel_reason: st === 'cancelled' ? rs : null };
-    $('o_sv').disabled = true;
+    $('o_sv').disabled = true; $('o_sv').textContent = 'جارٍ الحفظ…';
     const id = edit ? o.id : crypto.randomUUID();
     if (!edit) { row.id = id; row.created_by = S.me.email; }
     let { error } = edit ? await sb.from('ord_orders').update(row).eq('id', id) : await sb.from('ord_orders').insert(row);
     if (!error) {
-      const keep = its.filter(i => i.id).map(i => i.id), gone = origIds.filter(i => i && !keep.includes(i));
-      if (gone.length) await sb.from('ord_items').delete().in('id', gone);
-      ({ error } = await sb.from('ord_items').upsert(its.map((i, k) => ({ id: i.id || crypto.randomUUID(), order_id: id, pos: k, name: String(i.name).trim(), qty: +i.qty > 0 ? +i.qty : 1, price: +i.price || 0 }))));
+      const keep = its.map(i => i.id), gone = origIds.filter(i => !keep.includes(i));
+      const toRemove = [];
+      if (gone.length) { oItems(id).filter(i => gone.includes(i.id) && i.image_path).forEach(i => toRemove.push(i.image_path)); await sb.from('ord_items').delete().in('id', gone); }
+      for (const it of its) {   // رفع الصور الجديدة (مضغوطة) وحذف المستبدلة
+        if (it.blob) { const path = id + '/' + it.id + '.jpg', e2 = await imgUpload(path, it.blob); if (e2) { error = { message: 'تعذّر رفع صورة «' + it.name + '»: ' + e2 }; break; } it.newPath = path; }
+        else if (it.rmImg && it.img) { toRemove.push(it.img); it.newPath = null; } else it.newPath = it.img || null;
+      }
+      if (!error) {
+        ({ error } = await sb.from('ord_items').upsert(its.map((i, k) => ({ id: i.id, order_id: id, pos: k, name: String(i.name).trim(), supplier: String(i.supplier).trim() || null, qty: +i.qty > 0 ? +i.qty : 1, price: +i.price || 0, image_path: i.newPath }))));
+        if (!error && cc) ({ error } = await sb.from('ord_item_costs').upsert(its.map(i => ({ item_id: i.id, cost: +i.cost || 0 }))));
+      }
+      if (!error) await imgRemove(toRemove);
     }
-    if (error) { alert('تعذّر الحفظ: ' + error.message); $('o_sv').disabled = false; return; }
+    if (error) { alert('تعذّر الحفظ: ' + error.message); $('o_sv').disabled = false; $('o_sv').textContent = 'حفظ'; return; }
     if (!edit || row.status !== o.status || !same(row.rep_email, o.rep_email)) apiPost('/api/order-push', JSON.stringify({ order_id: id })).catch(() => {});
     dlg.close(); load();
   };

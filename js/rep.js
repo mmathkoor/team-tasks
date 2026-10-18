@@ -2,16 +2,17 @@
 async function repLoad() {
   const [r, nt] = await Promise.all([sb.rpc('rep_orders'), sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)]);
   S.rerr = r.error ? r.error.message : '';
-  if (!r.error) S.rorders = r.data || [];
+  if (!r.error) { S.rorders = r.data || []; S.rimg = await imgSign(S.rorders.flatMap(o => (o.items || []).map(i => i.image))); }
   if (!nt.error) S.notes = nt.data || [];
   repRender();
   if (typeof rtStart === 'function') rtStart();
   inboxAfterLoad();
 }
+const repImgUrl = p => (S.rimg || {})[p] || '';
 const rOpen = () => (S.rorders || []).filter(o => o.status === 'preparing');
 function repMsg(o) {
   return ['مرحباً كابتن *' + S.me.name + '* 🛵', '📦 طلب #' + o.order_no, '', '🧑‍💼 مسجل الطلب: ' + (o.created_by_name || '—'), '🙍 العميل: ' + o.customer_name, '📞 الهاتف: ' + (o.phone || '—'), '📍 العنوان: ' + (o.address || '—'),
-    '💵 المطلوب تحصيله: ' + money(o.collect) + ' ' + BRAND.currency, '', '📋 *قائمة التجهيز:*'].concat((o.items || []).map(i => '▫️ ' + i.name + ' × ' + (+i.qty)))
+    '💵 المطلوب تحصيله: ' + money(o.collect) + ' ' + BRAND.currency, '', '📋 *قائمة التجهيز:*'].concat((o.items || []).map(i => '▫️ ' + i.name + ' × ' + (+i.qty) + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '')))
     .concat(o.notes ? ['', '⚠️ *ملاحظات هامة:* ' + o.notes] : []).concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
 function repCard(o) {
@@ -20,7 +21,7 @@ function repCard(o) {
     '<div class="rn">' + esc(o.customer_name) + '</div>' +
     (o.phone ? '<div class="rcall"><a class="btnl" href="tel:' + esc(ph) + '">📞 اتصال</a><a class="btnl" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب</a><span class="m" dir="ltr">' + esc(o.phone) + '</span></div>' : '') +
     (o.address ? '<div class="ra">📍 ' + esc(o.address) + ' <a class="btnl" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '">🗺 الخريطة</a></div>' : '') +
-    '<div class="rlist"><b>📋 قائمة التجهيز</b>' + (o.items || []).map(i => '<div class="ritem"><span>' + esc(i.name) + '</span><b>× ' + (+i.qty) + '</b></div>').join('') + '</div>' +
+    '<div class="rlist"><b>📋 قائمة التجهيز</b>' + (o.items || []).map(i => '<div class="ritem">' + (repImgUrl(i.image) ? '<img class="thumb" src="' + esc(repImgUrl(i.image)) + '" alt="" data-zoom="' + esc(repImgUrl(i.image)) + '">' : '') + '<span><b>' + esc(i.name) + '</b>' + (i.supplier ? '<span class="rsup">🏪 التاجر: ' + esc(i.supplier) + '</span>' : '') + '</span><b>× ' + (+i.qty) + '</b></div>').join('') + '</div>' +
     (o.notes ? '<div class="dnote" style="background:var(--soonsoft);color:var(--soon)">⚠️ ' + esc(o.notes) + '</div>' : '') +
     (+o.collect > 0 ? '<div class="rcol">💵 المطلوب تحصيله: <b>' + money(o.collect) + ' ' + BRAND.currency + '</b></div>' : '') +
     '<div class="m" style="margin:6px 0">سجّله: ' + esc(o.created_by_name || '—') + ' (للاستفسار عن الطلب)</div>' +
@@ -43,6 +44,7 @@ function repRender() {
   bindHeader();
   document.querySelectorAll('[data-rd]').forEach(b => b.onclick = () => repDeliver(b.dataset.rd));
   document.querySelectorAll('[data-rc]').forEach(b => b.onclick = () => repCancel(b.dataset.rc));
+  document.querySelectorAll('[data-zoom]').forEach(im => im.onclick = () => { dlg.innerHTML = '<img src="' + im.dataset.zoom + '" alt="" class="zoomimg"><div class="row dact"><button class="s" id="zm_x">إغلاق</button></div>'; $('zm_x').onclick = () => dlg.close(); dlg.showModal(); });
   document.querySelectorAll('[data-re]').forEach(b => b.onclick = () => repPreview((S.rorders || []).find(o => o.id === b.dataset.re)));
   $('rep_set').onclick = repSettings;
 }

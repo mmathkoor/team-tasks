@@ -27,14 +27,14 @@ async function healthCheck() {
   const q = (await idbGet('q')) || []; add(q.length ? 2 : 1, 'التغييرات المنتظرة للمزامنة', q.length ? q.length + ' بانتظار الاتصال' : 'لا شيء');
   return R;
 }
-async function fetchAll(t) {
+async function exportFetchAll(t) {
   const out = [];
   for (let o = 0; o < 100000; o += 1000) { const { data, error } = await sb.from(t).select('*').limit(1000).offset(o); if (error) return { error: error.message }; out.push(...data); if (data.length < 1000) break; }
   return out;
 }
 async function exportBackup() {
   const out = { exported_at: new Date().toISOString(), version: VERSION, tables: {} };
-  for (const t of ['members', 'meetings', 'tasks', 'task_items', 'task_comments', 'task_files', 'task_done', 'recurring_tasks', 'proposals', 'votes', 'activity']) out.tables[t] = await fetchAll(t);
+  for (const t of ['members', 'meetings', 'tasks', 'task_items', 'task_comments', 'task_files', 'task_done', 'recurring_tasks', 'proposals', 'votes', 'activity']) out.tables[t] = await exportFetchAll(t);
   downloadText('backup-' + ymd(new Date()) + '.json', JSON.stringify(out, null, 1), 'application/json');
   return out;
 }

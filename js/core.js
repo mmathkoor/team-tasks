@@ -94,3 +94,49 @@ const mine = t => t.for_all || (S.me && same(t.assignee_email, S.me.email));
 const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
+
+/* ===== صور الأصناف (مخزن خاص + روابط مؤقتة) ===== */
+const IMG_BUCKET = 'order-images';
+async function imgSign(paths) {
+  paths = [...new Set((paths || []).filter(Boolean))]; const out = {}; if (!paths.length) return out;
+  try {
+    const r = await fetch(API + '/storage/v1/object/sign/' + IMG_BUCKET, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 3600, paths }) });
+    const j = await r.json(); if (r.ok && Array.isArray(j)) j.forEach(x => { if (x.signedURL) out[x.path] = API + '/storage/v1' + x.signedURL; });
+  } catch (e) {}
+  return out;
+}
+async function imgUpload(path, blob) {
+  try {
+    const r = await fetch(API + '/storage/v1/object/' + IMG_BUCKET + '/' + path, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' }, body: blob });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); return e.message || r.statusText; }
+    return '';
+  } catch (e) { return 'تعذّر الاتصال بالإنترنت'; }
+}
+async function imgRemove(paths) {
+  paths = (paths || []).filter(Boolean); if (!paths.length) return;
+  try { await fetch(API + '/storage/v1/object/' + IMG_BUCKET, { method: 'DELETE', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: paths }) }); } catch (e) {}
+}
+// ضغط الصورة قبل الرفع: أقصى بُعد 1024px وجودة 72% (≈ 80–150KB) لتوفير المساحة
+function compressImage(file, max = 1024, q = 0.72) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res(b) : rej(new Error('تعذّر ضغط الصورة')), 'image/jpeg', q);
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('ملف الصورة غير صالح')); };
+    im.src = url;
+  });
+}
+// جلب كل صفوف الجدول على دفعات (حد PostgREST الافتراضي 1000 صف)
+async function fetchAll(table, ord, max = 10000) {
+  const out = [];
+  for (let off = 0; off < max; off += 1000) {
+    const q = sb.from(table).select('*'); if (ord) q.order(ord.c, { ascending: !!ord.asc }); q.limit(1000).offset(off);
+    const { data, error } = await q; if (error) return { data: null, error };
+    out.push(...data); if (data.length < 1000) break;
+  }
+  return { data: out, error: null };
+}

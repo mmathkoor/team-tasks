@@ -51,3 +51,29 @@
   body.pinv dialog::before{display:none}.no-print{display:none!important}
   body.pinv .inv-t th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* أصناف الطلب: التاجر وسعر الشراء والصورة */
+.irow2{border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px;background:var(--card)}
+.ir-top{display:grid;grid-template-columns:1fr 36px;gap:6px;margin-bottom:6px}.ir-top button{padding:0}
+.ir-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px}
+.irow2 input{width:100%;padding:8px}
+.ir-img{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.imgbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px dashed var(--mute);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--mute);margin:0}
+.imgbtn:hover{border-color:var(--gold);color:var(--ink)}
+.thumb{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;flex:none}
+.zoomimg{width:100%;max-height:70vh;object-fit:contain;border-radius:12px;background:var(--col)}
+.prof{color:var(--ok)}.otot .prof{display:flex;justify-content:space-between;padding:2px 0}
+.rsup{display:block;font-size:13px;color:var(--mute);font-weight:400}
+.ritem{align-items:center;gap:10px}.ritem>span{flex:1}.ritem .thumb{width:56px;height:56px}
+/* التقارير */
+.otabs{margin-bottom:12px;max-width:340px}.otabs button{flex:1}
+.rpf{align-items:flex-end}.rpf label{display:flex;flex-direction:column;font-size:12.5px;color:var(--mute);gap:2px}
+.rpc{padding:14px}.rpt-w{overflow-x:auto}
+.rpt{width:100%;border-collapse:collapse;font-size:14px}
+.rpt th{background:var(--col);padding:7px 10px;text-align:start;font-size:12.5px;white-space:nowrap}
+.rpt td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.rpt td.num{font-variant-numeric:tabular-nums}
+.trend{display:flex;align-items:flex-end;gap:3px;height:150px;overflow-x:auto;padding-top:6px}
+.tcol{flex:1 0 14px;max-width:34px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;font-size:10px;color:var(--mute)}
+.tcol i{display:block;width:100%;background:linear-gradient(180deg,#ecd08a,#b8923a);border-radius:5px 5px 0 0;min-height:0}
+@media (max-width:768px){.rpk{display:flex!important}.rpk .stat{flex:0 0 120px}}

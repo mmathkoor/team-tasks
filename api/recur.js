@@ -4,11 +4,13 @@ const { createClient } = require('@supabase/supabase-js');
 const { randomUUID } = require('crypto');
 const { member, isCron } = require('./../lib/auth');
 const { deliver } = require('../lib/push');
+const { purgeImages } = require('../lib/purge');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 module.exports = async (req, res) => {
   if (!isCron(req)) { const me = await member(req); if (!me) return res.status(401).json({ error: 'unauthorized' }); }
   try {
+    await purgeImages(supabase).catch(e => console.error('purge:', e.message));   // تنظيف صور الطلبات المنتهية
     const now = new Date(Date.now() + 3 * 3600e3);
     const today = now.toISOString().slice(0, 10), dow = now.getUTCDay(), dom = now.getUTCDate();
     const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
