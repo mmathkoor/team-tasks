@@ -59,7 +59,17 @@ const sb = {
       try {
         const r = await fetch(API + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
         const j = await r.json();
-        if (!r.ok) return { error: { message: j.error_description || 'بيانات الدخول غير صحيحة' } };
+        if (!r.ok) {   // رسالة واضحة بحسب سبب الرفض الحقيقي (مع الرمز ليسهل التشخيص)
+          const code = j.error_code || j.error || '', st = r.status, d = String(j.error_description || j.msg || j.message || '');
+          const bad = code === 'invalid_credentials' || code === 'invalid_grant' || /invalid login credentials/i.test(d);
+          const m = bad ? 'البريد أو كلمة المرور غير صحيحة'
+            : code === 'email_not_confirmed' ? 'البريد الإلكتروني غير مؤكَّد — اطلب من الأدمن تأكيده'
+            : code === 'user_banned' ? 'هذا الحساب موقوف'
+            : st === 429 || /rate limit/i.test(code + d) ? 'محاولات كثيرة، انتظر بضع دقائق ثم أعد المحاولة'
+            : st === 401 || st === 403 ? 'مفتاح الاتصال بالخادم (anon key) غير صالح — راجع إعدادات النشر'
+            : st >= 500 ? 'الخادم لا يستجيب حالياً، حاول بعد قليل' : 'تعذّر تسجيل الدخول';
+          return { error: { message: m + ' [' + st + (code ? ' · ' + code : '') + ']' } };
+        }
         j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); init(); return { error: null };
       } catch (e) { return { error: { message: 'تعذّر الاتصال' } }; }
     },
