@@ -76,7 +76,6 @@ begin
 end $$;
 drop trigger if exists trg_log_comments on task_comments; create trigger trg_log_comments after insert on task_comments for each row execute function log_child();
 drop trigger if exists trg_log_files on task_files;       create trigger trg_log_files after insert or delete on task_files for each row execute function log_child();
-drop trigger if exists trg_log_items on task_items;       -- (يُنشأ بعد إنشاء الجدول أدناه)
 drop trigger if exists trg_log_done on task_done;         create trigger trg_log_done after insert on task_done for each row execute function log_child();
 
 -- تسجيل إنجاز المراحل داخل مسار العمل
@@ -118,6 +117,7 @@ create index if not exists task_items_task_idx on task_items(task_id);
 alter table task_items enable row level security;
 drop policy if exists "ti all" on task_items;
 create policy "ti all" on task_items for all using (is_member()) with check (is_member());
+drop trigger if exists trg_log_items on task_items;
 create trigger trg_log_items after update on task_items for each row execute function log_child();
 
 -- نسبة الإنجاز تُحسب من البنود، وأول بند منجز ينقل المهمة إلى «قيد العمل»
