@@ -170,3 +170,6 @@ label.chk input{width:18px;height:18px;margin:0;accent-color:var(--gold)}
 .top .brand h1{letter-spacing:-.2px}
 button,select,input,textarea{transition:border-color .15s,box-shadow .15s,background .15s}
 input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--goldsoft);outline:none}
+
+@keyframes ttShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+dialog.shake{animation:ttShake .35s}

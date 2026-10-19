@@ -31,7 +31,8 @@ module.exports = async (req, res) => {
       const d = new Date(now); d.setUTCDate(d.getUTCDate() + (r.due_after_days || 0));
       const base = { title: r.title, notes: r.notes, due_on: d.toISOString().slice(0, 10), status: 'todo', created_by: r.created_by, for_all: false };
       const gid = randomUUID();
-      const rows = r.for_all ? members.map(m => ({ ...base, id: randomUUID(), assignee_email: m.email, group_id: gid })) : [{ ...base, id: randomUUID(), assignee_email: r.assignee_email }];
+      const seen = new Set(), uniq = (members || []).filter(m => { const k = String(m.email).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+      const rows = r.for_all ? uniq.map(m => ({ ...base, id: randomUUID(), assignee_email: m.email, group_id: gid })) : [{ ...base, id: randomUUID(), assignee_email: r.assignee_email }];
       const { error: e1 } = await supabase.from('tasks').insert(rows);
       if (e1) { console.error(e1.message); await supabase.from('recurring_tasks').update({ last_run: r.last_run }).eq('id', r.id); continue; }
       made.push({ r, rows });

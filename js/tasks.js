@@ -258,7 +258,8 @@ function taskDialog(t, pre = {}) {
     let gmap = null, error;
     if (!edit && all) {            // مهمة جماعية: نسخة مستقلة لكل عضو
       const gid = crypto.randomUUID(); delete row.done_note;
-      const rows = S.members.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
+      const uniq = []; S.members.forEach(m => { if (!uniq.some(u => same(u.email, m.email))) uniq.push(m); });
+      const rows = uniq.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
       ({ error } = await sb.from('tasks').insert(rows));
       if (!error) { await Promise.all(rows.map(r => ck.flush(r.id))); gmap = {}; rows.forEach(r => { gmap[String(r.assignee_email).toLowerCase()] = r.id; }); }
     } else {
@@ -282,4 +283,16 @@ function taskDialog(t, pre = {}) {
   if (edit && canDel(t)) $('f_dl').onclick = () => { if (confirm('هل أنت متأكد من حذف المهمة؟')) { dlg.close(); run(sb.from('tasks').delete().eq('id', t.id)); } };
   dlg.showModal(); if (!edit) $('f_ti').focus();
 }
-dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+// حماية العمل غير المحفوظ: لا يُغلق الإطار بالضغط خارجه أو بزر Esc إن كتبتَ فيه شيئاً
+dlg._dirty = false;
+dlg.addEventListener('input', () => { dlg._dirty = true; });
+dlg.addEventListener('change', () => { dlg._dirty = true; });
+dlg.addEventListener('close', () => { dlg._dirty = false; });
+dlg.addEventListener('cancel', e => { if (dlg._dirty && !confirm('لديك تعديلات غير محفوظة. هل تريد تجاهلها؟')) e.preventDefault(); });
+dlg.addEventListener('click', e => {
+  if (e.target !== dlg) return;
+  if (dlg._dirty) { dlg.classList.add('shake'); setTimeout(() => dlg.classList.remove('shake'), 400); return; }
+  dlg.close();
+});
+const _showModal = HTMLDialogElement.prototype.showModal;
+dlg.showModal = function () { dlg._dirty = false; if (!dlg.open) _showModal.call(dlg); };

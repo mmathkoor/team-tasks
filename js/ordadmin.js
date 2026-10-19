@@ -17,7 +17,7 @@ function ordSettingsHtml() {
     '<label style="margin-top:8px">عنوان المتجر<input id="os_a" value="' + esc(s.store_address || '') + '"></label>' +
     '<label class="chk" style="margin-top:12px"><input type="checkbox" id="os_c" ' + (s.staff_can_cost ? 'checked' : '') + '> يرى الموظفون سعر الشراء ويدخلونه (افتراضياً: للمدير فقط)</label>' +
     '<label style="margin-top:10px">حذف صور الأصناف بعد انتهاء الطلب<select id="os_k">' + [[0, 'فوراً عند التسليم/الإلغاء'], [1, 'بعد يوم'], [2, 'بعد يومين'], [3, 'بعد 3 أيام'], [7, 'بعد أسبوع']].map(([v, l]) => '<option value="' + v + '"' + ((s.image_keep_days == null ? 1 : s.image_keep_days) === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
-    '<div class="row" style="margin-top:10px"><button class="p s" id="os_sv">حفظ الإعدادات</button></div></div>' + viewsCardHtml();
+    '<div class="row" style="margin-top:10px"><button class="p s" id="os_sv">حفظ الإعدادات</button></div></div>' + viewsCardHtml() + dupCardHtml();
 }
 const VIEW_LIST = [['board', 'المهام والمشاريع'], ['orders', 'إدارة الطلبات'], ['dash', 'لوحة الأرقام'], ['props', 'القرارات والتصويت'], ['log', 'سجل النشاط']];
 function viewsCardHtml() {
@@ -34,7 +34,22 @@ function credsDialog(name, phone, pw) {
   $('cr_wa').onclick = () => window.open('https://wa.me/' + (typeof waPhone === 'function' ? waPhone(phone) : phone) + '?text=' + encodeURIComponent(msg), '_blank');
   dlg.showModal();
 }
+function dupGroups() {
+  const m = {};
+  (S.tasks || []).forEach(t => { const k = [String(t.assignee_email || '').toLowerCase(), String(t.title || '').trim().toLowerCase(), t.due_on || '', t.for_all ? 'a' : ''].join('|'); (m[k] = m[k] || []).push(t); });
+  return Object.values(m).filter(g => g.length > 1).map(g => g.slice().sort((a, b) => String(a.created_at) < String(b.created_at) ? -1 : 1));
+}
+function dupCardHtml() {
+  if (!isAdmin()) return '';
+  const G = dupGroups();
+  return '<div class="card"><h2>🧹 فحص المهام المكررة</h2>' + (G.length ? '<p class="m" style="margin-bottom:8px">وُجدت ' + G.length + ' مجموعة مهام متشابهة (نفس العنوان والمسؤول والموعد). يُحذف الأحدث وتبقى الأقدم.</p>' +
+    G.map(g => '<div class="bar pr-r"><span><b>' + esc(g[0].title) + '</b> — ' + esc(nm(g[0].assignee_email)) + ' <span class="m">(' + g.length + ' نسخ: ' + g.map(x => esc(ST[x.status] || x.status)).join(' / ') + ')</span></span><button class="dng s" data-dup="' + g.slice(1).map(x => x.id).join(',') + '">حذف المكرر</button></div>').join('') : '<p class="m">لا توجد مهام مكررة ✓</p>') + '</div>';
+}
+function bindDupCard() {
+  document.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { const ids = b.dataset.dup.split(','); if (confirm('حذف ' + ids.length + ' نسخة مكررة؟')) run(sb.from('tasks').delete().in('id', ids)); });
+}
 function bindViewsCard() {
+  bindDupCard();
   if (!$('vw_sv')) return;
   $('vw_sv').onclick = async () => {
     const hidden = [...document.querySelectorAll('[data-vw]')].filter(c => !c.checked).map(c => c.dataset.vw);

@@ -70,7 +70,7 @@ create policy "meetings admin write" on meetings for all using (is_admin()) with
 
 create policy "tasks read" on tasks for select using (is_member());
 create policy "tasks add" on tasks for insert with check (is_member());
-create policy "tasks edit" on tasks for update using (is_admin() or lower(assignee_email) = lower(auth.jwt() ->> 'email') or lower(created_by) = lower(auth.jwt() ->> 'email'));
+create policy "tasks edit" on tasks for update using (is_admin() or lower(assignee_email) = lower(auth.jwt() ->> 'email') or lower(created_by) = lower(auth.jwt() ->> 'email')) with check (is_member());
 create policy "tasks remove" on tasks for delete using (is_admin() or lower(created_by) = lower(auth.jwt() ->> 'email'));
 
 create policy "done read" on task_done for select using (is_member());

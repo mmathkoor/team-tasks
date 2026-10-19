@@ -3,7 +3,6 @@
 -- شغّله مرة واحدة فقط على مشروع Supabase فارغ، ثم أضف المدير الأول (انظر DEPLOY.md).
 -- ======================================================================
 
-
 -- >>>>>>>>>> sql/000_base.sql <<<<<<<<<<
 -- 000: الأساس لقاعدة بيانات جديدة (للتركيب لنشاط/عميل جديد فقط — لا تشغّله على قاعدة قائمة)
 create table members (
@@ -77,7 +76,7 @@ create policy "meetings admin write" on meetings for all using (is_admin()) with
 
 create policy "tasks read" on tasks for select using (is_member());
 create policy "tasks add" on tasks for insert with check (is_member());
-create policy "tasks edit" on tasks for update using (is_admin() or lower(assignee_email) = lower(auth.jwt() ->> 'email') or lower(created_by) = lower(auth.jwt() ->> 'email'));
+create policy "tasks edit" on tasks for update using (is_admin() or lower(assignee_email) = lower(auth.jwt() ->> 'email') or lower(created_by) = lower(auth.jwt() ->> 'email')) with check (is_member());
 create policy "tasks remove" on tasks for delete using (is_admin() or lower(created_by) = lower(auth.jwt() ->> 'email'));
 
 create policy "done read" on task_done for select using (is_member());
@@ -729,4 +728,14 @@ create policy "v8 members admin edit" on members for update using (is_admin());
 
 alter table ord_settings add column if not exists hidden_views text[] not null default '{}';
 alter table ord_settings add column if not exists app_name text;
+
+
+-- >>>>>>>>>> sql/012_fix_task_edit.sql <<<<<<<<<<
+-- 012: إصلاح خطأ "new row violates row-level security policy for table tasks"
+-- السبب: سياسة تعديل المهام كانت تتحقق من الصف الجديد بنفس شرط الصف القديم، فيفشل أي تعديل
+-- يغيّر المسؤول عن المهمة (إحالة المهمة للتالي في المسار، أو إسنادها يدوياً لشخص آخر) لغير الأدمن.
+drop policy if exists "tasks edit" on tasks;
+create policy "tasks edit" on tasks for update
+  using (is_admin() or lower(assignee_email) = lower(auth.jwt() ->> 'email') or lower(created_by) = lower(auth.jwt() ->> 'email'))
+  with check (is_member());
 
