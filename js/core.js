@@ -105,43 +105,270 @@ const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
-/* ===== الشركات والإدارات (عزل بيانات كل شركة + هيكل الأقسام) ===== */
+function toast(msg, ok = true) {
+  let el = document.getElementById('app_toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'app_toast';
+    document.body.appendChild(el);
+  }
+  el.className = 'app-toast ' + (ok === false ? 'err' : 'ok');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._tm);
+  el._tm = setTimeout(() => { el.style.display = 'none'; }, 3200);
+}
+
+function waSummaryDialog(title, txt, phoneOpt) {
+  try { navigator.clipboard?.writeText(txt); } catch (e) {}
+  toast('تم تجهيز ونسخ ملخص الواتساب 📋');
+  const ph = phoneOpt && typeof waPhone === 'function' ? waPhone(phoneOpt) : '';
+  dlg.innerHTML = '<h2>💬 ' + esc(title || 'ملخص التقرير عبر واتساب') + '</h2>' +
+    '<p class="m" style="margin-bottom:8px">تم نسخ الملخص تلقائياً للحافظة، ويمكنك تعديله أو إرساله مباشرة عبر واتساب:</p>' +
+    '<textarea id="wa_sum_txt" rows="10" style="font-family:inherit;line-height:1.7;margin-bottom:10px">' + esc(txt) + '</textarea>' +
+    '<div class="row" style="margin-bottom:10px"><label style="flex:1">📱 رقم واتساب المستلم (اختياري — اتركه فارغاً لاختيار جهة الاتصال من واتساب)<input id="wa_sum_ph" dir="ltr" inputmode="tel" value="' + esc(phoneOpt || '') + '" placeholder="مثال: 77xxxxxxx"></label></div>' +
+    '<div class="row dact">' +
+      '<button class="s" type="button" id="wa_sum_cp">📋 نسخ النص</button>' +
+      '<button class="p s" type="button" id="wa_sum_go" style="background:#128c7e;border-color:#128c7e;color:#fff">📲 فتح وإرسال عبر واتساب</button>' +
+      '<button class="s" type="button" id="wa_sum_x">إغلاق</button>' +
+    '</div>';
+  $('wa_sum_x').onclick = () => dlg.close();
+  $('wa_sum_cp').onclick = async () => {
+    try { await navigator.clipboard.writeText($('wa_sum_txt').value); $('wa_sum_cp').textContent = 'تم النسخ ✓'; toast('تم نسخ النص للحافظة ✓'); }
+    catch (e) { alert('تعذّر النسخ'); }
+  };
+  $('wa_sum_go').onclick = () => {
+    const rawP = ($('wa_sum_ph') && $('wa_sum_ph').value.trim()) || '';
+    const cleanP = rawP && typeof waPhone === 'function' ? waPhone(rawP) : rawP.replace(/\D/g, '');
+    const url = 'https://wa.me/' + (cleanP || ph || '') + '?text=' + encodeURIComponent($('wa_sum_txt').value);
+    window.open(url, '_blank');
+  };
+  dlg.showModal();
+}
+
+/* ===== الشركات والإدارات والهوية الاحترافية لكل شركة (الشعار + الاسم + الفاتورة + عزل البيانات) ===== */
+const DEFAULT_COMPANY = 'متجرك';
+
 function parseMemberMeta(m) {
-  if (!m) return { company: '', department: '' };
-  let co = m.company || '', dep = m.department || '';
-  if ((!co && !dep) && m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
+  if (!m) return { company: '', department: '', phone: '', perms: {} };
+  let co = m.company || '', dep = m.department || '', ph = m.phone || '';
+  let perms = {};
+  if (m.permissions) {
+    if (typeof m.permissions === 'object') perms = Object.assign({}, m.permissions);
+    else { try { perms = JSON.parse(m.permissions); } catch (e) {} }
+  }
+  if (m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
     try {
       const j = JSON.parse(m.telegram_chat_id);
-      co = j.co || j.company || '';
-      dep = j.dep || j.department || '';
+      if (!co) co = j.co || j.company || '';
+      if (!dep) dep = j.dep || j.department || '';
+      if (!ph) ph = j.ph || j.phone || '';
+      if (!Object.keys(perms).length && j.perms && typeof j.perms === 'object') perms = Object.assign({}, j.perms);
     } catch (e) {}
   }
-  return { company: String(co || '').trim(), department: String(dep || '').trim() };
+  co = String(co || '').trim();
+  dep = String(dep || '').trim();
+  ph = String(ph || '').trim();
+  // جميع الموظفين والمناديب (غير المدير العام) يتبعون تلقائياً شركة «متجرك» ما لم تُحدَّد لهم شركة أخرى أو __all للمندوب المشترك
+  if (!co && m.role !== 'admin') co = DEFAULT_COMPANY;
+  return { company: co, department: dep, phone: ph, perms };
 }
-function encodeMemberMeta(co, dep) {
-  const c = String(co || '').trim(), d = String(dep || '').trim();
-  return (c || d) ? JSON.stringify({ co: c, dep: d }) : null;
+
+function encodeMemberMeta(co, dep, ph, perms) {
+  const c = String(co || '').trim(), d = String(dep || '').trim(), p = String(ph || '').trim();
+  const obj = {};
+  if (c) obj.co = c;
+  if (d) obj.dep = d;
+  if (p) obj.ph = p;
+  if (perms && typeof perms === 'object' && Object.keys(perms).length) obj.perms = perms;
+  return Object.keys(obj).length ? JSON.stringify(obj) : null;
+}
+
+// استرجاع صلاحيات الموظف الدقيقة
+function memberPerms(mOrEmail) {
+  const m = typeof mOrEmail === 'string'
+    ? (S.allMembers || S.members || S.rawMembers || []).find(x => same(x.email, mOrEmail))
+    : mOrEmail;
+  if (!m) return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false, settingsTabs: [] };
+  if (m.role === 'admin') return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true, settingsTabs: ['staff', 'reps', 'stores', 'orders_cfg', 'notify', 'recur', 'tools', 'account'] };
+  if (m.role === 'rep') return { screens: ['rep'], ordersScope: 'own', canCost: false, settingsTabs: ['account'] };
+
+  const meta = parseMemberMeta(m);
+  const p = meta.perms || {};
+  const setTabs = Array.isArray(p.settingsTabs) ? p.settingsTabs : [];
+  const screens = Array.isArray(p.screens) && p.screens.length ? p.screens.slice() : ['board', 'orders', 'dash', 'props', 'log'];
+  if (!screens.includes('set')) screens.push('set');
+
+  return {
+    screens: screens,
+    ordersScope: p.ordersScope === 'own' ? 'own' : 'all',
+    canCost: !!p.canCost,
+    settingsTabs: setTabs
+  };
+}
+
+function canMemberAccessScreen(screenId, m) {
+  const member = m || S.me;
+  if (!member) return false;
+  if (member.role === 'admin') return true;
+  const p = memberPerms(member);
+  if (screenId === 'set') return true;
+  return p.screens.includes(screenId);
+}
+
+function canMemberAccessSettingsTab(tabId, m) {
+  const member = m || S.me;
+  if (!member) return false;
+  if (tabId === 'account') return true;
+  if (member.role === 'admin') return true;
+  const p = memberPerms(member);
+  return Array.isArray(p.settingsTabs) && p.settingsTabs.includes(tabId);
+}
+
+function canMemberViewOtherOrders(m) {
+  const member = m || S.me;
+  if (!member) return false;
+  if (member.role === 'admin') return true;
+  const p = memberPerms(member);
+  return p.ordersScope !== 'own';
 }
 function memberCompany(email) {
-  if (!email) return '';
+  if (!email) return DEFAULT_COMPANY;
   const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
-  return m ? parseMemberMeta(m).company : '';
+  if (!m) return DEFAULT_COMPANY;
+  const c = parseMemberMeta(m).company;
+  return (!c || c === '__all') ? DEFAULT_COMPANY : c;
 }
 function memberDept(email) {
   if (!email) return '';
   const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
   return m ? parseMemberMeta(m).department : '';
 }
+function memberPhone(email) {
+  if (!email) return '';
+  const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
+  if (!m) return '';
+  return m.phone || parseMemberMeta(m).phone || '';
+}
 function getLocalOrgMeta() {
-  try { return JSON.parse(localStorage.getItem('org_meta_v1') || '{"companies":[],"departments":[]}'); }
-  catch (e) { return { companies: [], departments: [] }; }
+  try { return JSON.parse(localStorage.getItem('org_meta_v1') || '{"companies":[],"departments":[],"profiles":{}}'); }
+  catch (e) { return { companies: [], departments: [], profiles: {} }; }
+}
+function companyProfilesMap() {
+  const map = {};
+  const loc = getLocalOrgMeta().profiles || {};
+  Object.entries(loc).forEach(([k, v]) => { if (k && v && typeof v === 'object') map[k] = Object.assign({}, v); });
+  const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
+  hv.forEach(x => {
+    if (String(x).startsWith('__cop:')) {
+      try {
+        const j = JSON.parse(String(x).slice(6));
+        if (j && j.id) map[j.id] = Object.assign({}, map[j.id] || {}, j);
+      } catch (e) {}
+    }
+  });
+  // الجدول الصريح للشركات (companies) له الأولوية القصوى عند توفره
+  (S.companiesRows || []).forEach(r => {
+    if (!r || !r.id) return;
+    map[r.id] = Object.assign({}, map[r.id] || {}, {
+      id: r.id,
+      displayName: r.display_name || r.id,
+      slogan: r.slogan || '',
+      logo: r.logo || '',
+      phone: r.phone || '',
+      address: r.address || '',
+      currency: r.currency || 'ر.ي',
+      taxNo: r.tax_no || '',
+      accent: r.accent || '#c9a24e',
+      footer: r.footer || 'شكراً لتعاملكم معنا 🌹',
+      staffCanCost: !!r.staff_can_cost,
+      imageKeepDays: r.image_keep_days != null ? +r.image_keep_days : 1
+    });
+  });
+  return map;
+}
+function getCompanyProfile(coName) {
+  const name = String(coName || '').trim();
+  const map = companyProfilesMap();
+  const key = Object.keys(map).find(k => same(k, name));
+  const p = (key && map[key]) || {};
+  const isDef = !name || same(name, DEFAULT_COMPANY);
+  return {
+    id: name || DEFAULT_COMPANY,
+    displayName: p.displayName || (isDef ? ((S.ordSet && S.ordSet.store_name) || DEFAULT_COMPANY) : name),
+    appTitle: p.appTitle || (isDef ? ((S.ordSet && S.ordSet.app_name) || '') : ('منصة ' + name)),
+    slogan: p.slogan || '',
+    phone: p.phone || (isDef ? ((S.ordSet && S.ordSet.store_phone) || BRAND.phone || '') : ''),
+    address: p.address || (isDef ? ((S.ordSet && S.ordSet.store_address) || BRAND.address || '') : ''),
+    currency: p.currency || BRAND.currency || 'ر.ي',
+    color: p.color || '#0b1426',
+    accent: p.accent || '#d4af6a',
+    logo: p.logo || '',
+    footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
+    taxNo: p.taxNo || '',
+    staffCanCost: p.staffCanCost !== undefined ? !!p.staffCanCost : !!(S.ordSet && S.ordSet.staff_can_cost),
+    imageKeepDays: p.imageKeepDays !== undefined ? +p.imageKeepDays : (S.ordSet && S.ordSet.image_keep_days != null ? +S.ordSet.image_keep_days : 1)
+  };
+}
+function activeBrand() {
+  const co = activeCompanyFilter();
+  if (co) return getCompanyProfile(co);
+  return getCompanyProfile(DEFAULT_COMPANY);
+}
+function extractRecordCompany(text) {
+  const m = String(text || '').match(/\[شركة:\s*([^\]]+)\]/);
+  return m ? m[1].trim() : '';
+}
+function orderCompany(o) {
+  if (!o) return DEFAULT_COMPANY;
+  const tag = extractRecordCompany(o.notes);
+  if (o.company_id && String(o.company_id).trim() && (!same(o.company_id, DEFAULT_COMPANY) || !tag)) return String(o.company_id).trim();
+  if (o.company && String(o.company).trim() && (!same(o.company, DEFAULT_COMPANY) || !tag)) return String(o.company).trim();
+  if (tag) return tag;
+  if (o.rep_email) {
+    const mRep = (S.rawMembers || S.allMembers || []).find(x => same(x.email, o.rep_email));
+    const rc = mRep ? parseMemberMeta(mRep).company : '';
+    if (rc && rc !== '__all') return rc;
+  }
+  if (o.created_by) {
+    const m = (S.rawMembers || S.allMembers || []).find(x => same(x.email, o.created_by));
+    if (m && m.role !== 'admin') return parseMemberMeta(m).company || DEFAULT_COMPANY;
+    if (m) {
+      const mc = String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim();
+      if (mc && mc !== '__all') return mc;
+    }
+  }
+  return DEFAULT_COMPANY;
+}
+function taskCompany(t) {
+  if (!t) return DEFAULT_COMPANY;
+  const tag = extractRecordCompany(t.notes);
+  if (t.company_id && String(t.company_id).trim() && (!same(t.company_id, DEFAULT_COMPANY) || !tag)) return String(t.company_id).trim();
+  if (t.company && String(t.company).trim() && (!same(t.company, DEFAULT_COMPANY) || !tag)) return String(t.company).trim();
+  if (tag) return tag;
+  if (t.assignee_email) {
+    const m = (S.rawMembers || S.allMembers || []).find(x => same(x.email, t.assignee_email));
+    if (m && m.role !== 'admin') return parseMemberMeta(m).company || DEFAULT_COMPANY;
+    if (m) {
+      const mc = String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim();
+      if (mc && mc !== '__all') return mc;
+    }
+  }
+  if (t.created_by) {
+    const m = (S.rawMembers || S.allMembers || []).find(x => same(x.email, t.created_by));
+    if (m && m.role !== 'admin') return parseMemberMeta(m).company || DEFAULT_COMPANY;
+  }
+  return DEFAULT_COMPANY;
 }
 function companiesList() {
-  const set = new Set();
+  const set = new Set([DEFAULT_COMPANY]);
+  const addCo = v => { const s = String(v || '').trim(); if (s && s !== '__all') set.add(s); };
+  (S.companiesRows || []).forEach(r => addCo(r.id));
   const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
-  hv.forEach(x => { if (String(x).startsWith('__co:')) { const v = String(x).slice(5).trim(); if (v) set.add(v); } });
-  (getLocalOrgMeta().companies || []).forEach(v => { if (v && String(v).trim()) set.add(String(v).trim()); });
-  (S.rawMembers || S.allMembers || S.members || []).forEach(m => { const c = parseMemberMeta(m).company; if (c) set.add(c); });
+  hv.forEach(x => { if (String(x).startsWith('__co:')) addCo(String(x).slice(5)); });
+  Object.keys(companyProfilesMap()).forEach(addCo);
+  (getLocalOrgMeta().companies || []).forEach(addCo);
+  (S.rawMembers || S.allMembers || S.members || []).forEach(m => addCo(parseMemberMeta(m).company));
   return [...set];
 }
 function departmentsList() {
@@ -152,22 +379,72 @@ function departmentsList() {
   (S.rawMembers || S.allMembers || S.members || []).forEach(m => { const d = parseMemberMeta(m).department; if (d) set.add(d); });
   return [...set];
 }
-async function persistOrgLists(companies, departments) {
-  const cleanCo = [...new Set((companies || []).map(x => String(x || '').trim()).filter(Boolean))];
+async function persistOrgLists(companies, departments, profilesOpt) {
+  const cleanCo = [...new Set([DEFAULT_COMPANY].concat((companies || []).map(x => String(x || '').trim()).filter(x => x && x !== '__all')))];
   const cleanDep = [...new Set((departments || []).map(x => String(x || '').trim()).filter(Boolean))];
-  try { localStorage.setItem('org_meta_v1', JSON.stringify({ companies: cleanCo, departments: cleanDep })); } catch (e) {}
+  const profs = profilesOpt || companyProfilesMap();
+  try { localStorage.setItem('org_meta_v1', JSON.stringify({ companies: cleanCo, departments: cleanDep, profiles: profs })); } catch (e) {}
+  // حفظ في جدول الشركات الصريح إن كان مفعّلاً
+  if (!S.companiesErr) {
+    const rows = cleanCo.map(c => {
+      const k = Object.keys(profs).find(x => same(x, c));
+      const p = (k && profs[k]) || getCompanyProfile(c);
+      return {
+        id: c,
+        display_name: p.displayName || c,
+        slogan: p.slogan || '',
+        logo: p.logo || '',
+        phone: p.phone || '',
+        address: p.address || '',
+        currency: p.currency || 'ر.ي',
+        tax_no: p.taxNo || '',
+        accent: p.accent || '#c9a24e',
+        footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
+        staff_can_cost: !!p.staffCanCost,
+        image_keep_days: p.imageKeepDays != null ? +p.imageKeepDays : 1,
+        updated_at: new Date().toISOString()
+      };
+    });
+    await sb.from('companies').upsert(rows).catch(() => {});
+  }
   if (S.ordSet) {
-    const baseViews = (S.ordSet.hidden_views || []).filter(x => !String(x).startsWith('__co:') && !String(x).startsWith('__dep:'));
-    const nextHidden = baseViews.concat(cleanCo.map(c => '__co:' + c)).concat(cleanDep.map(d => '__dep:' + d));
+    const baseViews = (S.ordSet.hidden_views || []).filter(x => !String(x).startsWith('__co:') && !String(x).startsWith('__dep:') && !String(x).startsWith('__cop:'));
+    const profEntries = cleanCo.map(c => {
+      const k = Object.keys(profs).find(x => same(x, c));
+      const p = k ? profs[k] : null;
+      return p ? '__cop:' + JSON.stringify(Object.assign({}, p, { id: c })) : null;
+    }).filter(Boolean);
+    const nextHidden = baseViews.concat(cleanCo.map(c => '__co:' + c)).concat(cleanDep.map(d => '__dep:' + d)).concat(profEntries);
     S.ordSet.hidden_views = nextHidden;
     await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true);
   }
 }
-const isSuperAdmin = () => isAdmin() && !parseMemberMeta(S.me).company;
+async function saveCompanyProfile(coName, profileData) {
+  const name = String(coName || DEFAULT_COMPANY).trim();
+  const profs = companyProfilesMap();
+  const existingKey = Object.keys(profs).find(k => same(k, name)) || name;
+  profs[existingKey] = Object.assign({}, profs[existingKey] || {}, profileData, { id: name });
+  const cos = companiesList();
+  if (!cos.some(c => same(c, name))) cos.push(name);
+  await persistOrgLists(cos, departmentsList(), profs);
+  if (same(name, DEFAULT_COMPANY) && S.ordSet) {
+    const patch = {};
+    if (profileData.displayName !== undefined) patch.store_name = profileData.displayName || null;
+    if (profileData.phone !== undefined) patch.store_phone = profileData.phone || null;
+    if (profileData.address !== undefined) patch.store_address = profileData.address || null;
+    if (profileData.appTitle !== undefined && profileData.appTitle) patch.app_name = profileData.appTitle;
+    if (profileData.staffCanCost !== undefined) patch.staff_can_cost = !!profileData.staffCanCost;
+    if (profileData.imageKeepDays !== undefined) patch.image_keep_days = +profileData.imageKeepDays;
+    if (Object.keys(patch).length) {
+      Object.assign(S.ordSet, patch);
+      await sb.from('ord_settings').update(patch).eq('id', true);
+    }
+  }
+}
+const isSuperAdmin = () => isAdmin() && !String(S.me && (S.me.company || (S.me.telegram_chat_id && S.me.telegram_chat_id.startsWith('{') ? (JSON.parse(S.me.telegram_chat_id).co || '') : '')) || '').trim();
 function activeCompanyFilter() {
   if (!S.me) return '';
-  const myCo = parseMemberMeta(S.me).company;
-  if (myCo) return myCo;
+  if (!isSuperAdmin()) return parseMemberMeta(S.me).company || DEFAULT_COMPANY;
   return S.activeCompany || '';
 }
 function applyCompanyScope() {
@@ -183,37 +460,44 @@ function applyCompanyScope() {
     S.opay = (S.rawOpay || []).slice();
     S.meetings = (S.rawMeetings || []).slice();
     S.props = (S.rawProps || []).slice();
+    S.supPay = (S.rawSupPay || []).slice();
+    S.repHand = (S.rawRepHand || []).slice();
+    S.expenses = (S.rawExpenses || []).slice();
     return;
   }
-  const inCo = email => {
-    if (!email) return false;
-    return same(memberCompany(email), co);
-  };
-  S.allMembers = S.rawMembers.filter(m => same(parseMemberMeta(m).company, co) || same(m.email, S.me && S.me.email));
+  S.allMembers = S.rawMembers.filter(m => {
+    const mc = parseMemberMeta(m).company;
+    return same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email);
+  });
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');
-  S.tasks = (S.rawTasks || []).filter(t => {
-    const tagMatch = String(t.notes || '').includes('[شركة: ' + co + ']');
-    if (tagMatch) return true;
-    if (t.assignee_email) return inCo(t.assignee_email);
-    if (t.created_by) return inCo(t.created_by);
-    return false;
-  });
-  S.orders = (S.rawOrders || []).filter(o => {
-    const tagMatch = String(o.notes || '').includes('[شركة: ' + co + ']');
-    if (tagMatch) return true;
-    if (o.rep_email && inCo(o.rep_email)) return true;
-    if (o.created_by && inCo(o.created_by)) return true;
-    return false;
-  });
+  S.tasks = (S.rawTasks || []).filter(t => same(taskCompany(t), co));
+  let compOrders = (S.rawOrders || []).filter(o => same(orderCompany(o), co));
+  // عزل صلاحيات الطلبات: إذا لم يُسمح للموظف برؤية طلبات زملائه يرى طلباته الخاصة فقط
+  if (S.me && S.me.role !== 'admin' && typeof canMemberViewOtherOrders === 'function' && !canMemberViewOtherOrders(S.me)) {
+    compOrders = compOrders.filter(o => same(o.created_by, S.me.email) || same(o.rep_email, S.me.email));
+  }
+  S.orders = compOrders;
   const ordIds = new Set(S.orders.map(o => o.id));
   S.oitems = (S.rawOitems || []).filter(i => ordIds.has(i.order_id));
   S.opay = (S.rawOpay || []).filter(p => ordIds.has(p.order_id));
-  S.meetings = (S.rawMeetings || []).filter(m => !m.title.includes(' · [') || m.title.includes(' · [' + co + ']'));
-  S.props = (S.rawProps || []).filter(p => inCo(p.author_email));
+  S.meetings = (S.rawMeetings || []).filter(m => {
+    if (m.company_id && String(m.company_id).trim()) return same(m.company_id, co);
+    const tag = String(m.title || '').match(/\[([^\]]+)\]/);
+    if (tag) return same(tag[1].trim(), co);
+    return same(co, DEFAULT_COMPANY);
+  });
+  S.props = (S.rawProps || []).filter(p => {
+    if (p.company_id && String(p.company_id).trim()) return same(p.company_id, co);
+    const mc = memberCompany(p.author_email);
+    return same(mc || DEFAULT_COMPANY, co);
+  });
+  S.supPay = (S.rawSupPay || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
+  S.repHand = (S.rawRepHand || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
+  S.expenses = (S.rawExpenses || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
 }
 
-/* ===== صور الأصناف (مخزن خاص + روابط مؤقتة) ===== */
+/* ===== صور الأصناف والشعارات (مخزن خاص + ضغط الصور) ===== */
 const IMG_BUCKET = 'order-images';
 async function imgSign(paths) {
   paths = [...new Set((paths || []).filter(Boolean))]; const out = {}; if (!paths.length) return out;
@@ -245,6 +529,25 @@ function compressImage(file, max = 1024, q = 0.72) {
       c.toBlob(b => b ? res(b) : rej(new Error('تعذّر ضغط الصورة')), 'image/jpeg', q);
     };
     im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('ملف الصورة غير صالح')); };
+    im.src = url;
+  });
+}
+// ضغط شعار الشركة كـ DataURL خفيف وعالي الدقة (PNG/WebP شفاف أو مربع) لحفظه مباشرة في إعدادات الشركة
+function compressLogoDataUrl(file, max = 180) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k));
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      let out = c.toDataURL('image/webp', 0.82);
+      if (out.length > 45000) out = c.toDataURL('image/jpeg', 0.75);
+      res(out);
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('ملف الشعار غير صالح')); };
     im.src = url;
   });
 }

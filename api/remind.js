@@ -24,13 +24,36 @@ module.exports = async (req, res) => {
     targetDate.setDate(today.getDate() + 3);
     const dateString = targetDate.toISOString().slice(0, 10);
 
-    const { data: subs } = await supabase.from('push_subs').select('*');
+    const filterCo = String((req.query && req.query.company) || (req.body && req.body.company) || '').trim().toLowerCase();
+    const { data: allMembers } = await supabase.from('members').select('email,role,company,telegram_chat_id');
+    const getMemCo = m => {
+      if (!m) return 'متجرك';
+      let c = m.company || '';
+      if (!c && m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
+        try { c = JSON.parse(m.telegram_chat_id).co || ''; } catch (e) {}
+      }
+      c = String(c || '').trim();
+      return (!c && m.role !== 'admin') ? 'متجرك' : (c || 'متجرك');
+    };
+    const memMap = {};
+    (allMembers || []).forEach(m => { memMap[String(m.email || '').toLowerCase()] = getMemCo(m); });
+
+    const { data: subs0 } = await supabase.from('push_subs').select('*');
+    const subs = (subs0 || []).filter(s => !filterCo || (memMap[String(s.email || '').toLowerCase()] || 'متجرك').toLowerCase() === filterCo);
     if (!subs || subs.length === 0) return res.status(200).json({ message: 'لا توجد أجهزة مسجلة' });
 
-    const { data: tasks } = await supabase.from('tasks')
+    const { data: tasks0 } = await supabase.from('tasks')
       .select('*')
       .neq('status', 'done')
       .lte('due_on', dateString);
+
+    const getTaskCo = t => {
+      const m = String(t.notes || '').match(/\[شركة:\s*([^\]]+)\]/);
+      if (m) return m[1].trim();
+      if (t.assignee_email) return memMap[String(t.assignee_email).toLowerCase()] || 'متجرك';
+      return 'متجرك';
+    };
+    const tasks = (tasks0 || []).filter(t => !filterCo || getTaskCo(t).toLowerCase() === filterCo);
 
     const { data: dn } = await supabase.from('task_done').select('*');
     const { data: proposals } = await supabase.from('proposals').select('*').eq('status', 'open');
@@ -39,8 +62,9 @@ module.exports = async (req, res) => {
 
     if (tasks) {
       tasks.forEach(task => {
+        const tCo = getTaskCo(task);
         const payload = JSON.stringify({
-          title: '⏳ تذكير بمهمة تقترب',
+          title: '⏳ تذكير بمهمة تقترب (' + tCo + ')',
           body: `المهمة: ${task.title}\nتاريخ التسليم: ${task.due_on}`,
           icon: '/icon-192.png',
           task_id: task.id,
@@ -51,7 +75,9 @@ module.exports = async (req, res) => {
 
         subs.forEach(subRow => {
           if (task.for_all && (dn || []).some(d => d.task_id === task.id && d.email === subRow.email)) return;
-          if (task.for_all || task.assignee_email === subRow.email) {
+          const subCo = memMap[String(subRow.email || '').toLowerCase()] || 'متجرك';
+          if (task.for_all && subCo.toLowerCase() !== tCo.toLowerCase()) return;
+          if (task.for_all || String(task.assignee_email || '').toLowerCase() === String(subRow.email || '').toLowerCase()) {
             sendPromises.push(webpush.sendNotification(subRow.sub, payload).catch(e => console.error(e)));
           }
         });

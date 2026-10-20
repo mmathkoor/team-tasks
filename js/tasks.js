@@ -21,7 +21,7 @@ function renderNotesAndWorkflow(notesStr) {
         if(l.startsWith('[WF_HANDOFF]')) {
             let p = l.replace('[WF_HANDOFF]', '').split('||');
             wfHistory.push('<div class="wf-item"><div class="wf-meta">🔄 <b>' + esc(p[0]) + '</b> أحالها إلى <b>' + esc(p[1]) + '</b> <span dir="ltr">(' + esc(p[2]) + ')</span></div><div class="wf-msg">' + esc(p[3]||'') + '</div></div>');
-        } else {
+        } else if (!/^\[شركة:\s*[^\]]+\]$/.test(l.trim())) {
             mainNotes.push(l);
         }
     });
@@ -35,9 +35,330 @@ function renderNotesAndWorkflow(notesStr) {
 function dueInfo(t) {
   if (!t.due_on) return null;
   if (eff(t) === 'done') return { c: '', t: t.due_on };
-  if (t.due_on < today()) return { c: 'late', t: '⚠️ متأخرة (' + t.due_on + ')' };
+  if (t.due_on < today()) {
+    const ld = Math.max(1, Math.round((new Date(today()) - new Date(t.due_on)) / 864e5));
+    return { c: 'late', t: '⚠️ متأخرة منذ ' + ld + (ld === 1 ? ' يوم' : ld === 2 ? ' يومين' : ld <= 10 ? ' أيام' : ' يوماً') + ' (' + t.due_on + ')' };
+  }
   const d = daysTo(t.due_on);
   return d <= 1 ? { c: 'soon', t: d ? '⏱️ غداً' : '🔥 اليوم' } : { c: '', t: '📅 ' + t.due_on };
+}
+
+function taskDelayMeta(t) {
+  const st = eff(t);
+  const td = today();
+  const isLate = st !== 'done' && t.due_on && t.due_on < td;
+  const lateDays = isLate ? Math.max(1, Math.round((new Date(td) - new Date(t.due_on)) / 864e5)) : 0;
+  const remDays = (!isLate && st !== 'done' && t.due_on) ? daysTo(t.due_on) : null;
+  const ck = (S.itemStats || {})[t.id];
+  const ckTxt = ck && ck[1] ? (' · البنود الفرعية: ' + ck[0] + '/' + ck[1]) : '';
+  const pgTxt = (t.progress > 0 && st !== 'done') ? (' · نسبة الإنجاز: ' + t.progress + '%') : '';
+  const wfStep = (Array.isArray(t.flow) && t.flow.length > 1) ? (' · المسار: المرحلة ' + ((t.flow_step || 0) + 1) + ' من ' + t.flow.length) : '';
+  const stageName = st === 'doing' ? 'قيد العمل (جاري التنفيذ)' : st === 'todo' ? 'للتنفيذ (لم يبدأ العمل عليها)' : 'منجزة';
+  let level = 'normal';
+  if (lateDays > 3) level = 'critical';
+  else if (lateDays >= 1) level = 'late';
+  else if (remDays === 0) level = 'today';
+  else if (remDays === 1) level = 'soon';
+  return { st, isLate, lateDays, remDays, level, stageName, ckTxt, pgTxt, wfStep };
+}
+
+function buildTaskWaSingleMsg(t, tone = 'auto') {
+  const empName = t.assignee_email ? nm(t.assignee_email) : 'الزميل العزيز';
+  const coName = typeof taskCompany === 'function' ? taskCompany(t) : 'متجرك';
+  const prof = typeof getCompanyProfile === 'function' ? getCompanyProfile(coName) : { displayName: coName };
+  const stTitle = prof.displayName || coName;
+  const m = taskDelayMeta(t);
+  const pr = prioOf(t) === 'urgent' ? '🔴 عاجل جداً' : prioOf(t) === 'important' ? '🟠 مهم' : '';
+  const mt = (S.meetings || []).find(x => x.id === t.meeting_id);
+
+  let header = '';
+  let actionLine = '';
+  const effTone = tone === 'auto' ? m.level : tone;
+
+  if (effTone === 'critical' || effTone === 'urgent') {
+    header = '🚨 *متابعة عاجلة جداً — ' + stTitle + '*\nمرحباً أ. *' + empName + '*،';
+    actionLine = m.st === 'todo'
+      ? '⚠️ نلاحظ أن هذه المهمة *متأخرة منذ ' + m.lateDays + ' أيام* ولا تزال في مرحلة *«للتنفيذ» (لم يبدأ العمل عليها بعد)*. نرجو البدء الفوري بها اليوم أو إفادتنا بالعائق.'
+      : '⚠️ هذه المهمة في مرحلة *«قيد العمل»* لكنها *تجاوزت موعد التسليم بـ ' + m.lateDays + ' أيام*. نرجو استكمال ما تبقى منها وإغلاقها بشكل عاجل اليوم.';
+  } else if (effTone === 'late') {
+    header = '⏰ *تذكير بمهمة متأخرة — ' + stTitle + '*\nمرحباً أ. *' + empName + '* 🌹';
+    actionLine = m.st === 'todo'
+      ? '📌 المهمة متأخرة عن موعدها بـ *' + m.lateDays + (m.lateDays === 1 ? ' يوم' : m.lateDays === 2 ? ' يومين' : ' أيام') + '* وما زالت في قائمة *«للتنفيذ»*. نأمل تحريكها إلى «قيد العمل» والبدء بإنجازها.'
+      : '⏳ المهمة حالياً *«قيد العمل»* وقد مضى على موعدها *' + m.lateDays + (m.lateDays === 1 ? ' يوم' : m.lateDays === 2 ? ' يومين' : ' أيام') + '*. نأمل استكمالها واعتماد الإنجاز في أقرب وقت.';
+  } else if (effTone === 'today' || effTone === 'soon') {
+    header = '🔥 *تذكير بموعد تسليم مهم — ' + stTitle + '*\nمرحباً أ. *' + empName + '* 👋';
+    actionLine = m.st === 'todo'
+      ? '📌 موعد تسليم هذه المهمة *' + (m.remDays === 0 ? 'اليوم' : 'غداً') + '* وهي لا تزال في مرحلة *«للتنفيذ»*. نرجو المباشرة فيها لتفادي التأخير.'
+      : '💪 المهمة *«قيد العمل»* وموعد تسليمها *' + (m.remDays === 0 ? 'اليوم' : 'غداً') + '*. شد الهمة لإتمامها في موعدها المحدد.';
+  } else if (effTone === 'friendly') {
+    header = '🌟 *متابعة ودّية لسير المهام — ' + stTitle + '*\nيعطيك العافية أ. *' + empName + '* 🌹';
+    actionLine = m.st === 'todo'
+      ? 'نود تذكيرك بهذه المهمة المدرجة في قائمة *«للتنفيذ»* لديك، ونثقن حرصك على البدء بها وإنجازها بأفضل صورة. 🚀'
+      : 'شكراً لجهودك في هذه المهمة الجاري تنفيذها (*«قيد العمل»*)، نرجو إشعارنا فور اكتمالها. 🌟';
+  } else {
+    header = '📋 *متابعة رسمية للمهام — ' + stTitle + '*\nتحية طيبة أ. *' + empName + '*،';
+    actionLine = m.st === 'todo'
+      ? 'نرجو التكرم بمباشرة التنفيذ وتحديث حالة المهمة على المنصة.'
+      : 'نرجو التكرم باستكمال التنفيذ وتحديث نسبة الإنجاز أو إغلاق المهمة عند الانتهاء.';
+  }
+
+  return [
+    header,
+    '━━━━━━━━━━━━━━',
+    '📌 *المهمة:* ' + t.title,
+    '🔄 *المرحلة الحالية:* ' + m.stageName + m.pgTxt + m.ckTxt + m.wfStep,
+    pr ? '⚡ *الأولوية:* ' + pr : '',
+    mt ? '🏛️ *المشروع / الاجتماع:* ' + mt.title : '',
+    t.due_on ? ('📅 *تاريخ الاستحقاق:* ' + t.due_on + (m.isLate ? ' (🚨 متأخرة منذ ' + m.lateDays + ' يوم)' : m.remDays === 0 ? ' (🔥 اليوم)' : m.remDays === 1 ? ' (⏱️ غداً)' : '')) : '',
+    '━━━━━━━━━━━━━━',
+    actionLine
+  ].filter(Boolean).join('\n');
+}
+
+function buildEmployeeBatchWaMsg(email, taskList, tone = 'auto') {
+  const empName = email ? nm(email) : 'الزميل العزيز';
+  const empDep = email && typeof memberDept === 'function' ? memberDept(email) : '';
+  const coName = email && typeof memberCompany === 'function' ? memberCompany(email) : (activeCompanyFilter() || 'متجرك');
+  const prof = typeof getCompanyProfile === 'function' ? getCompanyProfile(coName) : { displayName: coName };
+  const stTitle = prof.displayName || coName;
+
+  if (!taskList || !taskList.length) {
+    return 'مرحباً أ. *' + empName + '* 🌹\nلا توجد مهام متأخرة أو معلّقة حالياً في قائمتك. شكراً لالتزامك وجهودك المميزة! 👏';
+  }
+
+  const enriched = taskList.map(t => ({ t, m: taskDelayMeta(t) }));
+  const lateItems = enriched.filter(x => x.m.isLate);
+  const maxLate = lateItems.reduce((mx, x) => Math.max(mx, x.m.lateDays), 0);
+  const todoItems = enriched.filter(x => x.m.st === 'todo');
+  const doingItems = enriched.filter(x => x.m.st === 'doing');
+
+  const effTone = tone === 'auto' ? (maxLate > 3 ? 'urgent' : lateItems.length > 0 ? 'late' : 'normal') : tone;
+
+  let intro = '';
+  let outro = '';
+  if (effTone === 'urgent') {
+    intro = '🚨 *تذكير عاجل بالمهام المتأخرة — ' + stTitle + '*\nمرحباً أ. *' + empName + '*' + (empDep ? ' (' + empDep + ')' : '') + '،\nيوجد لديك *(' + taskList.length + ') مهام* تحتاج تدخلاً عاجلاً (منها ' + lateItems.length + ' متأخرة وصلت مدة تأخرها إلى ' + maxLate + ' أيام):';
+    outro = '⚠️ *المطلوب عاجلاً:*\n' +
+      (todoItems.length ? '1️⃣ البدء فوراً بالمهام المتوقفة في مرحلة *«للتنفيذ»* (' + todoItems.length + ' مهام لم يبدأ العمل عليها).\n' : '') +
+      (doingItems.length ? (todoItems.length ? '2️⃣ ' : '1️⃣ ') + 'استكمال وإغلاق المهام المفتوحة في مرحلة *«قيد العمل»* (' + doingItems.length + ' مهام).\n' : '') +
+      'نرجو تحديث حالة الإنجاز على المنصة اليوم أو إفادتنا بأي عائق. ⏳';
+  } else if (effTone === 'late') {
+    intro = '⏰ *ملخص متابعة المهام المتأخرة والمستحقة — ' + stTitle + '*\nمرحباً أ. *' + empName + '*' + (empDep ? ' (' + empDep + ')' : '') + ' 🌹\nنود تذكيرك بقائمة المهام المسندة إليك لمتابعة إنجازها حسب مراحلها الحالية:';
+    outro = '📌 نأمل تحريك مهام *«للتنفيذ»* واستكمال مهام *«قيد العمل»* وتحديث حالتها على المنصة في أقرب وقت. شاكرين تعاونك! 🚀';
+  } else if (effTone === 'friendly') {
+    intro = '🌟 *متابعة ودّية لمهامك الحالية — ' + stTitle + '*\nيعطيك العافية أ. *' + empName + '*' + (empDep ? ' (' + empDep + ')' : '') + ' 🌹\nهذا ملخص سريع للمهام المسندة إليك حالياً (' + taskList.length + ' مهام):';
+    outro = '💪 نثق بهمتك العالية في إنجازها بالوقت المحدد، ولا تتردد في إبلاغنا إن احتجت أي دعم! 🌟';
+  } else {
+    intro = '📋 *كشف متابعة المهام المسندة — ' + stTitle + '*\nتحية طيبة أ. *' + empName + '*' + (empDep ? ' (' + empDep + ')' : '') + '،\nمرفق لكم بيان بالمهام الحالية المسندة إليكم (' + taskList.length + ' مهام) موزعة حسب مرحلة التنفيذ:';
+    outro = 'نرجو التكرم بمتابعة المهام المذكورة أعلاه وتحديث حالتها على المنصة أولاً بأول.';
+  }
+
+  const fmtItem = (x, idx) => {
+    const t = x.t, m = x.m;
+    const pr = prioOf(t) === 'urgent' ? ' [🔴 عاجل]' : prioOf(t) === 'important' ? ' [🟠 مهم]' : '';
+    const delayBadge = m.isLate
+      ? (' — 🚨 *متأخرة منذ ' + m.lateDays + (m.lateDays === 1 ? ' يوم' : m.lateDays === 2 ? ' يومين' : ' أيام') + '* (الموعد: ' + t.due_on + ')')
+      : m.remDays === 0 ? ' — 🔥 *مستحقة اليوم*'
+      : m.remDays === 1 ? ' — ⏱️ *مستحقة غداً*'
+      : t.due_on ? (' — 📅 الموعد: ' + t.due_on) : '';
+    const extra = [m.pgTxt ? m.pgTxt.replace(' · ', '') : '', m.ckTxt ? m.ckTxt.replace(' · ', '') : ''].filter(Boolean).join(' | ');
+    return (idx + 1) + '. *' + t.title + '*' + pr + delayBadge + (extra ? '\n   ↳ _' + extra + '_' : '');
+  };
+
+  const sections = [];
+  if (todoItems.length) {
+    sections.push('📌 *أولاً: مرحلة «للتنفيذ» — لم يبدأ العمل عليها (' + todoItems.length + '):*\n' + todoItems.map(fmtItem).join('\n'));
+  }
+  if (doingItems.length) {
+    sections.push('⏳ *' + (todoItems.length ? 'ثانياً' : 'أولاً') + ': مرحلة «قيد العمل» — جاري التنفيذ (' + doingItems.length + '):*\n' + doingItems.map(fmtItem).join('\n'));
+  }
+
+  return [
+    intro,
+    '━━━━━━━━━━━━━━',
+    sections.join('\n\n'),
+    '━━━━━━━━━━━━━━',
+    outro
+  ].filter(Boolean).join('\n');
+}
+
+function waRemindDialog(preEmail = '', preScope = 'late', singleTaskId = '') {
+  const singleTask = singleTaskId ? (S.tasks || []).find(t => t.id === singleTaskId) : null;
+  if (singleTask && !preEmail) preEmail = singleTask.assignee_email || '';
+
+  const allStaff = (S.members || []).filter(m => m.role !== 'rep');
+  const openTasksOf = em => (S.tasks || []).filter(t => !t.for_all && same(t.assignee_email, em) && eff(t) !== 'done').sort(taskCmp);
+  const lateTasksOf = em => openTasksOf(em).filter(t => t.due_on && t.due_on < today());
+
+  // ترتيب الموظفين: الأكثر تأخراً أولاً ثم الأكثر مهام مفتوحة
+  const staffStats = allStaff.map(m => {
+    const op = openTasksOf(m.email), lt = lateTasksOf(m.email);
+    const todoN = op.filter(t => eff(t) === 'todo').length;
+    const doingN = op.filter(t => eff(t) === 'doing').length;
+    return { m, open: op, late: lt, todoN, doingN };
+  }).sort((a, b) => b.late.length - a.late.length || b.open.length - a.open.length);
+
+  let curEmail = preEmail || (staffStats.find(x => x.late.length > 0)?.m.email) || (staffStats.find(x => x.open.length > 0)?.m.email) || (allStaff[0]?.email || '');
+  let curScope = singleTask ? 'single' : (preScope || (lateTasksOf(curEmail).length ? 'late' : 'all_open'));
+  let curTone = 'auto';
+
+  const getFilteredTasks = (em, scope) => {
+    if (scope === 'single' && singleTask && same(singleTask.assignee_email, em)) return [singleTask];
+    const op = openTasksOf(em);
+    if (scope === 'late') return op.filter(t => t.due_on && t.due_on < today());
+    if (scope === 'urgent') return op.filter(t => t.due_on && (t.due_on < today() || daysTo(t.due_on) <= 1));
+    if (scope === 'todo_only') return op.filter(t => eff(t) === 'todo');
+    if (scope === 'doing_only') return op.filter(t => eff(t) === 'doing');
+    return op;
+  };
+
+  const drawModal = () => {
+    const empObj = allStaff.find(m => same(m.email, curEmail));
+    const empPh = memberPhone(curEmail);
+    const candTasks = getFilteredTasks(curEmail, curScope);
+    const withLate = staffStats.filter(x => x.late.length > 0 || x.open.length > 0);
+
+    const empQuickBar = withLate.length ? (
+      '<div class="wa-emp-strip">' +
+        withLate.map(x => {
+          const on = same(x.m.email, curEmail);
+          return '<button type="button" class="wa-emp-pill' + (on ? ' on' : '') + '" data-wa-emp="' + esc(x.m.email) + '">' +
+            '<b>👤 ' + esc(x.m.name) + '</b>' +
+            '<span class="wa-emp-badges">' +
+              (x.late.length ? '<i class="b-late">🚨 ' + x.late.length + ' متأخرة</i>' : '') +
+              '<i class="b-open">📂 ' + x.open.length + ' مفتوحة</i>' +
+            '</span>' +
+          '</button>';
+        }).join('') +
+      '</div>'
+    ) : '';
+
+    dlg.innerHTML = '<h2>📲 مركز رسائل التذكير الذكية عبر واتساب (حسب المرحلة والتأخير / دفعة واحدة)</h2>' +
+      '<p class="m" style="margin-bottom:10px">اختر الموظف لإرسال <b>جميع مهامه المتأخرة أو المفتوحة في رسالة واحدة مجمّعة (دفعة واحدة)</b>، مع تخصيص الصياغة تلقائياً حسب المرحلة (للتنفيذ / قيد العمل) ومدة التأخير:</p>' +
+      empQuickBar +
+      '<div class="row" style="margin-top:8px;gap:8px">' +
+        '<label style="flex:1.3 1 180px">👤 الموظف المحدد<select id="wr_emp">' +
+          allStaff.map(m => {
+            const lt = lateTasksOf(m.email).length, op = openTasksOf(m.email).length;
+            return '<option value="' + esc(m.email) + '"' + (same(m.email, curEmail) ? ' selected' : '') + '>👤 ' + esc(m.name) + ' (' + (lt ? '🚨 ' + lt + ' متأخرة · ' : '') + op + ' مفتوحة)</option>';
+          }).join('') +
+        '</select></label>' +
+        '<label style="flex:1 1 160px">📱 رقم واتساب الموظف<div class="row s" style="gap:4px"><input id="wr_ph" dir="ltr" inputmode="tel" value="' + esc(empPh) + '" placeholder="77xxxxxxx" style="flex:1"><button type="button" class="s" id="wr_sv_ph" title="حفظ رقم واتساب الموظف">💾 حفظ</button></div></label>' +
+      '</div>' +
+      '<div class="row" style="margin-top:8px;gap:8px">' +
+        '<label style="flex:1 1 180px">🎯 نطاق المهام (الدفعة الواحدة)<select id="wr_scope">' +
+          (singleTask && same(singleTask.assignee_email, curEmail) ? '<option value="single"' + (curScope === 'single' ? ' selected' : '') + '>📌 المهمة المحددة فقط: ' + esc(singleTask.title.slice(0, 32)) + '</option>' : '') +
+          '<option value="late"' + (curScope === 'late' ? ' selected' : '') + '>⚠️ المهام المتأخرة فقط (' + lateTasksOf(curEmail).length + ')</option>' +
+          '<option value="urgent"' + (curScope === 'urgent' ? ' selected' : '') + '>🔥 المتأخرة + المستحقة اليوم/غداً</option>' +
+          '<option value="todo_only"' + (curScope === 'todo_only' ? ' selected' : '') + '>📌 مرحلة «للتنفيذ» فقط (لم تبدأ)</option>' +
+          '<option value="doing_only"' + (curScope === 'doing_only' ? ' selected' : '') + '>⏳ مرحلة «قيد العمل» فقط (جاري التنفيذ)</option>' +
+          '<option value="all_open"' + (curScope === 'all_open' ? ' selected' : '') + '>📂 كل المهام المفتوحة للموظف دفعة واحدة (' + openTasksOf(curEmail).length + ')</option>' +
+        '</select></label>' +
+        '<label style="flex:1 1 180px">✍️ صيغة وأسلوب الرسالة<select id="wr_tone">' +
+          '<option value="auto"' + (curTone === 'auto' ? ' selected' : '') + '>🤖 ذكية تلقائية (حسب المرحلة ومدة التأخير)</option>' +
+          '<option value="urgent"' + (curTone === 'urgent' ? ' selected' : '') + '>🚨 حازمة وعاجلة (للمتأخرات الحرجة)</option>' +
+          '<option value="late"' + (curTone === 'late' ? ' selected' : '') + '>⏰ تذكير بمتابعة التأخير</option>' +
+          '<option value="friendly"' + (curTone === 'friendly' ? ' selected' : '') + '>🤝 تحفيزية وودّية</option>' +
+          '<option value="formal"' + (curTone === 'formal' ? ' selected' : '') + '>📋 رسمية ومفصّلة</option>' +
+        '</select></label>' +
+      '</div>' +
+      '<div class="wa-task-pick-box" style="margin-top:10px">' +
+        '<div class="bar" style="margin-bottom:6px"><b style="font-size:13px">☑️ المهام المضمّنة في الدفعة (' + candTasks.length + '):</b><span class="m" style="font-size:12px">يمكنك استثناء أو إضافة أي مهمة من القائمة</span></div>' +
+        (candTasks.length ? '<div class="wa-task-list">' + candTasks.map(t => {
+          const m = taskDelayMeta(t);
+          const badge = m.isLate ? '<span class="chip late">متأخرة ' + m.lateDays + ' يوم</span>' : m.remDays === 0 ? '<span class="chip soon">🔥 اليوم</span>' : '<span class="chip">' + esc(t.due_on || 'بدون موعد') + '</span>';
+          const stChip = m.st === 'doing' ? '<span class="chip all">⏳ قيد العمل' + (t.progress ? ' ' + t.progress + '%' : '') + '</span>' : '<span class="chip">📌 للتنفيذ</span>';
+          return '<label class="wa-tk-item"><input type="checkbox" class="wr_tk_cb" value="' + t.id + '" checked><div style="flex:1"><b>' + esc(t.title) + '</b><div class="row s" style="gap:4px;margin-top:2px">' + stChip + badge + '</div></div></label>';
+        }).join('') + '</div>' : '<div class="m" style="padding:8px;text-align:center">لا توجد مهام في هذا النطاق لهذا الموظف — غيّر النطاق إلى «كل المهام المفتوحة» لعرض مهامه.</div>') +
+      '</div>' +
+      '<label style="margin-top:10px">📝 معاينة وتعديل رسالة الواتساب قبل الإرسال:<textarea id="wr_msg" rows="9" style="font-family:inherit;line-height:1.65"></textarea></label>' +
+      '<div class="row dact" style="margin-top:12px;flex-wrap:wrap">' +
+        '<button type="button" class="s" id="wr_cp">📋 نسخ الرسالة</button>' +
+        '<button type="button" class="s" id="wr_push" title="إرسال تنبيه داخلي أيضاً لجوال الموظف عبر التطبيق">🔔 تنبيه داخلي بالتطبيق</button>' +
+        '<button type="button" class="p s" id="wr_send" style="background:#128c7e;border-color:#128c7e;color:#fff">📲 إرسال الدفعة عبر واتساب لـ «' + esc(empObj ? empObj.name : '') + '»</button>' +
+        '<button type="button" class="s" id="wr_x">إغلاق</button>' +
+      '</div>';
+
+    const rebuildText = () => {
+      const checkedIds = [...dlg.querySelectorAll('.wr_tk_cb:checked')].map(c => c.value);
+      const chosen = candTasks.filter(t => checkedIds.includes(t.id));
+      if (chosen.length === 1 && curScope === 'single') {
+        $('wr_msg').value = buildTaskWaSingleMsg(chosen[0], curTone);
+      } else if (chosen.length === 1) {
+        $('wr_msg').value = buildTaskWaSingleMsg(chosen[0], curTone);
+      } else {
+        $('wr_msg').value = buildEmployeeBatchWaMsg(curEmail, chosen, curTone);
+      }
+    };
+    rebuildText();
+
+    dlg.querySelectorAll('[data-wa-emp]').forEach(b => {
+      b.onclick = () => {
+        curEmail = b.dataset.waEmp;
+        if (curScope === 'single') curScope = lateTasksOf(curEmail).length ? 'late' : 'all_open';
+        else if (curScope === 'late' && !lateTasksOf(curEmail).length) curScope = 'all_open';
+        drawModal();
+      };
+    });
+    $('wr_emp').onchange = e => {
+      curEmail = e.target.value;
+      if (curScope === 'single') curScope = lateTasksOf(curEmail).length ? 'late' : 'all_open';
+      else if (curScope === 'late' && !lateTasksOf(curEmail).length) curScope = 'all_open';
+      drawModal();
+    };
+    $('wr_scope').onchange = e => { curScope = e.target.value; drawModal(); };
+    $('wr_tone').onchange = e => { curTone = e.target.value; rebuildText(); };
+    dlg.querySelectorAll('.wr_tk_cb').forEach(cb => { cb.onchange = rebuildText; });
+
+    $('wr_sv_ph').onclick = async () => {
+      const newPh = $('wr_ph').value.trim();
+      const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, curEmail));
+      if (!m) return;
+      const meta = parseMemberMeta(m);
+      const isMeSuper = S.me && same(curEmail, S.me.email) && m.role === 'admin';
+      const coVal = isMeSuper ? '' : (meta.company || 'متجرك');
+      const tgStr = encodeMemberMeta(coVal, meta.department, newPh);
+      $('wr_sv_ph').disabled = true; $('wr_sv_ph').textContent = '...';
+      let { error } = await sb.from('members').update({ phone: newPh || null, telegram_chat_id: tgStr }).eq('email', curEmail);
+      if (error) {
+        ({ error } = await sb.from('members').update({ telegram_chat_id: tgStr }).eq('email', curEmail));
+      }
+      $('wr_sv_ph').disabled = false;
+      if (error) return alert('تعذّر حفظ الرقم: ' + error.message);
+      m.phone = newPh; m.telegram_chat_id = tgStr;
+      toast('تم حفظ رقم واتساب الموظف بنجاح ✅');
+      $('wr_sv_ph').textContent = '✓ حُفظ';
+    };
+
+    $('wr_cp').onclick = async () => {
+      try { await navigator.clipboard.writeText($('wr_msg').value); $('wr_cp').textContent = 'تم النسخ ✓'; toast('تم نسخ رسالة التذكير للحافظة 📋'); }
+      catch (e) { alert('تعذّر النسخ'); }
+    };
+
+    $('wr_push').onclick = async () => {
+      const txt = $('wr_msg').value.trim();
+      if (!txt || !curEmail) return;
+      $('wr_push').disabled = true; $('wr_push').textContent = 'جارٍ الإرسال...';
+      try {
+        const rr = await apiPost('/api/notify', JSON.stringify({ title: '⏰ تذكير بمهامك المتأخرة والمفتوحة', body: txt.slice(0, 500), assignee_email: curEmail, for_all: false, is_custom: true }));
+        if (rr.ok) { toast('تم إرسال التنبيه الداخلي للموظف بنجاح 🔔'); $('wr_push').textContent = 'تم الإرسال 🔔'; }
+        else { alert('تعذّر الإرسال'); $('wr_push').textContent = '🔔 تنبيه داخلي بالتطبيق'; }
+      } catch (e) { $('wr_push').textContent = '🔔 تنبيه داخلي بالتطبيق'; }
+      $('wr_push').disabled = false;
+    };
+
+    $('wr_send').onclick = () => {
+      const rawPh = $('wr_ph').value.trim();
+      const intlPh = rawPh && typeof waPhone === 'function' ? waPhone(rawPh) : rawPh.replace(/\D/g, '');
+      const url = 'https://wa.me/' + (intlPh || '') + '?text=' + encodeURIComponent($('wr_msg').value);
+      window.open(url, '_blank');
+    };
+
+    $('wr_x').onclick = () => dlg.close();
+  };
+
+  drawModal();
+  dlg.showModal();
 }
 
 function card(t) {
@@ -46,9 +367,8 @@ function card(t) {
   const dn = doneBy(t);
   
   let waBtn = '';
-  if (!t.for_all && t.assignee_email && S.me && t.assignee_email) {
-    const msg = 'مرحباً ' + nm(t.assignee_email) + '،\nتذكير بمهمة: *' + t.title + '*\n' + (t.due_on ? 'تاريخ الاستحقاق: ' + t.due_on : '') + '\nنرجو المتابعة. 🚀';
-    waBtn = '<a href="https://wa.me/?text=' + encodeURIComponent(msg) + '" target="_blank" class="wa-btn" title="تذكير عبر الواتساب">💬</a>';
+  if (!t.for_all && t.assignee_email && S.me) {
+    waBtn = '<button type="button" class="wa-btn" data-wa-tk="' + t.id + '" title="تذكير ذكي عبر الواتساب (حسب المرحلة والتأخير أو دفعة واحدة)">💬</button>';
   }
 
   let actsHtml = acts.map(([k, l]) => '<button data-mv="' + t.id + '" data-to="' + k + '">' + l + '</button>').join('');
@@ -89,6 +409,7 @@ function boardView() {
   let mtOpts = '<option value="">كل المشاريع/الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
   let depOpts = '<option value="">كل الإدارات والأقسام</option>' + deps.map(d => '<option value="' + esc(d) + '" ' + (same(S.dept, d) ? 'selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
   let adminBtn = '<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>';
+  let waBatchBtn = '<button class="s" id="wa_batch_btn" type="button" style="background:rgba(18,140,126,.12);color:#128c7e;border-color:rgba(18,140,126,.35);font-weight:700" title="إرسال رسائل تذكير للموظفين بالمهام المتأخرة والمفتوحة دفعة واحدة">📲 تذكير واتساب للموظفين</button>';
   let cTabs = Object.keys(ST).map(k => '<button data-c="' + k + '" class="' + (S.col === k ? 'on' : '') + '">' + ST[k] + ' (' + all.filter(t => eff(t) === k).length + ')</button>').join('');
 
   return kpiHtml() +
@@ -97,7 +418,7 @@ function boardView() {
     '<select id="fm" style="border-radius:6px">' + mtOpts + '</select>' +
     (deps.length ? '<select id="fdep" style="border-radius:6px">' + depOpts + '</select>' : '') +
     '<span class="sp"></span>' +
-    adminBtn + '<button class="p s" id="nt">➕ إضافة مهمة</button>' +
+    waBatchBtn + adminBtn + '<button class="p s" id="nt">➕ إضافة مهمة</button>' +
   '</div>' +
   '<div class="ctabs">' + cTabs + '</div>' +
   '<div class="board">' + cols + '</div>';
@@ -112,13 +433,21 @@ function bindBoard() {
   $('fm').onchange = e => { S.meeting = e.target.value; render(); };
   if ($('fdep')) $('fdep').onchange = e => { S.dept = e.target.value; render(); };
   $('nt').onclick = () => taskDialog(null);
+  if ($('wa_batch_btn')) $('wa_batch_btn').onclick = () => waRemindDialog('', 'late');
   if ($('nmt')) $('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
   
   document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
   document.querySelectorAll('[data-hf]').forEach(b => { b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); }; });
+  document.querySelectorAll('[data-wa-tk]').forEach(b => {
+    b.onclick = e => {
+      e.stopPropagation();
+      const tk = S.tasks.find(x => x.id === b.dataset.waTk);
+      if (tk) waRemindDialog(tk.assignee_email || '', 'single', tk.id);
+    };
+  });
 
   document.querySelectorAll('.tk').forEach(el => {
-    el.onclick = e => { if (e.target.closest('.ckrows')) return; taskDialog(S.tasks.find(t => t.id === el.dataset.id)); };
+    el.onclick = e => { if (e.target.closest('.ckrows') || e.target.closest('[data-wa-tk]')) return; taskDialog(S.tasks.find(t => t.id === el.dataset.id)); };
     el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag'); };
     el.ondragend = () => el.classList.remove('drag');
   });
@@ -213,9 +542,11 @@ function taskDialog(t, pre = {}) {
   const depQuickBtns = deps.length ? '<div class="dep-picks"><span class="m" style="font-size:12px">🏛️ تحديد قسم كامل:</span>' +
     deps.map(d => '<button type="button" class="s dep-btn" data-dep-pick="' + esc(d) + '">🏛️ ' + esc(d) + '</button>').join('') + '</div>' : '';
 
+  const cleanTaskNotes = String(x.notes || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
+
   dlg.innerHTML = '<h2>' + (edit ? 'تعديل المهمة' : 'مهمة جديدة') + '</h2>' +
   '<label>العنوان<input id="f_ti" value="' + esc(x.title || '') + '" placeholder="ما هو المطلوب إنجازه؟"></label>' +
-  '<label>تفاصيل وروابط (اختياري)<textarea id="f_no" rows="3">' + esc(x.notes || '') + '</textarea></label>' +
+  '<label>تفاصيل وروابط (اختياري)<textarea id="f_no" rows="3">' + esc(cleanTaskNotes) + '</textarea></label>' +
   '<div class="row">' +
     '<label>المسؤول الأول عن التنفيذ<select id="f_as">' + asOpts + '</select></label>' +
     '<label>تاريخ الاستحقاق<input id="f_du" type="date" value="' + esc(x.due_on || '') + '"></label>' +
@@ -333,7 +664,12 @@ function taskDialog(t, pre = {}) {
     const chkEmails = !edit ? getCheckedEmails() : [];
     const isMulti = !edit && (all || v === '__multi' || chkEmails.length > 1);
     const assignee = isMulti ? null : (v === '__multi' ? (chkEmails[0] || '') : v);
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: isMulti ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: isMulti ? 'todo' : $('f_st').value };
+    const activeCo = edit ? (typeof taskCompany === 'function' ? taskCompany(t) : 'متجرك') : ((typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '') || (assignee ? memberCompany(assignee) : 'متجرك'));
+    const cleanNotes = $('f_no').value.trim().replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
+    const fallbackNotes = activeCo ? ((cleanNotes ? cleanNotes + '\n' : '') + '[شركة: ' + activeCo + ']') : cleanNotes;
+    const useExplicitCol = S.hasExplicitTaskCo !== false;
+    const row = { title, notes: (useExplicitCol ? cleanNotes : fallbackNotes) || null, for_all: all, assignee_email: isMulti ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: isMulti ? 'todo' : $('f_st').value };
+    if (useExplicitCol) row.company_id = activeCo || 'متجرك';
     if (!edit) { row.created_by = S.me.email; row.id = crypto.randomUUID(); } else row.progress = +$('f_pg').value;
     let flow = !isMulti && fw.length >= 2 ? fw.map(z => ({ email: z.email, note: (z.note || '').trim() })) : null;
     if (flow) { flow[cur].email = assignee || flow[cur].email; flow = flow.filter(z => z.email); if (flow.length < 2) flow = null; }
@@ -347,11 +683,21 @@ function taskDialog(t, pre = {}) {
       const gid = crypto.randomUUID(); delete row.done_note;
       const targetMembers = all ? S.members : S.members.filter(m => chkEmails.some(e => same(e, m.email)));
       const uniq = []; targetMembers.forEach(m => { if (!uniq.some(u => same(u.email, m.email))) uniq.push(m); });
-      const rows = uniq.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
+      let rows = uniq.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
       ({ error } = await sb.from('tasks').insert(rows));
+      if (error && /company_id/i.test(error.message)) {
+        S.hasExplicitTaskCo = false;
+        rows = rows.map(r => { const c = Object.assign({}, r, { notes: fallbackNotes || null }); delete c.company_id; return c; });
+        ({ error } = await sb.from('tasks').insert(rows));
+      } else if (!error && useExplicitCol) S.hasExplicitTaskCo = true;
       if (!error) { await Promise.all(rows.map(r => ck.flush(r.id))); gmap = {}; rows.forEach(r => { gmap[String(r.assignee_email).toLowerCase()] = r.id; }); }
     } else {
       ({ error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row));
+      if (error && /company_id/i.test(error.message)) {
+        S.hasExplicitTaskCo = false;
+        delete row.company_id; row.notes = fallbackNotes || null;
+        ({ error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row));
+      } else if (!error && useExplicitCol) S.hasExplicitTaskCo = true;
       if (!error && !edit && !isMulti) await ck.flush(row.id);
       if (!error && edit && t.group_id && $('f_ga') && $('f_ga').checked) await sb.from('tasks').update({ title: row.title, notes: row.notes, due_on: row.due_on, priority: row.priority, meeting_id: row.meeting_id }).eq('group_id', t.group_id);
     }
