@@ -99,6 +99,8 @@ const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
 
 const nm = e => (S.allMembers || S.members || []).find(m => same(m.email, e))?.name || S.members.find(m => same(m.email, e))?.name || 'غير مُسند';
 const isAdmin = () => S.me && S.me.role === 'admin';
+// قائمة من يمكن إسنادهم/إحالة المهام إليهم: الأدمن مخفي عن غير الأدمن (إلا إذا كانت المهمة مسندة له أصلاً)
+const assignables = keepEmail => (S.members || []).filter(m => isAdmin() || m.role !== 'admin' || (keepEmail && same(m.email, keepEmail)));
 const canDel = t => isAdmin() || (S.me && same(t.created_by, S.me.email));
 const mine = t => t.for_all || (S.me && same(t.assignee_email, S.me.email));
 const doneBy = t => S.done.filter(d => d.task_id === t.id);
