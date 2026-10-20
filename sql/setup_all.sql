@@ -893,4 +893,135 @@ create policy "erp_exp_all" on erp_expenses for all
   using (can_access_company(company_id))
   with check (can_access_company(company_id));
 
+-- 6) ترقية دالة طلبات المندوب لتشمل السجل الكامل وتفاصيل الفاتورة والإيصال الحراري
+drop function if exists rep_orders();
+create or replace function rep_orders() returns table (
+  id uuid, order_no bigint, order_date date, customer_name text, phone text, address text, notes text,
+  status text, cancel_reason text, created_by_name text, delivered_at timestamptz,
+  collect numeric, subtotal numeric, delivery_fee numeric, discount numeric, total numeric, paid numeric, balance numeric, company_id text, items jsonb)
+language sql stable security definer set search_path = public as $$
+  select o.id, o.order_no, o.order_date, o.customer_name, o.phone, o.address, o.notes, o.status, o.cancel_reason,
+         (select m.name from members m where lower(m.email) = lower(o.created_by)), o.delivered_at,
+         o.balance as collect, o.subtotal, o.delivery_fee, o.discount, o.total, o.paid, o.balance,
+         coalesce(o.company_id, 'متجرك'),
+         coalesce((select jsonb_agg(jsonb_build_object(
+           'name', i.name,
+           'qty', i.qty,
+           'price', i.price,
+           'line_total', i.line_total,
+           'supplier', i.supplier,
+           'image', i.image_path
+         ) order by i.pos) from ord_items i where i.order_id = o.id), '[]'::jsonb)
+  from ord_orders o
+  where lower(o.rep_email) = lower(auth.jwt() ->> 'email')
+  order by (o.status = 'preparing') desc, o.order_no desc;
+$$;
+grant execute on function rep_orders() to authenticated;
+
+-- 7) دوال مساعدة للمدير لإنشاء حسابات الموظفين والمناديب وتعيين كلمات المرور بدون مشاكل التفعيل
+create extension if not exists pgcrypto;
+
+create or replace function public.admin_create_auth_user(
+  p_email text,
+  p_password text,
+  p_name text default null,
+  p_phone text default null,
+  p_role text default 'member'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+declare
+  v_uid uuid;
+  v_encrypted text;
+begin
+  if not is_admin() then
+    raise exception 'للمدير فقط';
+  end if;
+
+  select id into v_uid from auth.users where lower(email) = lower(p_email);
+  v_encrypted := crypt(p_password, gen_salt('bf'));
+
+  if v_uid is not null then
+    update auth.users
+    set encrypted_password = v_encrypted,
+        email_confirmed_at = coalesce(email_confirmed_at, now()),
+        raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('name', p_name, 'phone', p_phone, 'role', p_role),
+        updated_at = now()
+    where id = v_uid;
+    return v_uid;
+  end if;
+
+  v_uid := gen_random_uuid();
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, recovery_sent_at, last_sign_in_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token
+  ) values (
+    '00000000-0000-0000-0000-000000000000',
+    v_uid,
+    'authenticated',
+    'authenticated',
+    lower(p_email),
+    v_encrypted,
+    now(),
+    null,
+    null,
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    jsonb_build_object('name', p_name, 'phone', p_phone, 'role', p_role),
+    now(),
+    now(),
+    '', '', '', ''
+  );
+
+  insert into auth.identities (
+    id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+  ) values (
+    v_uid,
+    v_uid,
+    jsonb_build_object('sub', v_uid::text, 'email', lower(p_email)),
+    'email',
+    null,
+    now(),
+    now()
+  ) on conflict (provider, id) do nothing;
+
+  return v_uid;
+end;
+$$;
+
+create or replace function public.admin_set_user_password(p_email text, p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+declare
+  v_uid uuid;
+begin
+  if not is_admin() then
+    raise exception 'للمدير فقط';
+  end if;
+  
+  select id into v_uid from auth.users where lower(email) = lower(p_email);
+  if v_uid is null then
+    return false;
+  end if;
+  
+  update auth.users
+  set encrypted_password = crypt(p_password, gen_salt('bf')),
+      email_confirmed_at = coalesce(email_confirmed_at, now()),
+      updated_at = now()
+  where id = v_uid;
+  
+  return true;
+end;
+$$;
+
+grant execute on function public.admin_create_auth_user(text, text, text, text, text) to authenticated;
+grant execute on function public.admin_set_user_password(text, text) to authenticated;
+
 
