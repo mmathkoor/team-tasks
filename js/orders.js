@@ -340,9 +340,9 @@ function invoiceInner(o) {
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap">' +
       '<div style="flex:1 1 250px">' +
         (pays.length ? '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;font-size:12.5px"><b style="display:block;margin-bottom:4px;color:#0f172a">💳 سجل الدفعات المسجّلة:</b>' + pays.map(py => '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #e2e8f0"><span>✓ ' + esc(py.method || 'نقداً') + ' (' + esc(py.paid_on) + ')</span><b style="color:#15803d">' + money(py.amount) + ' ' + esc(cur) + '</b></div>').join('') + '</div>' : '') +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;padding-top:8px">' +
-          '<div style="border:1px dashed #cbd5e1;border-radius:10px;padding:10px;text-align:center;color:#64748b;font-size:12px">توقيع المستلم / العميل<div style="height:28px"></div>___________________</div>' +
-          '<div style="border:1px dashed #cbd5e1;border-radius:10px;padding:10px;text-align:center;color:#64748b;font-size:12px">ختم البائع / المندوب<div style="height:28px"></div>___________________</div>' +
+        '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;color:#475467;font-size:12px;line-height:1.7">' +
+          '<div style="font-weight:700;color:#0f172a;margin-bottom:2px">🛡️ فاتورة إلكترونية معتمدة آلياً</div>' +
+          '<div>صادرة إلكترونياً من نظام <b>' + esc(bn(o)) + '</b> بتاريخ ' + esc(o.order_date) + ' للطلب رقم <b>#' + o.order_no + '</b> وهي معتمدة تلقائياً دون الحاجة إلى توقيع أو ختم يدوي.</div>' +
         '</div>' +
       '</div>' +
 
@@ -500,13 +500,20 @@ function orderDialog(o) {
     if (st === 'cancelled' && rs.length < 3) { $('o_rsw').style.display = ''; return $('o_rs').focus(); }
     if (st === 'preparing' && !rep) return alert('اختر المندوب قبل تحويل الطلب إلى «قيد التجهيز»');
     const chosenCo = ($('o_co') && $('o_co').value) || initCo || 'متجرك';
-    let rawNotes = $('o_nt').value.trim().replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
-    rawNotes = (rawNotes ? rawNotes + '\n' : '') + '[شركة: ' + chosenCo + ']';
-    const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: rawNotes || null, cancel_reason: st === 'cancelled' ? rs : null };
+    const cleanNotes = $('o_nt').value.trim().replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
+    const fallbackNotes = (cleanNotes ? cleanNotes + '\n' : '') + '[شركة: ' + chosenCo + ']';
+    const useExplicitCol = S.hasExplicitOrderCo !== false;
+    const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: (useExplicitCol ? cleanNotes : fallbackNotes) || null, cancel_reason: st === 'cancelled' ? rs : null };
+    if (useExplicitCol) row.company_id = chosenCo;
     $('o_sv').disabled = true; $('o_sv').textContent = 'جارٍ الحفظ…';
     const id = edit ? o.id : crypto.randomUUID();
     if (!edit) { row.id = id; row.created_by = S.me.email; }
     let { error } = edit ? await sb.from('ord_orders').update(row).eq('id', id) : await sb.from('ord_orders').insert(row);
+    if (error && /company_id/i.test(error.message)) {
+      S.hasExplicitOrderCo = false;
+      delete row.company_id; row.notes = fallbackNotes || null;
+      ({ error } = edit ? await sb.from('ord_orders').update(row).eq('id', id) : await sb.from('ord_orders').insert(row));
+    } else if (!error && useExplicitCol) S.hasExplicitOrderCo = true;
     if (!error) {
       const keep = its.map(i => i.id), gone = origIds.filter(i => !keep.includes(i));
       const toRemove = [];

@@ -665,11 +665,11 @@ function taskDialog(t, pre = {}) {
     const isMulti = !edit && (all || v === '__multi' || chkEmails.length > 1);
     const assignee = isMulti ? null : (v === '__multi' ? (chkEmails[0] || '') : v);
     const activeCo = edit ? (typeof taskCompany === 'function' ? taskCompany(t) : 'متجرك') : ((typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '') || (assignee ? memberCompany(assignee) : 'متجرك'));
-    let rawNotes = $('f_no').value.trim().replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
-    if (activeCo) {
-      rawNotes = (rawNotes ? rawNotes + '\n' : '') + '[شركة: ' + activeCo + ']';
-    }
-    const row = { title, notes: rawNotes || null, for_all: all, assignee_email: isMulti ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: isMulti ? 'todo' : $('f_st').value };
+    const cleanNotes = $('f_no').value.trim().replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
+    const fallbackNotes = activeCo ? ((cleanNotes ? cleanNotes + '\n' : '') + '[شركة: ' + activeCo + ']') : cleanNotes;
+    const useExplicitCol = S.hasExplicitTaskCo !== false;
+    const row = { title, notes: (useExplicitCol ? cleanNotes : fallbackNotes) || null, for_all: all, assignee_email: isMulti ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: isMulti ? 'todo' : $('f_st').value };
+    if (useExplicitCol) row.company_id = activeCo || 'متجرك';
     if (!edit) { row.created_by = S.me.email; row.id = crypto.randomUUID(); } else row.progress = +$('f_pg').value;
     let flow = !isMulti && fw.length >= 2 ? fw.map(z => ({ email: z.email, note: (z.note || '').trim() })) : null;
     if (flow) { flow[cur].email = assignee || flow[cur].email; flow = flow.filter(z => z.email); if (flow.length < 2) flow = null; }
@@ -683,11 +683,21 @@ function taskDialog(t, pre = {}) {
       const gid = crypto.randomUUID(); delete row.done_note;
       const targetMembers = all ? S.members : S.members.filter(m => chkEmails.some(e => same(e, m.email)));
       const uniq = []; targetMembers.forEach(m => { if (!uniq.some(u => same(u.email, m.email))) uniq.push(m); });
-      const rows = uniq.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
+      let rows = uniq.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
       ({ error } = await sb.from('tasks').insert(rows));
+      if (error && /company_id/i.test(error.message)) {
+        S.hasExplicitTaskCo = false;
+        rows = rows.map(r => { const c = Object.assign({}, r, { notes: fallbackNotes || null }); delete c.company_id; return c; });
+        ({ error } = await sb.from('tasks').insert(rows));
+      } else if (!error && useExplicitCol) S.hasExplicitTaskCo = true;
       if (!error) { await Promise.all(rows.map(r => ck.flush(r.id))); gmap = {}; rows.forEach(r => { gmap[String(r.assignee_email).toLowerCase()] = r.id; }); }
     } else {
       ({ error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row));
+      if (error && /company_id/i.test(error.message)) {
+        S.hasExplicitTaskCo = false;
+        delete row.company_id; row.notes = fallbackNotes || null;
+        ({ error } = edit ? await sb.from('tasks').update(row).eq('id', t.id) : await sb.from('tasks').insert(row));
+      } else if (!error && useExplicitCol) S.hasExplicitTaskCo = true;
       if (!error && !edit && !isMulti) await ck.flush(row.id);
       if (!error && edit && t.group_id && $('f_ga') && $('f_ga').checked) await sb.from('tasks').update({ title: row.title, notes: row.notes, due_on: row.due_on, priority: row.priority, meeting_id: row.meeting_id }).eq('group_id', t.group_id);
     }

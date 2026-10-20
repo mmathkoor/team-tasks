@@ -774,3 +774,122 @@ language sql stable security definer set search_path = public as $$
     ), ''));
 $$;
 
+
+-- >>>>>>>>>> sql/014_clean_architecture_and_erp.sql <<<<<<<<<<
+create table if not exists companies (
+  id text primary key,
+  display_name text not null,
+  slogan text default '',
+  logo text default '',
+  phone text default '',
+  address text default '',
+  currency text not null default 'ر.ي',
+  tax_no text default '',
+  accent text not null default '#c9a24e',
+  footer text default 'شكراً لتعاملكم معنا وثقتكم بنا 🌹',
+  staff_can_cost boolean not null default false,
+  image_keep_days int not null default 1,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+insert into companies (id, display_name)
+values ('متجرك', 'متجرك')
+on conflict (id) do nothing;
+
+alter table members add column if not exists company text default 'متجرك';
+alter table members add column if not exists department text default '';
+alter table members add column if not exists phone text;
+
+alter table tasks add column if not exists company_id text not null default 'متجرك';
+alter table ord_orders add column if not exists company_id text not null default 'متجرك';
+alter table meetings add column if not exists company_id text not null default 'متجرك';
+alter table proposals add column if not exists company_id text not null default 'متجرك';
+
+create index if not exists tasks_company_id_idx on tasks(company_id);
+create index if not exists ord_orders_company_id_idx on ord_orders(company_id);
+
+create or replace function current_user_company() returns text
+language sql stable security definer set search_path = public as $$
+  select case
+    when m.role = 'admin' and (m.company is null or trim(m.company) = '' or trim(m.company) = '__all') then null
+    else coalesce(nullif(trim(m.company), ''), 'متجرك')
+  end
+  from members m
+  where lower(m.email) = lower(auth.jwt() ->> 'email')
+  limit 1;
+$$;
+
+create or replace function can_access_company(row_company text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select
+    is_member() and (
+      current_user_company() is null
+      or lower(coalesce(nullif(trim(row_company), ''), 'متجرك')) = lower(current_user_company())
+    );
+$$;
+
+alter table companies enable row level security;
+drop policy if exists "companies_read" on companies;
+drop policy if exists "companies_write" on companies;
+create policy "companies_read" on companies for select using (is_member() or is_rep());
+create policy "companies_write" on companies for all using (is_admin()) with check (is_admin());
+
+create table if not exists erp_supplier_payments (
+  id uuid primary key default gen_random_uuid(),
+  company_id text not null default 'متجرك',
+  supplier_name text not null,
+  entry_type text not null default 'payment' check (entry_type in ('payment', 'purchase')),
+  amount numeric(12,2) not null check (amount > 0),
+  method text not null default 'نقداً',
+  paid_on date not null default ((now() at time zone 'Asia/Aden')::date),
+  note text,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists erp_sup_co_idx on erp_supplier_payments(company_id, supplier_name);
+alter table erp_supplier_payments enable row level security;
+drop policy if exists "erp_sup_all" on erp_supplier_payments;
+create policy "erp_sup_all" on erp_supplier_payments for all
+  using (can_access_company(company_id))
+  with check (can_access_company(company_id));
+
+create table if not exists erp_rep_handovers (
+  id uuid primary key default gen_random_uuid(),
+  company_id text not null default 'متجرك',
+  rep_email text not null,
+  entry_type text not null default 'handover' check (entry_type in ('handover', 'collect_adj')),
+  amount numeric(12,2) not null check (amount > 0),
+  method text not null default 'نقداً',
+  handed_on date not null default ((now() at time zone 'Asia/Aden')::date),
+  note text,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists erp_rep_co_idx on erp_rep_handovers(company_id, rep_email);
+alter table erp_rep_handovers enable row level security;
+drop policy if exists "erp_rep_all" on erp_rep_handovers;
+create policy "erp_rep_all" on erp_rep_handovers for all
+  using (can_access_company(company_id))
+  with check (can_access_company(company_id));
+
+create table if not exists erp_expenses (
+  id uuid primary key default gen_random_uuid(),
+  company_id text not null default 'متجرك',
+  category text not null default 'إعلانات وترويج',
+  title text not null,
+  amount numeric(12,2) not null check (amount > 0),
+  method text not null default 'نقداً',
+  spent_on date not null default ((now() at time zone 'Asia/Aden')::date),
+  note text,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists erp_exp_co_idx on erp_expenses(company_id, spent_on desc);
+alter table erp_expenses enable row level security;
+drop policy if exists "erp_exp_all" on erp_expenses;
+create policy "erp_exp_all" on erp_expenses for all
+  using (can_access_company(company_id))
+  with check (can_access_company(company_id));
+
+

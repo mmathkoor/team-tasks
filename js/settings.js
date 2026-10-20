@@ -410,7 +410,7 @@ function bindSettings() {
   document.querySelectorAll('[data-mwa]').forEach(b => b.onclick = () => {
     if (typeof waRemindDialog === 'function') waRemindDialog(b.dataset.mwa, 'late');
   });
-  document.querySelectorAll('[data-mts]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-mts]').forEach(b => b.onclick = async () => {
     const em = b.dataset.mts;
     const i = document.querySelector('[data-mt="' + em + '"]');
     const phEl = document.querySelector('[data-mph="' + em + '"]');
@@ -424,22 +424,41 @@ function bindSettings() {
     const newDep = depEl ? depEl.value : oldMeta.department;
     const newPh = phEl ? phEl.value.trim() : (oldMeta.phone || '');
     const newRole = roleEl ? roleEl.value : m.role;
-    const patch = { title: i ? (i.value.trim() || null) : null, telegram_chat_id: encodeMemberMeta(newCo, newDep, newPh) };
+    const patch = {
+      title: i ? (i.value.trim() || null) : null,
+      company: newCo || null,
+      department: newDep || null,
+      phone: newPh || null,
+      telegram_chat_id: encodeMemberMeta(newCo, newDep, newPh)
+    };
     if (newRole && newRole !== m.role) patch.role = newRole;
-    run(sb.from('members').update(patch).eq('email', em));
+    let { error } = await sb.from('members').update(patch).eq('email', em);
+    if (error && /(company|department|phone)/i.test(error.message)) {
+      delete patch.company; delete patch.department; delete patch.phone;
+      ({ error } = await sb.from('members').update(patch).eq('email', em));
+    }
+    if (error) alert('خطأ: ' + error.message);
+    else if (typeof toast === 'function') toast('تم حفظ بيانات العضو ✓');
+    load();
   });
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
-  if ($('addm')) $('addm').onclick = () => {
+  if ($('addm')) $('addm').onclick = async () => {
     const e = $('ne').value.trim(), n = $('nn').value.trim();
     if (!e || !n) return alert('الرجاء كتابة الاسم والبريد الإلكتروني.');
     const co = $('nco') ? $('nco').value : activeCompanyFilter();
     const dep = $('ndep') ? $('ndep').value : '';
     const ph = $('nph') ? $('nph').value.trim() : '';
     const title = $('ntitle') && $('ntitle').value.trim() ? $('ntitle').value.trim() : null;
-    const row = { email: e, name: n, role: $('nr') ? $('nr').value : 'member' };
+    const row = { email: e, name: n, role: $('nr') ? $('nr').value : 'member', company: co || 'متجرك', department: dep || null, phone: ph || null };
     if (title) row.title = title;
     const metaStr = encodeMemberMeta(co, dep, ph);
     if (metaStr) row.telegram_chat_id = metaStr;
-    run(sb.from('members').insert(row));
+    let { error } = await sb.from('members').insert(row);
+    if (error && /(company|department|phone)/i.test(error.message)) {
+      delete row.company; delete row.department; delete row.phone;
+      ({ error } = await sb.from('members').insert(row));
+    }
+    if (error) alert('خطأ: ' + error.message);
+    load();
   };
 }

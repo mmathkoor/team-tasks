@@ -210,6 +210,24 @@ function companyProfilesMap() {
       } catch (e) {}
     }
   });
+  // الجدول الصريح للشركات (companies) له الأولوية القصوى عند توفره
+  (S.companiesRows || []).forEach(r => {
+    if (!r || !r.id) return;
+    map[r.id] = Object.assign({}, map[r.id] || {}, {
+      id: r.id,
+      displayName: r.display_name || r.id,
+      slogan: r.slogan || '',
+      logo: r.logo || '',
+      phone: r.phone || '',
+      address: r.address || '',
+      currency: r.currency || 'ر.ي',
+      taxNo: r.tax_no || '',
+      accent: r.accent || '#c9a24e',
+      footer: r.footer || 'شكراً لتعاملكم معنا 🌹',
+      staffCanCost: !!r.staff_can_cost,
+      imageKeepDays: r.image_keep_days != null ? +r.image_keep_days : 1
+    });
+  });
   return map;
 }
 function getCompanyProfile(coName) {
@@ -247,6 +265,8 @@ function extractRecordCompany(text) {
 function orderCompany(o) {
   if (!o) return DEFAULT_COMPANY;
   const tag = extractRecordCompany(o.notes);
+  if (o.company_id && String(o.company_id).trim() && (!same(o.company_id, DEFAULT_COMPANY) || !tag)) return String(o.company_id).trim();
+  if (o.company && String(o.company).trim() && (!same(o.company, DEFAULT_COMPANY) || !tag)) return String(o.company).trim();
   if (tag) return tag;
   if (o.rep_email) {
     const mRep = (S.rawMembers || S.allMembers || []).find(x => same(x.email, o.rep_email));
@@ -266,6 +286,8 @@ function orderCompany(o) {
 function taskCompany(t) {
   if (!t) return DEFAULT_COMPANY;
   const tag = extractRecordCompany(t.notes);
+  if (t.company_id && String(t.company_id).trim() && (!same(t.company_id, DEFAULT_COMPANY) || !tag)) return String(t.company_id).trim();
+  if (t.company && String(t.company).trim() && (!same(t.company, DEFAULT_COMPANY) || !tag)) return String(t.company).trim();
   if (tag) return tag;
   if (t.assignee_email) {
     const m = (S.rawMembers || S.allMembers || []).find(x => same(x.email, t.assignee_email));
@@ -284,6 +306,7 @@ function taskCompany(t) {
 function companiesList() {
   const set = new Set([DEFAULT_COMPANY]);
   const addCo = v => { const s = String(v || '').trim(); if (s && s !== '__all') set.add(s); };
+  (S.companiesRows || []).forEach(r => addCo(r.id));
   const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
   hv.forEach(x => { if (String(x).startsWith('__co:')) addCo(String(x).slice(5)); });
   Object.keys(companyProfilesMap()).forEach(addCo);
@@ -304,6 +327,29 @@ async function persistOrgLists(companies, departments, profilesOpt) {
   const cleanDep = [...new Set((departments || []).map(x => String(x || '').trim()).filter(Boolean))];
   const profs = profilesOpt || companyProfilesMap();
   try { localStorage.setItem('org_meta_v1', JSON.stringify({ companies: cleanCo, departments: cleanDep, profiles: profs })); } catch (e) {}
+  // حفظ في جدول الشركات الصريح إن كان مفعّلاً
+  if (!S.companiesErr) {
+    const rows = cleanCo.map(c => {
+      const k = Object.keys(profs).find(x => same(x, c));
+      const p = (k && profs[k]) || getCompanyProfile(c);
+      return {
+        id: c,
+        display_name: p.displayName || c,
+        slogan: p.slogan || '',
+        logo: p.logo || '',
+        phone: p.phone || '',
+        address: p.address || '',
+        currency: p.currency || 'ر.ي',
+        tax_no: p.taxNo || '',
+        accent: p.accent || '#c9a24e',
+        footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
+        staff_can_cost: !!p.staffCanCost,
+        image_keep_days: p.imageKeepDays != null ? +p.imageKeepDays : 1,
+        updated_at: new Date().toISOString()
+      };
+    });
+    await sb.from('companies').upsert(rows).catch(() => {});
+  }
   if (S.ordSet) {
     const baseViews = (S.ordSet.hidden_views || []).filter(x => !String(x).startsWith('__co:') && !String(x).startsWith('__dep:') && !String(x).startsWith('__cop:'));
     const profEntries = cleanCo.map(c => {
@@ -357,6 +403,9 @@ function applyCompanyScope() {
     S.opay = (S.rawOpay || []).slice();
     S.meetings = (S.rawMeetings || []).slice();
     S.props = (S.rawProps || []).slice();
+    S.supPay = (S.rawSupPay || []).slice();
+    S.repHand = (S.rawRepHand || []).slice();
+    S.expenses = (S.rawExpenses || []).slice();
     return;
   }
   S.allMembers = S.rawMembers.filter(m => {
@@ -371,14 +420,19 @@ function applyCompanyScope() {
   S.oitems = (S.rawOitems || []).filter(i => ordIds.has(i.order_id));
   S.opay = (S.rawOpay || []).filter(p => ordIds.has(p.order_id));
   S.meetings = (S.rawMeetings || []).filter(m => {
+    if (m.company_id && String(m.company_id).trim()) return same(m.company_id, co);
     const tag = String(m.title || '').match(/\[([^\]]+)\]/);
     if (tag) return same(tag[1].trim(), co);
     return same(co, DEFAULT_COMPANY);
   });
   S.props = (S.rawProps || []).filter(p => {
+    if (p.company_id && String(p.company_id).trim()) return same(p.company_id, co);
     const mc = memberCompany(p.author_email);
     return same(mc || DEFAULT_COMPANY, co);
   });
+  S.supPay = (S.rawSupPay || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
+  S.repHand = (S.rawRepHand || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
+  S.expenses = (S.rawExpenses || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
 }
 
 /* ===== صور الأصناف والشعارات (مخزن خاص + ضغط الصور) ===== */

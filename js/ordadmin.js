@@ -51,7 +51,7 @@ function repsCardHtml() {
       '<input id="rp_n" placeholder="اسم المندوب" style="flex:1 1 130px">' +
       '<input id="rp_p" dir="ltr" inputmode="tel" placeholder="رقم الجوال" style="flex:1 1 120px">' +
       '<select id="rp_co" title="المتجر التابع له المندوب" style="flex:1 1 140px">' + repCoOpts(defNewRepCo) + '</select>' +
-      '<input id="rp_w" dir="ltr" placeholder="كلمة المرور (8 أحرف+)" style="flex:1 1 140px">' +
+      '<input id="rp_w" dir="ltr" placeholder="كلمة المرور (6 أحرف+)" style="flex:1 1 140px">' +
       '<button class="s" id="rp_g" type="button">توليد</button>' +
       '<button class="p s" id="rp_add">إضافة مندوب</button>' +
     '</div></div>';
@@ -88,7 +88,7 @@ function ordSettingsHtml() {
     '<label style="margin-top:10px">حذف صور الأصناف بعد انتهاء الطلب<select id="os_k">' + [[0, 'فوراً عند التسليم/الإلغاء'], [1, 'بعد يوم'], [2, 'بعد يومين'], [3, 'بعد 3 أيام'], [7, 'بعد أسبوع']].map(([v, l]) => '<option value="' + v + '"' + ((p.imageKeepDays == null ? 1 : +p.imageKeepDays) === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<div class="row" style="margin-top:12px"><button class="p s" id="os_sv">💾 حفظ إعدادات متجر «' + esc(p.displayName || targetCo) + '»</button></div></div>' + viewsCardHtml() + dupCardHtml();
 }
-const VIEW_LIST = [['board', 'المهام والمشاريع'], ['orders', 'إدارة الطلبات'], ['dash', 'لوحة الأرقام'], ['props', 'القرارات والتصويت'], ['log', 'سجل النشاط']];
+const VIEW_LIST = [['board', 'المهام والمشاريع'], ['orders', 'إدارة الطلبات'], ['erp', 'الحسابات والعهد والمصروفات'], ['dash', 'لوحة الأرقام'], ['props', 'القرارات والتصويت'], ['log', 'سجل النشاط']];
 function viewsCardHtml() {
   const s = S.ordSet || {}, hid = (s.hidden_views || []).filter(x => !String(x).startsWith('__'));
   return '<div class="card"><h2>🧩 الشاشات واسم التطبيق العام</h2><p class="m" style="margin-bottom:8px">أخفِ ما لا تحتاجه في هذا النشاط (يختفي من كل الأعضاء). الإعدادات تبقى دائماً.</p>' +
@@ -98,9 +98,11 @@ function viewsCardHtml() {
 }
 function credsDialog(name, phone, pw, coName) {
   const storeTitle = coName && coName !== '__all' ? getCompanyProfile(coName).displayName : (typeof bn === 'function' ? bn() : BRAND.name);
-  const msg = 'مرحباً ' + name + ' 👋\nحسابك كمندوب توصيل في ' + storeTitle + ':\nالرابط: ' + location.origin + '\nرقم الدخول: ' + phone + '\nكلمة المرور: ' + pw + '\nبعد الدخول فعّل الإشعارات من ⚙ الإعدادات.';
-  dlg.innerHTML = '<h2>✅ تم إنشاء حساب المندوب</h2><pre class="msgp">' + esc(msg) + '</pre><p class="m">احفظ كلمة المرور الآن، لن تظهر مرة أخرى.</p><div class="row dact"><button class="p s" id="cr_wa">إرسالها للمندوب واتساب</button><button class="s" id="cr_x">إغلاق</button></div>';
+  const localPh = String(phone || '').startsWith('967') ? String(phone).slice(3) : phone;
+  const msg = 'مرحباً كابتن ' + name + ' 👋\nحسابك كمندوب توصيل في *' + storeTitle + '*:\n🌐 الرابط: ' + location.origin + '\n📱 رقم الجوال للدخول: ' + localPh + '\n🔑 كلمة المرور: ' + pw + '\n\n(يمكنك الدخول بكتابة رقم جوالك ' + localPh + ' أو ' + phone + ' مع كلمة المرور، وبعد الدخول فعّل الإشعارات من ⚙ الإعدادات).';
+  dlg.innerHTML = '<h2>✅ بيانات دخول المندوب جاهزة</h2><pre class="msgp">' + esc(msg) + '</pre><p class="m">احفظ كلمة المرور أو أرسلها للمندوب الآن.</p><div class="row dact"><button class="s" id="cr_cp">📋 نسخ البيانات</button><button class="p s" id="cr_wa">📲 إرسال للمندوب واتساب</button><button class="s" id="cr_x">إغلاق</button></div>';
   $('cr_x').onclick = () => dlg.close();
+  $('cr_cp').onclick = async () => { try { await navigator.clipboard.writeText(msg); $('cr_cp').textContent = 'تم النسخ ✓'; } catch (e) {} };
   $('cr_wa').onclick = () => window.open('https://wa.me/' + (typeof waPhone === 'function' ? waPhone(phone) : phone) + '?text=' + encodeURIComponent(msg), '_blank');
   dlg.showModal();
 }
@@ -124,7 +126,7 @@ function bindViewsCard() {
   $('vw_sv').onclick = async () => {
     const hidden = [...document.querySelectorAll('[data-vw]')].filter(c => !c.checked).map(c => c.dataset.vw);
     if (hidden.length >= VIEW_LIST.length) return alert('أبقِ شاشة واحدة على الأقل ظاهرة');
-    const orgTags = ((S.ordSet && S.ordSet.hidden_views) || []).filter(x => String(x).startsWith('__co:') || String(x).startsWith('__dep:') || String(x).startsWith('__cop:'));
+    const orgTags = ((S.ordSet && S.ordSet.hidden_views) || []).filter(x => String(x).startsWith('__'));
     const finalHidden = orgTags.length ? hidden.concat(orgTags) : hidden;
     const { error } = await sb.from('ord_settings').update({ hidden_views: finalHidden, app_name: $('vw_n').value.trim() || null }).eq('id', true);
     if (error) return alert('تعذّر الحفظ: ' + error.message + '\n(شغّل sql/011_titles_views.sql أولاً)');
@@ -153,9 +155,9 @@ function bindOrdAdmin() {
   }
   $('rp_g').onclick = () => { $('rp_w').value = genPw(); };
   $('rp_add').onclick = async () => {
-    const n = $('rp_n').value.trim(), p = $('rp_p').value.trim(), w = $('rp_w').value;
+    const n = $('rp_n').value.trim(), p = $('rp_p').value.trim(), w = $('rp_w').value.trim();
     const co = ($('rp_co') && $('rp_co').value) || activeCompanyFilter() || 'متجرك';
-    if (!n || !p || w.length < 8) return alert('اكتب الاسم ورقم الجوال وكلمة مرور من 8 أحرف على الأقل');
+    if (!n || !p || w.length < 6) return alert('اكتب الاسم ورقم الجوال وكلمة مرور من 6 أحرف على الأقل');
     $('rp_add').disabled = true; const r = await repApi({ action: 'create', name: n, phone: p, password: w, company: co }); $('rp_add').disabled = false;
     if (!r.ok) return alert(r.error);
     await load(); credsDialog(n, r.j.phone, w, co);
@@ -166,15 +168,14 @@ function bindOrdAdmin() {
     const r = await repApi({ action: 'set_company', email: em, company: newCo });
     sel.disabled = false;
     if (!r.ok) {
-      // fallback via direct members update
       await sb.from('members').update({ telegram_chat_id: encodeMemberMeta(newCo, '') }).eq('email', em);
     }
     await load();
   });
   document.querySelectorAll('[data-rpw]').forEach(b => b.onclick = async () => {
     const allReps = (S.rawMembers || S.allMembers || S.reps || []).filter(m => m.role === 'rep');
-    const rep = allReps.find(x => x.email === b.dataset.rpw), w = prompt('كلمة المرور الجديدة للمندوب ' + (rep ? rep.name : '') + ' (8 أحرف أو أكثر، اتركها فارغة للتوليد):', '');
-    if (w === null) return; const pw = w.trim() || genPw(); if (pw.length < 8) return alert('8 أحرف على الأقل');
+    const rep = allReps.find(x => x.email === b.dataset.rpw), w = prompt('كلمة المرور الجديدة للمندوب ' + (rep ? rep.name : '') + ' (6 أحرف أو أكثر، اتركها فارغة للتوليد):', '');
+    if (w === null) return; const pw = w.trim() || genPw(); if (pw.length < 6) return alert('6 أحرف على الأقل');
     const r = await repApi({ action: 'password', email: b.dataset.rpw, password: pw }); if (!r.ok) return alert(r.error);
     if (rep) credsDialog(rep.name, rep.phone, pw, parseMemberMeta(rep).company);
   });
