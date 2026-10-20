@@ -1,4 +1,7 @@
 {
+  {
+  "outputDirectory": ".",
+  "crons": [
   "crons": [
     {
       "path": "/api/recur",
