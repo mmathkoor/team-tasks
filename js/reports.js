@@ -195,6 +195,9 @@ function waOrderReport(D, cc) {
   const del = all.filter(o => o.status === 'delivered'), can = all.filter(o => o.status === 'cancelled');
   const sales = sum(R, o => +o.total), paid = sum(R, o => +o.paid), bal = sum(R, o => Math.max(0, +o.balance));
   const gross = sum(R, oProfit);
+  const topReps = groupBy(all.filter(o => o.rep_email), o => repName(o.rep_email)).map(([k, a]) => ({
+    name: k, del: a.filter(o => o.status === 'delivered').length, tot: a.length
+  })).sort((a, b) => b.del - a.del).slice(0, 3);
   const txt = [
     '📊 *التقرير التنفيذي للمبيعات — ' + stName + '*',
     '📅 الفترة: ' + D.f + ' إلى ' + D.t,
@@ -202,12 +205,12 @@ function waOrderReport(D, cc) {
     '📦 إجمالي الطلبات: *' + all.length + '* (مسلّم: ' + del.length + ' | ملغي: ' + can.length + ')',
     '✅ نسبة النجاح: *' + rpct(del.length, del.length + can.length) + '%*',
     '💰 إجمالي المبيعات: *' + money(sales) + ' ' + cur + '*',
-    '💵 المحصّل: *' + money(paid) + ' ' + cur + '*',
+    '💵 المحصّل الفعلي: *' + money(paid) + ' ' + cur + '*',
     '⏳ المتبقي (ديون): *' + money(bal) + ' ' + cur + '*',
-    cc ? '📈 صافي ربح البضاعة: *' + money(gross) + ' ' + cur + '*' : ''
+    cc ? '📈 صافي ربح البضاعة: *' + money(gross) + ' ' + cur + '*' : '',
+    topReps.length ? '━━━━━━━━━━━━━━\n🛵 *أداء المناديب الأبرز:*\n' + topReps.map((r, i) => (i + 1) + '. ' + r.name + ': ' + r.del + '/' + r.tot + ' مسلّم').join('\n') : ''
   ].filter(Boolean).join('\n');
-  navigator.clipboard?.writeText(txt);
-  toast('تم نسخ ملخص التقرير التنفيذي للحافظة 📋');
+  if (typeof waSummaryDialog === 'function') waSummaryDialog('ملخص تقرير المبيعات — ' + stName, txt);
 }
 
 function reportsHtml() {

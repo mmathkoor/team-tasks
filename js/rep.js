@@ -2,27 +2,49 @@
 async function repLoad() {
   const [r, nt] = await Promise.all([sb.rpc('rep_orders'), sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)]);
   S.rerr = r.error ? r.error.message : '';
-  if (!r.error) { S.rorders = r.data || []; S.rimg = await imgSign(S.rorders.flatMap(o => (o.items || []).map(i => i.image))); }
+  if (!r.error) {
+    S.rorders = r.data || [];
+    const paths = S.rorders.flatMap(o => (o.items || []).map(i => i.image || i.image_path).filter(Boolean));
+    S.rimg = paths.length ? await imgSign(paths) : {};
+  }
   if (!nt.error) S.notes = nt.data || [];
   repRender();
   if (typeof rtStart === 'function') rtStart();
   inboxAfterLoad();
 }
-const repImgUrl = p => (S.rimg || {})[p] || '';
+const repImgUrl = p => (p && (S.rimg || {})[p]) || '';
 const rOpen = () => (S.rorders || []).filter(o => o.status === 'preparing');
+const repCleanNotes = o => String((o && o.notes) || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
 function repMsg(o) {
+  const cn = repCleanNotes(o);
   return ['مرحباً كابتن *' + S.me.name + '* 🛵', '📦 طلب #' + o.order_no, '', '🧑‍💼 مسجل الطلب: ' + (o.created_by_name || '—'), '🙍 العميل: ' + o.customer_name, '📞 الهاتف: ' + (o.phone || '—'), '📍 العنوان: ' + (o.address || '—'),
-    '💵 المطلوب تحصيله: ' + money(o.collect) + ' ' + BRAND.currency, '', '📋 *قائمة التجهيز:*'].concat((o.items || []).map(i => '▫️ ' + i.name + ' × ' + (+i.qty) + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '')))
-    .concat(o.notes ? ['', '⚠️ *ملاحظات هامة:* ' + o.notes] : []).concat(['', '🌹 قل تم وشد الهمة']).join('\n');
+    '💵 المطلوب تحصيله: ' + money(o.collect) + ' ' + BRAND.currency, '', '📋 *قائمة التجهيز:*'].concat((o.items || []).map(i => {
+      const u = repImgUrl(i.image || i.image_path);
+      return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') + (u ? '\n    📷 صورة المنتج: ' + u : '');
+    }))
+    .concat(cn ? ['', '⚠️ *ملاحظات هامة:* ' + cn] : []).concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
 function repCard(o) {
   const ph = o.phone ? digits(o.phone) : '';
+  const cn = repCleanNotes(o);
+  const its = o.items || [];
+  const imgItems = its.filter(i => repImgUrl(i.image || i.image_path));
   return '<div class="card rcard" data-roid="' + o.id + '"><div class="bar"><b class="rno">#' + o.order_no + '</b><span class="m">' + esc(o.order_date) + '</span></div>' +
     '<div class="rn">' + esc(o.customer_name) + '</div>' +
     (o.phone ? '<div class="rcall"><a class="btnl" href="tel:' + esc(ph) + '">📞 اتصال</a><a class="btnl" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب</a><span class="m" dir="ltr">' + esc(o.phone) + '</span></div>' : '') +
     (o.address ? '<div class="ra">📍 ' + esc(o.address) + ' <a class="btnl" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '">🗺 الخريطة</a></div>' : '') +
-    '<div class="rlist"><b>📋 قائمة التجهيز</b>' + (o.items || []).map(i => '<div class="ritem">' + (repImgUrl(i.image) ? '<img class="thumb" src="' + esc(repImgUrl(i.image)) + '" alt="" data-zoom="' + esc(repImgUrl(i.image)) + '">' : '') + '<span><b>' + esc(i.name) + '</b>' + (i.supplier ? '<span class="rsup">🏪 التاجر: ' + esc(i.supplier) + '</span>' : '') + '</span><b>× ' + (+i.qty) + '</b></div>').join('') + '</div>' +
-    (o.notes ? '<div class="dnote" style="background:var(--soonsoft);color:var(--soon)">⚠️ ' + esc(o.notes) + '</div>' : '') +
+    '<div class="rlist"><div class="bar" style="margin-bottom:6px"><b>📋 قائمة التجهيز (' + its.length + ')</b>' + (imgItems.length ? '<span class="chip ok">📷 ' + imgItems.length + ' صور مرفقة</span>' : '') + '</div>' +
+    its.map(i => {
+      const u = repImgUrl(i.image || i.image_path);
+      return '<div class="ritem">' +
+        (u ? '<img class="thumb" src="' + esc(u) + '" alt="' + esc(i.name) + '" data-zoom="' + esc(u) + '" title="اضغط لتكبير صورة المنتج" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:2px solid var(--acc);cursor:zoom-in">' : '') +
+        '<span style="flex:1"><b>' + esc(i.name) + '</b>' +
+        (i.supplier ? '<span class="rsup">🏪 التاجر: ' + esc(i.supplier) + '</span>' : '') +
+        (u ? '<span class="m" style="display:block;font-size:11.5px;color:var(--ok);margin-top:2px">🔍 اضغط على الصورة لتكبيرها ومطابقة الصنف</span>' : '') +
+        '</span><b>× ' + (+i.qty) + '</b></div>';
+    }).join('') + '</div>' +
+    (imgItems.length ? '<div style="margin:8px 0;padding:10px;border-radius:12px;background:var(--bg);border:1px solid var(--line)"><div style="font-size:12px;font-weight:700;margin-bottom:6px">🖼️ معرض صور المنتجات السريع (اضغط للتكبير):</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path); return '<div style="text-align:center;cursor:zoom-in" data-zoom="' + esc(u) + '"><img src="' + esc(u) + '" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1.5px solid var(--line);display:block"><span style="font-size:11px;display:block;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">' + esc(i.name) + '</span></div>'; }).join('') + '</div></div>' : '') +
+    (cn ? '<div class="dnote" style="background:var(--soonsoft);color:var(--soon)">⚠️ ' + esc(cn) + '</div>' : '') +
     (+o.collect > 0 ? '<div class="rcol">💵 المطلوب تحصيله: <b>' + money(o.collect) + ' ' + BRAND.currency + '</b></div>' : '') +
     '<div class="m" style="margin:6px 0">سجّله: ' + esc(o.created_by_name || '—') + ' (للاستفسار عن الطلب)</div>' +
     '<div class="acts ract"><button class="p" data-rd="' + o.id + '">✅ تم التوصيل</button><button class="dng" data-rc="' + o.id + '">❌ إلغاء</button><button data-re="' + o.id + '" aria-label="معاينة الرسالة">👁</button></div></div>';
@@ -54,7 +76,9 @@ function repFocus(id) {
 }
 function repPreview(o) {
   if (!o) return;
-  dlg.innerHTML = '<h2>👁 معاينة الطلب</h2><pre class="msgp">' + esc(repMsg(o)) + '</pre><div class="row dact"><button class="s" id="rv_cp">نسخ</button><button class="s" id="rv_x">إغلاق</button></div>';
+  const imgItems = (o.items || []).filter(i => repImgUrl(i.image || i.image_path));
+  const gal = imgItems.length ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path); return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></a>'; }).join('') + '</div>' : '';
+  dlg.innerHTML = '<h2>👁 معاينة الطلب #' + o.order_no + '</h2>' + gal + '<pre class="msgp">' + esc(repMsg(o)) + '</pre><div class="row dact"><button class="s" id="rv_cp">نسخ</button><button class="s" id="rv_x">إغلاق</button></div>';
   $('rv_x').onclick = () => dlg.close();
   $('rv_cp').onclick = async () => { try { await navigator.clipboard.writeText(repMsg(o)); $('rv_cp').textContent = 'تم النسخ ✓'; } catch (e) { alert('تعذّر النسخ'); } };
   dlg.showModal();

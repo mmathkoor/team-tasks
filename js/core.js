@@ -105,28 +105,75 @@ const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
 
+function toast(msg, ok = true) {
+  let el = document.getElementById('app_toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'app_toast';
+    document.body.appendChild(el);
+  }
+  el.className = 'app-toast ' + (ok === false ? 'err' : 'ok');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._tm);
+  el._tm = setTimeout(() => { el.style.display = 'none'; }, 3200);
+}
+
+function waSummaryDialog(title, txt, phoneOpt) {
+  try { navigator.clipboard?.writeText(txt); } catch (e) {}
+  toast('تم تجهيز ونسخ ملخص الواتساب 📋');
+  const ph = phoneOpt && typeof waPhone === 'function' ? waPhone(phoneOpt) : '';
+  dlg.innerHTML = '<h2>💬 ' + esc(title || 'ملخص التقرير عبر واتساب') + '</h2>' +
+    '<p class="m" style="margin-bottom:8px">تم نسخ الملخص تلقائياً للحافظة، ويمكنك تعديله أو إرساله مباشرة عبر واتساب:</p>' +
+    '<textarea id="wa_sum_txt" rows="10" style="font-family:inherit;line-height:1.7;margin-bottom:10px">' + esc(txt) + '</textarea>' +
+    '<div class="row" style="margin-bottom:10px"><label style="flex:1">📱 رقم واتساب المستلم (اختياري — اتركه فارغاً لاختيار جهة الاتصال من واتساب)<input id="wa_sum_ph" dir="ltr" inputmode="tel" value="' + esc(phoneOpt || '') + '" placeholder="مثال: 77xxxxxxx"></label></div>' +
+    '<div class="row dact">' +
+      '<button class="s" type="button" id="wa_sum_cp">📋 نسخ النص</button>' +
+      '<button class="p s" type="button" id="wa_sum_go" style="background:#128c7e;border-color:#128c7e;color:#fff">📲 فتح وإرسال عبر واتساب</button>' +
+      '<button class="s" type="button" id="wa_sum_x">إغلاق</button>' +
+    '</div>';
+  $('wa_sum_x').onclick = () => dlg.close();
+  $('wa_sum_cp').onclick = async () => {
+    try { await navigator.clipboard.writeText($('wa_sum_txt').value); $('wa_sum_cp').textContent = 'تم النسخ ✓'; toast('تم نسخ النص للحافظة ✓'); }
+    catch (e) { alert('تعذّر النسخ'); }
+  };
+  $('wa_sum_go').onclick = () => {
+    const rawP = ($('wa_sum_ph') && $('wa_sum_ph').value.trim()) || '';
+    const cleanP = rawP && typeof waPhone === 'function' ? waPhone(rawP) : rawP.replace(/\D/g, '');
+    const url = 'https://wa.me/' + (cleanP || ph || '') + '?text=' + encodeURIComponent($('wa_sum_txt').value);
+    window.open(url, '_blank');
+  };
+  dlg.showModal();
+}
+
 /* ===== الشركات والإدارات والهوية الاحترافية لكل شركة (الشعار + الاسم + الفاتورة + عزل البيانات) ===== */
 const DEFAULT_COMPANY = 'متجرك';
 
 function parseMemberMeta(m) {
-  if (!m) return { company: '', department: '' };
-  let co = m.company || '', dep = m.department || '';
-  if ((!co && !dep) && m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
+  if (!m) return { company: '', department: '', phone: '' };
+  let co = m.company || '', dep = m.department || '', ph = m.phone || '';
+  if (m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
     try {
       const j = JSON.parse(m.telegram_chat_id);
-      co = j.co || j.company || '';
-      dep = j.dep || j.department || '';
+      if (!co) co = j.co || j.company || '';
+      if (!dep) dep = j.dep || j.department || '';
+      if (!ph) ph = j.ph || j.phone || '';
     } catch (e) {}
   }
   co = String(co || '').trim();
   dep = String(dep || '').trim();
+  ph = String(ph || '').trim();
   // جميع الموظفين والمناديب (غير المدير العام) يتبعون تلقائياً شركة «متجرك» ما لم تُحدَّد لهم شركة أخرى أو __all للمندوب المشترك
   if (!co && m.role !== 'admin') co = DEFAULT_COMPANY;
-  return { company: co, department: dep };
+  return { company: co, department: dep, phone: ph };
 }
-function encodeMemberMeta(co, dep) {
-  const c = String(co || '').trim(), d = String(dep || '').trim();
-  return (c || d) ? JSON.stringify({ co: c, dep: d }) : null;
+function encodeMemberMeta(co, dep, ph) {
+  const c = String(co || '').trim(), d = String(dep || '').trim(), p = String(ph || '').trim();
+  const obj = {};
+  if (c) obj.co = c;
+  if (d) obj.dep = d;
+  if (p) obj.ph = p;
+  return Object.keys(obj).length ? JSON.stringify(obj) : null;
 }
 function memberCompany(email) {
   if (!email) return DEFAULT_COMPANY;
@@ -139,6 +186,12 @@ function memberDept(email) {
   if (!email) return '';
   const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
   return m ? parseMemberMeta(m).department : '';
+}
+function memberPhone(email) {
+  if (!email) return '';
+  const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
+  if (!m) return '';
+  return m.phone || parseMemberMeta(m).phone || '';
 }
 function getLocalOrgMeta() {
   try { return JSON.parse(localStorage.getItem('org_meta_v1') || '{"companies":[],"departments":[],"profiles":{}}'); }

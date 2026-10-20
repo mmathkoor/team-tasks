@@ -199,11 +199,14 @@ function settingsView() {
         return '<div class="bar mem-row" style="background:var(--col);padding:10px 12px;border-radius:10px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span> <span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '">' + ({ admin: 'مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span>' +
           (selectedCo ? '<span class="chip">🏢 ' + esc(selectedCo) + '</span>' : '<span class="chip all">🌐 كل الشركات</span>') +
           (meta.department ? '<span class="chip">🏛️ ' + esc(meta.department) + '</span>' : '') +
+          (meta.phone ? '<span class="chip ok" dir="ltr">📱 ' + esc(meta.phone) + '</span>' : '') +
+          '<button class="s" type="button" data-mwa="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px" title="إرسال تذكير واتساب بمهام الموظف">📲 تذكير واتساب</button>' +
           '</div><div class="row" style="flex:1 1 100%;margin-top:8px;gap:6px">' +
-          '<input data-mt="' + esc(m.email) + '" value="' + esc(m.title || '') + '" placeholder="المسمى الوظيفي (مثال: مسؤول التسويق)" style="flex:2 1 150px">' +
-          '<select data-mco="' + esc(m.email) + '" title="الشركة" style="flex:1 1 130px">' + coOpts + '</select>' +
-          '<select data-mdep="' + esc(m.email) + '" title="الإدارة / القسم" style="flex:1 1 130px">' + depOpts + '</select>' +
-          '<select data-mrole="' + esc(m.email) + '" title="الصلاحية" style="flex:0 1 105px"><option value="member"' + (m.role !== 'admin' ? ' selected' : '') + '>👤 عضو</option><option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>👑 مدير</option></select>' +
+          '<input data-mt="' + esc(m.email) + '" value="' + esc(m.title || '') + '" placeholder="المسمى الوظيفي (مثال: مسؤول التسويق)" style="flex:2 1 140px">' +
+          '<input data-mph="' + esc(m.email) + '" dir="ltr" inputmode="tel" value="' + esc(meta.phone || '') + '" placeholder="📱 واتساب الموظف (77...)" style="flex:1 1 130px">' +
+          '<select data-mco="' + esc(m.email) + '" title="الشركة" style="flex:1 1 125px">' + coOpts + '</select>' +
+          '<select data-mdep="' + esc(m.email) + '" title="الإدارة / القسم" style="flex:1 1 125px">' + depOpts + '</select>' +
+          '<select data-mrole="' + esc(m.email) + '" title="الصلاحية" style="flex:0 1 100px"><option value="member"' + (m.role !== 'admin' ? ' selected' : '') + '>👤 عضو</option><option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>👑 مدير</option></select>' +
           '<button class="s p" data-mts="' + esc(m.email) + '">حفظ</button>' + rmBtn + '</div></div>';
     }).join('');
     
@@ -237,7 +240,10 @@ function settingsView() {
     adminHtml = orgSettingsHtml() +
       '<div class="card" style="border-color:var(--accsoft)">' +
       '<div class="bar" style="margin-bottom:12px"><h2 style="margin:0">👑 إدارة الأعضاء والتنبيهات والصلاحيات</h2>' + scopeBar + '</div>' +
-      '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon);color:#fff">' + esc(remindLabel) + '</button>' +
+      '<div class="row" style="margin-bottom:14px;gap:8px">' +
+        '<button class="p" id="admin_remind" style="flex:1 1 220px;background:var(--soon);border-color:var(--soon);color:#fff">' + esc(remindLabel) + '</button>' +
+        '<button class="p" id="admin_wa_batch" type="button" style="flex:1 1 220px;background:#15803d;border-color:#15803d;color:#fff">📲 تذكير الموظفين بالمهام المتأخرة (واتساب)</button>' +
+      '</div>' +
       '<h3 style="font-size:14px;margin-top:16px;color:var(--acc)">إرسال إشعار مخصص لموظف أو متجر أو إدارة:</h3>' +
       '<div class="row" style="margin-bottom:8px"><select id="ping_to"><option value="__all">' + esc(allLabel) + '</option>' + optCos + optDeps + optMembers + '</select></div>' +
       '<div class="row" style="margin-bottom:8px"><input id="ping_msg" placeholder="اكتب رسالة التنبيه (اختياري)..."></div>' +
@@ -246,8 +252,8 @@ function settingsView() {
       '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
       '<div class="bar" style="margin-bottom:8px"><b>👥 قائمة الأعضاء والموظفين (' + listMembers.length + (admCo ? ' في ' + esc(admCo) : '') + ')</b></div>' +
       memList + 
-      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو / موظف جديد وتحديد متجره وإدارته:</h3>' +
-      '<div class="row" style="gap:6px"><input id="nn" placeholder="اسم الموظف" style="flex:1 1 140px"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني" style="flex:1 1 170px"><input id="ntitle" placeholder="المسمى الوظيفي (اختياري)" style="flex:1 1 140px"></div>' +
+      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو / موظف جديد وتحديد متجره وإدارته ورقم واتساب:</h3>' +
+      '<div class="row" style="gap:6px"><input id="nn" placeholder="اسم الموظف" style="flex:1 1 140px"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني" style="flex:1 1 170px"><input id="nph" dir="ltr" inputmode="tel" placeholder="📱 رقم واتساب (اختياري)" style="flex:1 1 130px"><input id="ntitle" placeholder="المسمى الوظيفي (اختياري)" style="flex:1 1 140px"></div>' +
       '<div class="row" style="margin-top:8px;gap:6px"><select id="nco" style="flex:1 1 140px">' + newCoOpts + '</select><select id="ndep" style="flex:1 1 140px">' + newDepOpts + '</select><select id="nr" style="flex:0 1 130px"><option value="member">👤 صلاحية: عضو</option><option value="admin">👑 صلاحية: مدير</option></select><button class="p s" id="addm">إضافة</button></div></div>';
   }
 
@@ -398,9 +404,16 @@ function bindSettings() {
     const { error } = await sb.auth.updateUser({ password: v }); 
     alert(error ? error.message : 'تم التغيير.'); $('np').value = ''; $('svp').textContent = 'حفظ التغيير';
   };
+  if ($('admin_wa_batch') && typeof waRemindDialog === 'function') {
+    $('admin_wa_batch').onclick = () => waRemindDialog('', 'late');
+  }
+  document.querySelectorAll('[data-mwa]').forEach(b => b.onclick = () => {
+    if (typeof waRemindDialog === 'function') waRemindDialog(b.dataset.mwa, 'late');
+  });
   document.querySelectorAll('[data-mts]').forEach(b => b.onclick = () => {
     const em = b.dataset.mts;
     const i = document.querySelector('[data-mt="' + em + '"]');
+    const phEl = document.querySelector('[data-mph="' + em + '"]');
     const coEl = document.querySelector('[data-mco="' + em + '"]');
     const depEl = document.querySelector('[data-mdep="' + em + '"]');
     const roleEl = document.querySelector('[data-mrole="' + em + '"]');
@@ -409,8 +422,9 @@ function bindSettings() {
     const isMeSuper = S.me && same(em, S.me.email) && m.role === 'admin';
     const newCo = coEl ? coEl.value : (isMeSuper ? '' : (oldMeta.company || 'متجرك'));
     const newDep = depEl ? depEl.value : oldMeta.department;
+    const newPh = phEl ? phEl.value.trim() : (oldMeta.phone || '');
     const newRole = roleEl ? roleEl.value : m.role;
-    const patch = { title: i ? (i.value.trim() || null) : null, telegram_chat_id: encodeMemberMeta(newCo, newDep) };
+    const patch = { title: i ? (i.value.trim() || null) : null, telegram_chat_id: encodeMemberMeta(newCo, newDep, newPh) };
     if (newRole && newRole !== m.role) patch.role = newRole;
     run(sb.from('members').update(patch).eq('email', em));
   });
@@ -420,10 +434,11 @@ function bindSettings() {
     if (!e || !n) return alert('الرجاء كتابة الاسم والبريد الإلكتروني.');
     const co = $('nco') ? $('nco').value : activeCompanyFilter();
     const dep = $('ndep') ? $('ndep').value : '';
+    const ph = $('nph') ? $('nph').value.trim() : '';
     const title = $('ntitle') && $('ntitle').value.trim() ? $('ntitle').value.trim() : null;
     const row = { email: e, name: n, role: $('nr') ? $('nr').value : 'member' };
     if (title) row.title = title;
-    const metaStr = encodeMemberMeta(co, dep);
+    const metaStr = encodeMemberMeta(co, dep, ph);
     if (metaStr) row.telegram_chat_id = metaStr;
     run(sb.from('members').insert(row));
   };

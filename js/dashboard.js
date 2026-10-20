@@ -132,7 +132,7 @@ function dashWaSummary(D, f, per) {
   const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
   const prof = typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo || 'متجرك') : {};
   const stName = curCo ? (prof.displayName || curCo) : (BRAND.orgName || 'كل الشركات والفروع');
-  const topPeople = D.people.filter(p => p.total && p.email).map(p => ({ name: nm(p.email), r: pct(p.done, p.total), done: p.done, tot: p.total })).sort((a, b) => b.r - a.r).slice(0, 5);
+  const topPeople = D.people.filter(p => p.total && p.email).map(p => ({ name: nm(p.email), r: pct(p.done, p.total), done: p.done, tot: p.total, late: p.late })).sort((a, b) => b.r - a.r).slice(0, 5);
   const txt = [
     '📋 *تقرير إنجاز المهام التنفيذي — ' + stName + '*',
     '📅 الفترة: ' + (per[f.period] || 'الكل') + (f.dep ? ' · القسم: ' + f.dep : ''),
@@ -141,10 +141,9 @@ function dashWaSummary(D, f, per) {
     '⏱ الإنجاز في الموعد: *' + (D.onTimePct == null ? '—' : D.onTimePct + '%') + '*',
     '📂 مهام مفتوحة: *' + D.open + '* (' + D.doingOk + ' قيد العمل)',
     '⚠️ مهام متأخرة: *' + D.late + '*',
-    topPeople.length ? '━━━━━━━━━━━━━━\n🏆 *أعلى الأعضاء إنجازاً:*\n' + topPeople.map((p, i) => (i + 1) + '. ' + p.name + ': ' + p.r + '% (' + p.done + '/' + p.tot + ')').join('\n') : ''
+    topPeople.length ? '━━━━━━━━━━━━━━\n🏆 *أداء الأعضاء الأبرز:*\n' + topPeople.map((p, i) => (i + 1) + '. ' + p.name + ': ' + p.r + '% (' + p.done + '/' + p.tot + (p.late ? ' · ⚠️ متأخرة: ' + p.late : '') + ')').join('\n') : ''
   ].filter(Boolean).join('\n');
-  navigator.clipboard?.writeText(txt);
-  toast('تم نسخ ملخص إنجاز المهام للحافظة 📋');
+  if (typeof waSummaryDialog === 'function') waSummaryDialog('ملخص تقرير المهام — ' + stName, txt);
 }
 
 function dashView() {
@@ -185,6 +184,7 @@ function dashView() {
         '</div>' +
         '<div class="reh-actions">' +
           '<button class="gold" id="ds_pr" type="button">🖨 طباعة تقرير رسمي (PDF)</button>' +
+          '<button class="reh-btn" id="ds_wa_rem" type="button" style="border-color:rgba(52,211,153,.45);color:#6fcf9f">📲 تذكير الموظفين بالمتأخرات</button>' +
           '<button class="reh-btn" id="ds_wa" type="button">💬 ملخص واتساب</button>' +
           '<button class="reh-btn" id="ds_csv" type="button">⬇ تصدير CSV</button>' +
         '</div>' +
@@ -234,16 +234,20 @@ function dashView() {
     '<div class="dsh-card"><h2>توزيع حمل العمل</h2>' + (D.people.some(p => p.total) ? D.people.filter(p => p.total).map(p => '<div class="dsh-rw"><span>' + esc(p.email ? nm(p.email) : 'غير مُسند') + '</span><div class="dsh-bar" style="width:' + (100 * p.total / mx).toFixed(1) + '%">' + seg(p.done, p.total, 'var(--c-done)') + seg(p.open, p.total, 'var(--c-todo)') + seg(p.late, p.total, 'var(--c-late)') + '</div><small>' + p.done + '/' + p.total + '</small></div>').join('') +
       '<div class="dsh-legend row-l"><div><i style="background:var(--c-done)"></i>منجزة</div><div><i style="background:var(--c-todo)"></i>مفتوحة</div><div><i style="background:var(--c-late)"></i>متأخرة</div></div>' : empty) + '</div>' +
     '<div class="dsh-card"><h2>الإنجاز حسب الاجتماع</h2>' + (D.meets.length ? D.meets.map(r => '<div class="dsh-rw"><span>' + esc(mname(r.id)) + '</span><div class="dsh-bar" style="width:100%">' + seg(r.done, r.total || 1, 'var(--c-done)') + '</div><small>' + pct(r.done, r.total) + '%</small></div>').join('') : empty) + '</div>' +
-    '<div class="dsh-card"><h2>تحتاج انتباهاً (الأقدم موعداً)</h2>' + (D.attention.length ? D.attention.map(dshRow).join('') : '<div class="m" style="padding:8px 0">لا شيء متأخر 🎉</div>') + '</div>' +
+    '<div class="dsh-card"><div class="bar" style="margin-bottom:6px"><h2 style="margin:0">تحتاج انتباهاً (الأقدم موعداً)</h2>' + (D.attention.length ? '<button class="s" type="button" id="ds_att_wa" style="font-size:12px;color:#128c7e">📲 تذكير واتساب</button>' : '') + '</div>' + (D.attention.length ? D.attention.map(dshRow).join('') : '<div class="m" style="padding:8px 0">لا شيء متأخر 🎉</div>') + '</div>' +
     '<div class="dsh-card"><h2>أُنجزت مؤخراً</h2>' + (D.recent.length ? D.recent.map(dshRow).join('') : '<div class="m" style="padding:8px 0">ستظهر هنا المهام المنجزة بعد تفعيل تسجيل الوقت.</div>') + '</div></div>' +
     // جدول تقييم الموظفين التفصيلي
-    '<div class="card rpc" style="margin-top:14px"><div class="bar"><h2 style="margin:0">🏆 كشف تقييم وإنجاز الموظفين التفصيلي</h2><button class="s" type="button" id="ds_pr2">🖨 طباعة الكشف</button></div>' +
-      (rankedPeople.length ? '<div class="rpt-w" style="margin-top:10px"><table class="rpt"><thead><tr><th>الموظف</th><th>الشركة / الفرع</th><th>القسم</th><th>الإجمالي</th><th>منجزة</th><th>مفتوحة</th><th>متأخرة</th><th>نسبة الإنجاز</th></tr></thead><tbody>' +
+    '<div class="card rpc" style="margin-top:14px"><div class="bar"><h2 style="margin:0">🏆 كشف تقييم وإنجاز الموظفين التفصيلي</h2><div class="row s" style="gap:6px"><button class="s" type="button" id="ds_wa_tbl" style="color:#128c7e">📲 تذكير الموظفين</button><button class="s" type="button" id="ds_pr2">🖨 طباعة الكشف</button></div></div>' +
+      (rankedPeople.length ? '<div class="rpt-w" style="margin-top:10px"><table class="rpt"><thead><tr><th>الموظف</th><th>الشركة / الفرع</th><th>القسم</th><th>الإجمالي</th><th>منجزة</th><th>مفتوحة</th><th>متأخرة</th><th>نسبة الإنجاز</th><th>تذكير واتساب (دفعة)</th></tr></thead><tbody>' +
         rankedPeople.map((x, i) => {
           const m = (S.allMembers || S.members || []).find(z => same(z.email, x.p.email));
           const meta = m && typeof parseMemberMeta === 'function' ? parseMemberMeta(m) : { company: '', department: '' };
           const col = x.r >= 75 ? 'var(--ok)' : x.r >= 45 ? 'var(--gold)' : 'var(--late)';
-          return '<tr><td><b>' + (medals[i] || (i + 1) + '. ') + esc(nm(x.p.email)) + '</b></td><td>' + esc(meta.company || 'متجرك') + '</td><td>' + esc(meta.department || '—') + '</td><td class="num"><b>' + x.p.total + '</b></td><td class="num" style="color:var(--ok)"><b>' + x.p.done + '</b></td><td class="num">' + x.p.open + '</td><td class="num" style="color:' + (x.p.late ? 'var(--late)' : 'var(--mute)') + '"><b>' + x.p.late + '</b></td><td class="num"><div class="rpt-pct-cell"><b>' + x.r + '%</b><div class="rpt-pbar"><i style="width:' + x.r + '%;background:' + col + '"></i></div></div></td></tr>';
+          const hasPending = (x.p.late + x.p.open) > 0;
+          const waAction = hasPending
+            ? '<button type="button" class="s" data-emp-wa="' + esc(x.p.email) + '" style="font-size:12px;padding:4px 10px;' + (x.p.late ? 'background:var(--latesoft);color:var(--late);border-color:rgba(201,59,59,.3)' : 'color:#128c7e') + '">📲 ' + (x.p.late ? 'تذكير بالمتأخرات (' + x.p.late + ')' : 'متابعة (' + x.p.open + ')') + '</button>'
+            : '<span class="m" style="font-size:12px">مكتمل ✓</span>';
+          return '<tr><td><b>' + (medals[i] || (i + 1) + '. ') + esc(nm(x.p.email)) + '</b></td><td>' + esc(meta.company || 'متجرك') + '</td><td>' + esc(meta.department || '—') + '</td><td class="num"><b>' + x.p.total + '</b></td><td class="num" style="color:var(--ok)"><b>' + x.p.done + '</b></td><td class="num">' + x.p.open + '</td><td class="num" style="color:' + (x.p.late ? 'var(--late)' : 'var(--mute)') + '"><b>' + x.p.late + '</b></td><td class="num"><div class="rpt-pct-cell"><b>' + x.r + '%</b><div class="rpt-pbar"><i style="width:' + x.r + '%;background:' + col + '"></i></div></div></td><td>' + waAction + '</td></tr>';
         }).join('') +
       '</tbody></table></div>' : empty) +
     '</div>';
@@ -280,6 +284,12 @@ function bindDash() {
   if ($('ds_pr')) $('ds_pr').onclick = () => printTasksReport(D, f, per);
   if ($('ds_pr2')) $('ds_pr2').onclick = () => printTasksReport(D, f, per);
   if ($('ds_wa')) $('ds_wa').onclick = () => dashWaSummary(D, f, per);
+  if ($('ds_wa_rem')) $('ds_wa_rem').onclick = () => { if (typeof waRemindDialog === 'function') waRemindDialog(f.who || '', 'late'); };
+  if ($('ds_wa_tbl')) $('ds_wa_tbl').onclick = () => { if (typeof waRemindDialog === 'function') waRemindDialog(f.who || '', 'late'); };
+  if ($('ds_att_wa')) $('ds_att_wa').onclick = () => { if (typeof waRemindDialog === 'function') waRemindDialog(D.attention[0]?.who || '', 'late'); };
+  document.querySelectorAll('[data-emp-wa]').forEach(b => b.onclick = () => {
+    if (typeof waRemindDialog === 'function') waRemindDialog(b.dataset.empWa, 'late');
+  });
   if ($('ds_csv')) $('ds_csv').onclick = () => downloadText('tasks-' + ymd(new Date()) + '.csv', dashCsv(D.U), 'text/csv;charset=utf-8');
   document.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { const t = S.tasks.find(x => x.id === el.dataset.open); if (t) taskDialog(t); });
 }
