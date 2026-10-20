@@ -461,7 +461,7 @@ function bindBoard() {
 function handoffDialog(tId) {
     const t = S.tasks.find(x => x.id === tId);
     if(!t) return;
-    let opts = '<option value="">-- اختر الزميل --</option>' + S.members.filter(m => !same(m.email, t.assignee_email)).map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
+    let opts = '<option value="">-- اختر الزميل --</option>' + assignables().filter(m => !same(m.email, t.assignee_email)).map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('');
     
     dlg.innerHTML = '<h2>إحالة المهمة (Workflow)</h2>' +
     '<div style="background:var(--col);padding:10px;border-radius:8px;margin-bottom:16px;font-weight:600">' + esc(t.title) + '</div>' +
@@ -525,14 +525,14 @@ function taskDialog(t, pre = {}) {
   let asOpts = '<option value="__all" ' + (asVal === '__all' ? 'selected' : '') + '>👥 مهمة جماعية للكل</option>' +
                '<option value="__multi">☑️ موظفون محددون (بالتشيك بوكس / القسم)</option>' +
                '<option value="" ' + (asVal === '' ? 'selected' : '') + '>غير مُسند</option>' +
-               S.members.map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, asVal) ? 'selected' : '') + '>' + esc(m.name + (m.title ? ' — ' + m.title : '')) + '</option>').join('');
+               assignables(asVal).map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, asVal) ? 'selected' : '') + '>' + esc(m.name + (m.title ? ' — ' + m.title : '')) + '</option>').join('');
                
   let mtOpts = '<option value="">بدون ارتباط</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (x.meeting_id === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
   let stOpts = Object.entries(ST).map(([k, v]) => '<option value="' + k + '" ' + ((x.status || 'todo') === k ? 'selected' : '') + '>' + v + '</option>').join('');
 
   let dlBtn = edit && canDel(t) ? '<button class="dng s" id="f_dl" style="margin-inline-end:auto">حذف</button>' : '<span></span>';
 
-  const empCheckboxes = S.members.map(m => {
+  const empCheckboxes = assignables(asVal).map(m => {
     const dep = typeof memberDept === 'function' ? memberDept(m.email) : '';
     const sub = [dep ? '🏛️ ' + dep : '', m.title || ''].filter(Boolean).join(' · ');
     const isChecked = asVal === '__all' || same(m.email, asVal);
@@ -581,7 +581,7 @@ function taskDialog(t, pre = {}) {
   let fw = Array.isArray(x.flow) ? x.flow.map(z => ({ email: z.email, note: z.note || '' })) : [];
   const cur = edit ? (x.flow_step || 0) : 0;
   const drawFlow = () => {
-    const sel = i => '<select data-fe="' + i + '" style="flex:1 1 130px">' + S.members.map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, fw[i].email) ? 'selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select>';
+    const sel = i => '<select data-fe="' + i + '" style="flex:1 1 130px">' + assignables(fw[i].email).map(m => '<option value="' + esc(m.email) + '" ' + (same(m.email, fw[i].email) ? 'selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select>';
     $('fw_box').innerHTML = '<b>🔗 مسار العمل (اختياري)</b><div class="m" style="margin:2px 0 8px">حدّد من يستلم المهمة بعد إنجاز كل مرحلة؛ تنتقل إليه تلقائياً ويصله إشعار. زر «إحالة» يبقى متاحاً لأي تحويل طارئ.</div>' +
       fw.map((z, i) => '<div class="row" style="align-items:center;margin-bottom:6px"><span class="chip s">' + (i + 1) + '</span>' +
         (i === 0 && !edit ? '<span class="m" style="flex:1 1 130px">المسؤول الأول (المحدد أعلاه)</span>' : i <= cur ? '<b style="flex:1 1 130px">' + esc(nm(z.email)) + (i < cur ? ' ✓' : ' (الحالي)') + '</b>' : sel(i)) +
@@ -591,7 +591,7 @@ function taskDialog(t, pre = {}) {
     $('fw_box').querySelectorAll('[data-fe]').forEach(e => e.onchange = () => { fw[+e.dataset.fe].email = e.value; });
     $('fw_box').querySelectorAll('[data-fn]').forEach(e => e.oninput = () => { fw[+e.dataset.fn].note = e.value; });
     $('fw_box').querySelectorAll('[data-fr]').forEach(b => b.onclick = () => { fw.splice(+b.dataset.fr, 1); if (fw.length < 2) fw = []; drawFlow(); });
-    $('fw_add').onclick = () => { if (!fw.length) fw.push({ email: (edit && x.assignee_email) || '', note: '' }); fw.push({ email: S.members[0].email, note: '' }); drawFlow(); };
+    $('fw_add').onclick = () => { if (!fw.length) fw.push({ email: (edit && x.assignee_email) || '', note: '' }); fw.push({ email: (assignables()[0] || S.members[0]).email, note: '' }); drawFlow(); };
     if ($('fw_clr')) $('fw_clr').onclick = () => { fw = []; drawFlow(); };
   };
   drawFlow();
@@ -600,8 +600,8 @@ function taskDialog(t, pre = {}) {
   const updateChkCounter = () => {
     if (!$('f_chk_cnt')) return;
     const n = getCheckedEmails().length;
-    $('f_chk_cnt').textContent = 'المحدد: ' + n + ' من ' + S.members.length + ' موظف';
-    if ($('f_chk_all')) $('f_chk_all').checked = S.members.length > 0 && n === S.members.length;
+    $('f_chk_cnt').textContent = 'المحدد: ' + n + ' من ' + assignables().length + ' موظف';
+    if ($('f_chk_all')) $('f_chk_all').checked = assignables().length > 0 && n === assignables().length;
   };
 
   const sync = () => {
@@ -617,7 +617,7 @@ function taskDialog(t, pre = {}) {
 
   const syncFromCheckboxes = () => {
     const chk = getCheckedEmails();
-    if (chk.length === S.members.length && S.members.length > 1) $('f_as').value = '__all';
+    if (chk.length === assignables().length && assignables().length > 1) $('f_as').value = '__all';
     else if (chk.length > 1) $('f_as').value = '__multi';
     else if (chk.length === 1) $('f_as').value = chk[0];
     else $('f_as').value = '';
@@ -681,7 +681,7 @@ function taskDialog(t, pre = {}) {
     let gmap = null, error;
     if (!edit && isMulti) {            // مهمة جماعية (للكل أو لمجموعة موظفين محددين بالتشيك بوكس / القسم)
       const gid = crypto.randomUUID(); delete row.done_note;
-      const targetMembers = all ? S.members : S.members.filter(m => chkEmails.some(e => same(e, m.email)));
+      const targetMembers = all ? assignables() : assignables().filter(m => chkEmails.some(e => same(e, m.email)));
       const uniq = []; targetMembers.forEach(m => { if (!uniq.some(u => same(u.email, m.email))) uniq.push(m); });
       let rows = uniq.map(m => Object.assign({}, row, { id: crypto.randomUUID(), for_all: false, assignee_email: m.email, group_id: gid, status: 'todo' }));
       ({ error } = await sb.from('tasks').insert(rows));
