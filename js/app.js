@@ -44,21 +44,25 @@ async function load() {
     sb.from('ord_settings').select('*').limit(1),
     fetchAll('ord_item_costs', { c: 'item_id', asc: true })
   ]);
-  if (!mb.error && mb.data && mb.data.length) { S.allMembers = mb.data; S.members = mb.data.filter(x => x.role !== 'rep'); S.reps = mb.data.filter(x => x.role === 'rep'); S.me = mb.data.find(x => same(x.email, S.me.email)) || S.me; }
+  if (!mb.error && mb.data && mb.data.length) { S.rawMembers = mb.data; S.allMembers = mb.data; S.members = mb.data.filter(x => x.role !== 'rep'); S.reps = mb.data.filter(x => x.role === 'rep'); S.me = mb.data.find(x => same(x.email, S.me.email)) || S.me; }
+  else if (!S.rawMembers && S.allMembers) { S.rawMembers = S.allMembers; }
   S.ordErr = !!(oo.error || oi.error || op.error);
-  if (!oo.error) S.orders = oo.data || []; if (!oi.error) S.oitems = oi.data || []; if (!op.error) S.opay = op.data || [];
+  if (!oo.error) { S.rawOrders = oo.data || []; S.orders = S.rawOrders; }
+  if (!oi.error) { S.rawOitems = oi.data || []; S.oitems = S.rawOitems; }
+  if (!op.error) { S.rawOpay = op.data || []; S.opay = S.rawOpay; }
   if (!os.error) S.ordSet = (os.data || [])[0] || null;
   S.ocost = {}; if (!oc.error) (oc.data || []).forEach(c => { S.ocost[c.item_id] = +c.cost; });
   
-  if (!m.error) S.meetings = m.data || [];
-  if (!t.error) S.tasks = t.data || [];
+  if (!m.error) { S.rawMeetings = m.data || []; S.meetings = S.rawMeetings; }
+  if (!t.error) { S.rawTasks = t.data || []; S.tasks = S.rawTasks; }
   if (!d.error) S.done = d.data || [];
   if (!nt.error) S.notes = nt.data || [];
   if (!ci.error) { S.items = (ci.data || []).slice().sort((a, b) => (a.pos || 0) - (b.pos || 0)); S.itemStats = {}; (ci.data || []).forEach(r => { const z = S.itemStats[r.task_id] || (S.itemStats[r.task_id] = [0, 0]); z[1]++; if (r.done) z[0]++; }); }
   S.propsErr = !!(p.error || v.error);
-  if (!p.error) S.props = p.data || [];
+  if (!p.error) { S.rawProps = p.data || []; S.props = S.rawProps; }
   if (!v.error) S.votes = v.data || [];
   
+  if (typeof applyCompanyScope === 'function') applyCompanyScope();
   if (!m.error && !t.error && S.me) try { localStorage.setItem(CACHE_KEY, JSON.stringify({ email: S.me.email, s: { me: S.me, members: S.members, meetings: S.meetings, tasks: S.tasks, done: S.done, props: S.props, votes: S.votes } })); } catch (e) {}
   render();
   if (typeof rtStart === 'function') rtStart();

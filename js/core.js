@@ -97,13 +97,121 @@ const ACT_ALL = { todo: [['done', 'إنجاز المهمة ✓']], done: [['todo
 const PST = { open: 'قيد التصويت', accepted: 'مُعتمد', rejected: 'مرفوض', closed: 'مغلق' };
 const isClosed = p => ['accepted', 'rejected', 'closed'].includes(p.status);
 
-const nm = e => S.members.find(m => same(m.email, e))?.name || 'غير مُسند';
+const nm = e => (S.allMembers || S.members || []).find(m => same(m.email, e))?.name || S.members.find(m => same(m.email, e))?.name || 'غير مُسند';
 const isAdmin = () => S.me && S.me.role === 'admin';
 const canDel = t => isAdmin() || (S.me && same(t.created_by, S.me.email));
 const mine = t => t.for_all || (S.me && same(t.assignee_email, S.me.email));
 const doneBy = t => S.done.filter(d => d.task_id === t.id);
 const eff = t => t.for_all ? (S.me && doneBy(t).some(d => same(d.email, S.me.email)) ? 'done' : 'todo') : t.status;
 const run = async p => { const { error } = await p; if (error) alert('خطأ: ' + error.message); load(); };
+
+/* ===== الشركات والإدارات (عزل بيانات كل شركة + هيكل الأقسام) ===== */
+function parseMemberMeta(m) {
+  if (!m) return { company: '', department: '' };
+  let co = m.company || '', dep = m.department || '';
+  if ((!co && !dep) && m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
+    try {
+      const j = JSON.parse(m.telegram_chat_id);
+      co = j.co || j.company || '';
+      dep = j.dep || j.department || '';
+    } catch (e) {}
+  }
+  return { company: String(co || '').trim(), department: String(dep || '').trim() };
+}
+function encodeMemberMeta(co, dep) {
+  const c = String(co || '').trim(), d = String(dep || '').trim();
+  return (c || d) ? JSON.stringify({ co: c, dep: d }) : null;
+}
+function memberCompany(email) {
+  if (!email) return '';
+  const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
+  return m ? parseMemberMeta(m).company : '';
+}
+function memberDept(email) {
+  if (!email) return '';
+  const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
+  return m ? parseMemberMeta(m).department : '';
+}
+function getLocalOrgMeta() {
+  try { return JSON.parse(localStorage.getItem('org_meta_v1') || '{"companies":[],"departments":[]}'); }
+  catch (e) { return { companies: [], departments: [] }; }
+}
+function companiesList() {
+  const set = new Set();
+  const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
+  hv.forEach(x => { if (String(x).startsWith('__co:')) { const v = String(x).slice(5).trim(); if (v) set.add(v); } });
+  (getLocalOrgMeta().companies || []).forEach(v => { if (v && String(v).trim()) set.add(String(v).trim()); });
+  (S.rawMembers || S.allMembers || S.members || []).forEach(m => { const c = parseMemberMeta(m).company; if (c) set.add(c); });
+  return [...set];
+}
+function departmentsList() {
+  const set = new Set();
+  const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
+  hv.forEach(x => { if (String(x).startsWith('__dep:')) { const v = String(x).slice(6).trim(); if (v) set.add(v); } });
+  (getLocalOrgMeta().departments || []).forEach(v => { if (v && String(v).trim()) set.add(String(v).trim()); });
+  (S.rawMembers || S.allMembers || S.members || []).forEach(m => { const d = parseMemberMeta(m).department; if (d) set.add(d); });
+  return [...set];
+}
+async function persistOrgLists(companies, departments) {
+  const cleanCo = [...new Set((companies || []).map(x => String(x || '').trim()).filter(Boolean))];
+  const cleanDep = [...new Set((departments || []).map(x => String(x || '').trim()).filter(Boolean))];
+  try { localStorage.setItem('org_meta_v1', JSON.stringify({ companies: cleanCo, departments: cleanDep })); } catch (e) {}
+  if (S.ordSet) {
+    const baseViews = (S.ordSet.hidden_views || []).filter(x => !String(x).startsWith('__co:') && !String(x).startsWith('__dep:'));
+    const nextHidden = baseViews.concat(cleanCo.map(c => '__co:' + c)).concat(cleanDep.map(d => '__dep:' + d));
+    S.ordSet.hidden_views = nextHidden;
+    await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true);
+  }
+}
+const isSuperAdmin = () => isAdmin() && !parseMemberMeta(S.me).company;
+function activeCompanyFilter() {
+  if (!S.me) return '';
+  const myCo = parseMemberMeta(S.me).company;
+  if (myCo) return myCo;
+  return S.activeCompany || '';
+}
+function applyCompanyScope() {
+  if (!S.rawMembers) return;
+  const co = activeCompanyFilter();
+  if (!co) {
+    S.allMembers = S.rawMembers.slice();
+    S.members = S.allMembers.filter(m => m.role !== 'rep');
+    S.reps = S.allMembers.filter(m => m.role === 'rep');
+    S.tasks = (S.rawTasks || []).slice();
+    S.orders = (S.rawOrders || []).slice();
+    S.oitems = (S.rawOitems || []).slice();
+    S.opay = (S.rawOpay || []).slice();
+    S.meetings = (S.rawMeetings || []).slice();
+    S.props = (S.rawProps || []).slice();
+    return;
+  }
+  const inCo = email => {
+    if (!email) return false;
+    return same(memberCompany(email), co);
+  };
+  S.allMembers = S.rawMembers.filter(m => same(parseMemberMeta(m).company, co) || same(m.email, S.me && S.me.email));
+  S.members = S.allMembers.filter(m => m.role !== 'rep');
+  S.reps = S.allMembers.filter(m => m.role === 'rep');
+  S.tasks = (S.rawTasks || []).filter(t => {
+    const tagMatch = String(t.notes || '').includes('[شركة: ' + co + ']');
+    if (tagMatch) return true;
+    if (t.assignee_email) return inCo(t.assignee_email);
+    if (t.created_by) return inCo(t.created_by);
+    return false;
+  });
+  S.orders = (S.rawOrders || []).filter(o => {
+    const tagMatch = String(o.notes || '').includes('[شركة: ' + co + ']');
+    if (tagMatch) return true;
+    if (o.rep_email && inCo(o.rep_email)) return true;
+    if (o.created_by && inCo(o.created_by)) return true;
+    return false;
+  });
+  const ordIds = new Set(S.orders.map(o => o.id));
+  S.oitems = (S.rawOitems || []).filter(i => ordIds.has(i.order_id));
+  S.opay = (S.rawOpay || []).filter(p => ordIds.has(p.order_id));
+  S.meetings = (S.rawMeetings || []).filter(m => !m.title.includes(' · [') || m.title.includes(' · [' + co + ']'));
+  S.props = (S.rawProps || []).filter(p => inCo(p.author_email));
+}
 
 /* ===== صور الأصناف (مخزن خاص + روابط مؤقتة) ===== */
 const IMG_BUCKET = 'order-images';
