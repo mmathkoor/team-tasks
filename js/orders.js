@@ -22,18 +22,20 @@ function orderMsg(o) {
     '💵 المطلوب تحصيله: ' + money(o.balance) + ' ' + BRAND.currency, '', '----------------', '📋 *قائمة التجهيز:*', L, '----------------']
     .concat(o.notes ? ['⚠️ *ملاحظات هامة:* ' + o.notes] : []).concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
-// فاتورة العميل: أسعار البيع فقط — بدون التاجر وبدون سعر الشراء
+// فاتورة العميل: أسعار البيع فقط — بدون التاجر وبدون سعر الشراء — مع هوية وشعار الشركة الخاصة بالطلب
+const bProf = o => typeof getCompanyProfile === 'function' ? getCompanyProfile(o ? orderCompany(o) : activeCompanyFilter() || 'متجرك') : { displayName: BRAND.name, phone: BRAND.phone, address: BRAND.address, currency: BRAND.currency, footer: 'شكراً لتعاملكم معنا 🌹', logo: '' };
+const bn = o => bProf(o).displayName || (S.ordSet && S.ordSet.store_name) || BRAND.name;
+const bphone = o => bProf(o).phone || (S.ordSet && S.ordSet.store_phone) || BRAND.phone;
+const baddr = o => bProf(o).address || (S.ordSet && S.ordSet.store_address) || BRAND.address;
+const bcurr = o => bProf(o).currency || BRAND.currency || 'ر.ي';
 function invoiceText(o) {
-  const its = oItems(o.id);
-  return ['🧾 *فاتورة #' + o.order_no + '* — ' + bn(), 'التاريخ: ' + o.order_date, '', '👤 ' + o.customer_name, '', '*الأصناف:*']
+  const its = oItems(o.id), p = bProf(o), cur = bcurr(o);
+  return ['🧾 *فاتورة #' + o.order_no + '* — ' + bn(o)].concat(p.slogan ? ['_' + p.slogan + '_'] : []).concat(['التاريخ: ' + o.order_date, '', '👤 ' + o.customer_name, '', '*الأصناف:*'])
     .concat(its.map(i => '▫️ ' + i.name + ' × ' + (+i.qty) + ' = ' + money(i.line_total))).concat([''])
     .concat(['المجموع: ' + money(o.subtotal)]).concat(+o.delivery_fee ? ['رسوم التوصيل: ' + money(o.delivery_fee)] : []).concat(+o.discount ? ['الخصم: -' + money(o.discount)] : [])
-    .concat(['*الإجمالي: ' + money(o.total) + ' ' + BRAND.currency + '*', 'المدفوع: ' + money(o.paid), '*المتبقي: ' + money(o.balance) + ' ' + BRAND.currency + '*'])
-    .concat(bphone() ? ['', '📞 ' + bphone()] : []).concat(['', 'شكراً لتعاملكم معنا 🌹']).join('\n');
+    .concat(['*الإجمالي: ' + money(o.total) + ' ' + cur + '*', 'المدفوع: ' + money(o.paid), '*المتبقي: ' + money(o.balance) + ' ' + cur + '*'])
+    .concat(bphone(o) ? ['', '📞 ' + bphone(o)] : []).concat(baddr(o) ? ['📍 ' + baddr(o)] : []).concat(['', p.footer || 'شكراً لتعاملكم معنا 🌹']).join('\n');
 }
-const bn = () => (S.ordSet && S.ordSet.store_name) || BRAND.name;
-const bphone = () => (S.ordSet && S.ordSet.store_phone) || BRAND.phone;
-const baddr = () => (S.ordSet && S.ordSet.store_address) || BRAND.address;
 const canCost = () => isAdmin() || !!(S.ordSet && S.ordSet.staff_can_cost);
 const costOf = id => (S.ocost || {})[id] || 0;
 const oCostTotal = o => oItems(o.id).reduce((a, i) => a + (+i.qty) * costOf(i.id), 0);
@@ -237,14 +239,15 @@ function payDialog(o) {
 }
 // ===== الفاتورة: محتوى واحد يُستخدم للمعاينة والطباعة (بسعر البيع فقط: بلا سعر شراء وبلا اسم التاجر) =====
 function invoiceInner(o) {
-  const its = oItems(o.id), pays = oPays(o.id);
-  const logo = BRAND.logo && BRAND.logo.startsWith('/') ? location.origin + BRAND.logo : BRAND.logo;
-  return '<div class="inv"><div class="inv-h"><img src="' + esc(logo) + '" alt="" width="54" height="54"><div><h2>' + esc(bn()) + '</h2><div class="m">' + esc([bphone(), baddr()].filter(Boolean).join(' · ')) + '</div></div><div class="inv-no"><b>فاتورة #' + o.order_no + '</b><div class="m">' + esc(o.order_date) + '</div></div></div>' +
+  const its = oItems(o.id), pays = oPays(o.id), p = bProf(o), cur = bcurr(o);
+  const rawLogo = p.logo || BRAND.logo;
+  const logo = rawLogo && rawLogo.startsWith('/') ? location.origin + rawLogo : rawLogo;
+  return '<div class="inv"><div class="inv-h" style="border-bottom-color:' + esc(p.accent || '#c9a24e') + '"><img src="' + esc(logo) + '" alt="" width="58" height="58" style="object-fit:cover;border-radius:12px"><div><h2>' + esc(bn(o)) + '</h2>' + (p.slogan ? '<div class="m" style="font-weight:600">' + esc(p.slogan) + '</div>' : '') + '<div class="m">' + esc([bphone(o), baddr(o), p.taxNo ? 'الرقم الضريبي/التجاري: ' + p.taxNo : ''].filter(Boolean).join(' · ')) + '</div></div><div class="inv-no"><b>فاتورة #' + o.order_no + '</b><div class="m">' + esc(o.order_date) + '</div></div></div>' +
     '<div class="inv-c"><b>العميل:</b> ' + esc(o.customer_name) + (o.phone ? ' · <span dir="ltr">' + esc(o.phone) + '</span>' : '') + (o.address ? '<br><b>العنوان:</b> ' + esc(o.address) : '') + '</div>' +
     '<table class="inv-t"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>' + its.map(i => '<tr><td>' + esc(i.name) + '</td><td>' + (+i.qty) + '</td><td>' + money(i.price) + '</td><td>' + money(i.line_total) + '</td></tr>').join('') + '</tbody></table>' +
     '<div class="inv-s"><div><span>المجموع</span><b>' + money(o.subtotal) + '</b></div>' + (+o.delivery_fee ? '<div><span>رسوم التوصيل</span><b>' + money(o.delivery_fee) + '</b></div>' : '') + (+o.discount ? '<div><span>الخصم</span><b>-' + money(o.discount) + '</b></div>' : '') +
-    '<div class="tt"><span>الإجمالي</span><b>' + money(o.total) + ' ' + BRAND.currency + '</b></div><div><span>المدفوع</span><b>' + money(o.paid) + '</b></div><div class="tt"><span>المتبقي</span><b>' + money(o.balance) + ' ' + BRAND.currency + '</b></div></div>' +
-    (pays.length ? '<div class="m" style="margin-top:8px">الدفعات: ' + pays.map(p => money(p.amount) + ' (' + esc(p.paid_on) + ')').join(' · ') + '</div>' : '') + '<p class="inv-f">شكراً لتعاملكم معنا 🌹</p></div>';
+    '<div class="tt"><span>الإجمالي</span><b>' + money(o.total) + ' ' + esc(cur) + '</b></div><div><span>المدفوع</span><b>' + money(o.paid) + '</b></div><div class="tt"><span>المتبقي</span><b>' + money(o.balance) + ' ' + esc(cur) + '</b></div></div>' +
+    (pays.length ? '<div class="m" style="margin-top:8px">الدفعات: ' + pays.map(py => money(py.amount) + ' (' + esc(py.paid_on) + ')').join(' · ') + '</div>' : '') + '<p class="inv-f">' + esc(p.footer || 'شكراً لتعاملكم معنا 🌹') + '</p></div>';
 }
 // صفحة مستقلة تماماً للطباعة (لا تتأثر بتنسيقات التطبيق) — تعمل مع «حفظ كـ PDF» في المتصفح
 function invoiceDoc(o, toolbar) {
@@ -374,7 +377,12 @@ function orderDialog(o) {
     const st = $('o_st').value, rep = $('o_rep').value || null, rs = $('o_rs').value.trim();
     if (st === 'cancelled' && rs.length < 3) { $('o_rsw').style.display = ''; return $('o_rs').focus(); }
     if (st === 'preparing' && !rep) return alert('اختر المندوب قبل تحويل الطلب إلى «قيد التجهيز»');
-    const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: $('o_nt').value.trim() || null, cancel_reason: st === 'cancelled' ? rs : null };
+    const activeCo = (typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '') || 'متجرك';
+    let rawNotes = $('o_nt').value.trim();
+    if (!edit && activeCo && !rawNotes.includes('[شركة:')) {
+      rawNotes = (rawNotes ? rawNotes + '\n' : '') + '[شركة: ' + activeCo + ']';
+    }
+    const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: rawNotes || null, cancel_reason: st === 'cancelled' ? rs : null };
     $('o_sv').disabled = true; $('o_sv').textContent = 'جارٍ الحفظ…';
     const id = edit ? o.id : crypto.randomUUID();
     if (!edit) { row.id = id; row.created_by = S.me.email; }

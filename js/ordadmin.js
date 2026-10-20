@@ -54,7 +54,7 @@ function bindViewsCard() {
   $('vw_sv').onclick = async () => {
     const hidden = [...document.querySelectorAll('[data-vw]')].filter(c => !c.checked).map(c => c.dataset.vw);
     if (hidden.length >= VIEW_LIST.length) return alert('أبقِ شاشة واحدة على الأقل ظاهرة');
-    const orgTags = ((S.ordSet && S.ordSet.hidden_views) || []).filter(x => String(x).startsWith('__co:') || String(x).startsWith('__dep:'));
+    const orgTags = ((S.ordSet && S.ordSet.hidden_views) || []).filter(x => String(x).startsWith('__co:') || String(x).startsWith('__dep:') || String(x).startsWith('__cop:'));
     const finalHidden = orgTags.length ? hidden.concat(orgTags) : hidden;
     const { error } = await sb.from('ord_settings').update({ hidden_views: finalHidden, app_name: $('vw_n').value.trim() || null }).eq('id', true);
     if (error) return alert('تعذّر الحفظ: ' + error.message + '\n(شغّل sql/011_titles_views.sql أولاً)');

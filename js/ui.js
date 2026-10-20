@@ -16,7 +16,17 @@ const viewHidden = id => id !== 'set' && !!(S.ordSet && (S.ordSet.hidden_views |
 const visNav = () => NAV_ITEMS.filter(n => n.id === 'more' || !viewHidden(n.id));
 const visMore = () => MORE_ITEMS.filter(m => !viewHidden(m.id));
 const firstView = () => (visNav().find(n => n.id !== 'more') || { id: 'set' }).id;
-const appName = () => (S.ordSet && S.ordSet.app_name) || (window.__CFG && window.__CFG.name) || 'مدير المهام';
+const appName = () => {
+  if (typeof activeCompanyFilter === 'function') {
+    const co = activeCompanyFilter();
+    if (co && typeof getCompanyProfile === 'function') {
+      const p = getCompanyProfile(co);
+      if (p.appTitle) return p.appTitle;
+      if (p.displayName) return p.displayName;
+    }
+  }
+  return (S.ordSet && S.ordSet.app_name) || (window.__CFG && window.__CFG.name) || 'مدير المهام';
+};
 const titleOf = e => ((S.allMembers || S.members || []).find(m => same(m.email, e)) || {}).title || '';
 const nmt = e => { const m = (S.allMembers || S.members || []).find(x => same(x.email, e)); return m ? m.name + (m.title ? ' — ' + m.title : '') : 'غير مُسند'; };
 function navHtml(view, propsBadge) {
@@ -47,18 +57,33 @@ function greetingText() {
   const h = new Date().getHours();
   return h < 12 ? 'صباح الخير' : h < 18 ? 'مساء الخير' : 'مساء النور';
 }
+function companyLogoHtml(coName, size = 42) {
+  const p = typeof getCompanyProfile === 'function' ? getCompanyProfile(coName) : {};
+  if (p && p.logo) {
+    return '<img src="' + esc(p.logo) + '" alt="' + esc(p.displayName || coName || '') + '" class="co-logo-img" style="width:' + size + 'px;height:' + size + 'px;object-fit:cover;border-radius:12px;border:1.5px solid ' + esc(p.accent || '#d4af6a') + ';background:#fff;flex:none">';
+  }
+  const bg = (p && p.color) || '#0b1426';
+  const ac = (p && p.accent) || '#d4af6a';
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="' + esc(bg) + '"/><circle cx="32" cy="32" r="21" fill="none" stroke="' + esc(ac) + '" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
 function headerHtml() {
   let d = '';
   try { d = new Date().toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) {}
   const myMeta = typeof parseMemberMeta === 'function' ? parseMemberMeta(S.me) : { company: '', department: '' };
   const coList = typeof companiesList === 'function' ? companiesList() : [];
   const canSw = typeof isSuperAdmin === 'function' && isSuperAdmin() && coList.length > 0;
-  const swHtml = canSw ? '<select id="co_sw" class="co-sw" title="تبديل الشركة المعروضة"><option value="">🏢 كل الشركات (' + coList.length + ')</option>' + coList.map(c => '<option value="' + esc(c) + '"' + (S.activeCompany === c ? ' selected' : '') + '>🏢 ' + esc(c) + '</option>').join('') + '</select>' :
-    (myMeta.company ? '<span class="co-tag">🏢 ' + esc(myMeta.company) + '</span>' : '');
+  const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
+  const prof = curCo && typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo) : null;
+  const swHtml = canSw ? '<select id="co_sw" class="co-sw" title="تبديل الشركة المعروضة"><option value="">🌐 كل الشركات (' + coList.length + ')</option>' + coList.map(c => {
+    const cp = typeof getCompanyProfile === 'function' ? getCompanyProfile(c) : { displayName: c };
+    return '<option value="' + esc(c) + '"' + (same(S.activeCompany, c) ? ' selected' : '') + '>🏢 ' + esc(cp.displayName || c) + '</option>';
+  }).join('') + '</select>' :
+    (curCo ? '<span class="co-tag">🏢 ' + esc((prof && prof.displayName) || curCo) + '</span>' : '');
   const roleSub = [S.me.title, myMeta.department].filter(Boolean).join(' · ');
+  const sloganTxt = prof && prof.slogan ? ' · ' + prof.slogan : '';
   return '<div class="top"><div class="brand">' +
-    '<svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-    '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (roleSub ? ' (' + esc(roleSub) + ')' : '') + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
+    companyLogoHtml(curCo || 'متجرك', 42) +
+    '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (roleSub ? ' (' + esc(roleSub) + ')' : '') + esc(sloganTxt) + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
     '<div class="hbtns">' + swHtml + '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
     '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
     '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button></div></div>';

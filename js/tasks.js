@@ -21,7 +21,7 @@ function renderNotesAndWorkflow(notesStr) {
         if(l.startsWith('[WF_HANDOFF]')) {
             let p = l.replace('[WF_HANDOFF]', '').split('||');
             wfHistory.push('<div class="wf-item"><div class="wf-meta">🔄 <b>' + esc(p[0]) + '</b> أحالها إلى <b>' + esc(p[1]) + '</b> <span dir="ltr">(' + esc(p[2]) + ')</span></div><div class="wf-msg">' + esc(p[3]||'') + '</div></div>');
-        } else {
+        } else if (!/^\[شركة:\s*[^\]]+\]$/.test(l.trim())) {
             mainNotes.push(l);
         }
     });
@@ -333,7 +333,12 @@ function taskDialog(t, pre = {}) {
     const chkEmails = !edit ? getCheckedEmails() : [];
     const isMulti = !edit && (all || v === '__multi' || chkEmails.length > 1);
     const assignee = isMulti ? null : (v === '__multi' ? (chkEmails[0] || '') : v);
-    const row = { title, notes: $('f_no').value.trim() || null, for_all: all, assignee_email: isMulti ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: isMulti ? 'todo' : $('f_st').value };
+    const activeCo = (typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '') || (assignee ? memberCompany(assignee) : 'متجرك');
+    let rawNotes = $('f_no').value.trim();
+    if (!edit && activeCo && !rawNotes.includes('[شركة:')) {
+      rawNotes = (rawNotes ? rawNotes + '\n' : '') + '[شركة: ' + activeCo + ']';
+    }
+    const row = { title, notes: rawNotes || null, for_all: all, assignee_email: isMulti ? null : (assignee || null), due_on: $('f_du').value || null, meeting_id: $('f_mt').value || null, priority: $('f_pr').value, status: isMulti ? 'todo' : $('f_st').value };
     if (!edit) { row.created_by = S.me.email; row.id = crypto.randomUUID(); } else row.progress = +$('f_pg').value;
     let flow = !isMulti && fw.length >= 2 ? fw.map(z => ({ email: z.email, note: (z.note || '').trim() })) : null;
     if (flow) { flow[cur].email = assignee || flow[cur].email; flow = flow.filter(z => z.email); if (flow.length < 2) flow = null; }
