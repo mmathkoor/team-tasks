@@ -71,11 +71,7 @@ dialog[open]{animation:ttPop .22s cubic-bezier(.2,.8,.2,1)}
   .acts button{min-height:40px}
   .tk{padding:14px}
 
-  .fab{display:flex;position:fixed;inset-inline-end:16px;bottom:calc(92px + env(safe-area-inset-bottom));z-index:35;
-    width:56px;height:56px;padding:0;border-radius:18px;font-size:30px;line-height:1;
-    background:linear-gradient(135deg,#ecd08a,#b8923a);color:#0b1426;border:0;
-    box-shadow:0 14px 26px -10px rgba(184,146,58,.8)}
-  .fab:hover:not(:disabled){background:linear-gradient(135deg,#f4dc9c,#c9a24e);transform:none}
+  .fab{display:none!important}
 
   #net{bottom:calc(84px + env(safe-area-inset-bottom))!important}
 

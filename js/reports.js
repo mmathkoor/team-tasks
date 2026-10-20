@@ -25,10 +25,58 @@ const hrs = (a, b) => (new Date(b) - new Date(a)) / 36e5;
 function groupBy(rows, keyFn) { const m = new Map(); rows.forEach(o => { const k = keyFn(o) || '—'; if (!m.has(k)) m.set(k, []); m.get(k).push(o); }); return [...m.entries()]; }
 function tcard(key, title, heads, rows, note) {
   RPT.t[key] = { title, heads, rows };
-  const fmt = (c, h) => h.t === 'n' ? money(c) : h.t === 'p' ? c + '%' : h.t === 'h' ? (c ? c.toFixed(1) + ' س' : '—') : esc(c);
-  return '<div class="card rpc"><div class="bar"><h2 style="margin:0">' + title + '</h2><button class="s" data-ex="' + key + '">⬇ CSV</button></div>' + (note ? '<p class="m" style="margin:4px 0 8px">' + note + '</p>' : '') +
+  const medals = ['🥇 ', '🥈 ', '🥉 '];
+  const fmt = (c, h, rIdx, cIdx) => {
+    if (h.t === 'n') return '<b class="rpt-num">' + money(c) + '</b>';
+    if (h.t === 'p') {
+      const v = Math.max(0, Math.min(100, +c || 0));
+      const col = v >= 75 ? 'var(--ok)' : v >= 45 ? 'var(--gold)' : 'var(--late)';
+      return '<div class="rpt-pct-cell"><b>' + v + '%</b><div class="rpt-pbar"><i style="width:' + v + '%;background:' + col + '"></i></div></div>';
+    }
+    if (h.t === 'h') return c ? (+c).toFixed(1) + ' س' : '—';
+    const prefix = (cIdx === 0 && rIdx < 3 && rows.length > 1 && key !== 'cancel') ? '<span class="rpt-mdl">' + medals[rIdx] + '</span>' : '';
+    return prefix + '<b>' + esc(c) + '</b>';
+  };
+  let footHtml = '';
+  if (rows.length > 1) {
+    const totals = heads.map((h, i) => {
+      if (i === 0) return '<b>Σ الإجمالي (' + rows.length + ')</b>';
+      if (h.t === 's' || h.t === 'p' || h.t === 'h') return '—';
+      const s = rows.reduce((acc, r) => acc + (+r[i] || 0), 0);
+      return '<b>' + money(s) + '</b>';
+    });
+    footHtml = '<tfoot><tr class="rpt-tfoot">' + totals.map((val, i) => '<td' + (heads[i].t !== 's' ? ' class="num"' : '') + '>' + val + '</td>').join('') + '</tr></tfoot>';
+  }
+  return '<div class="card rpc"><div class="bar"><h2 style="margin:0">' + title + '</h2><div class="row s" style="gap:6px"><button class="s" type="button" data-pr-tbl="' + key + '" title="طباعة هذا الكشف مستقلاً">🖨 طباعة كشف</button><button class="s" type="button" data-ex="' + key + '">⬇ CSV</button></div></div>' + (note ? '<p class="m" style="margin:4px 0 8px">' + note + '</p>' : '') +
     (rows.length ? '<div class="rpt-w"><table class="rpt"><thead><tr>' + heads.map(h => '<th>' + h.h + '</th>').join('') + '</tr></thead><tbody>' +
-      rows.map(r => '<tr>' + r.map((c, i) => '<td' + (heads[i].t !== 's' ? ' class="num"' : '') + '>' + fmt(c, heads[i]) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '<div class="empty">لا بيانات في هذه الفترة</div>') + '</div>';
+      rows.map((r, rIdx) => '<tr>' + r.map((c, i) => '<td' + (heads[i].t !== 's' ? ' class="num"' : '') + '>' + fmt(c, heads[i], rIdx, i) + '</td>').join('') + '</tr>').join('') + '</tbody>' + footHtml + '</table></div>' : '<div class="empty">لا بيانات في هذه الفترة</div>') + '</div>';
+}
+function printTableStatement(key) {
+  const t = RPT.t[key];
+  if (!t) return;
+  const D = rpData();
+  const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
+  const prof = typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo || 'متجرك') : {};
+  const stName = curCo ? (prof.displayName || curCo) : (BRAND.orgName || 'كل الشركات والفروع');
+  const logoHtml = prof.logo ? '<img src="' + esc(prof.logo) + '" style="width:54px;height:54px;object-fit:contain;border-radius:12px;border:1px solid #e4e9f2;padding:4px;background:#fff">' : '';
+  const fmt = (c, h) => h.t === 'n' ? money(c) : h.t === 'p' ? c + '%' : h.t === 'h' ? (c ? (+c).toFixed(1) + ' س' : '—') : esc(c);
+  const w = window.open('', '_blank');
+  if (!w) { toast('الرجاء السماح بالنوافذ المنبثقة للطباعة', false); return; }
+  w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>' + esc(t.title) + ' - ' + esc(stName) + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">' +
+    '<style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Tajawal,Tahoma,sans-serif;color:#0f1d35;margin:0;padding:18px;background:#fff;font-size:13px}' +
+    '.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #c9a24e;padding-bottom:12px;margin-bottom:16px}' +
+    'table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px}th{background:#0e1a2f;color:#f6e3a8;padding:9px;text-align:right}td{padding:8px 9px;border-bottom:1px solid #e6ebf2}tr:nth-child(even) td{background:#f9fbff}tfoot td{background:#f4efe2!important;font-weight:800;border-top:2px solid #c9a24e}' +
+    '.nopr{margin-bottom:14px;display:flex;gap:8px}@media print{.nopr{display:none!important}}</style></head><body>' +
+    '<div class="nopr"><button onclick="window.print()" style="padding:8px 18px;background:#0e1a2f;color:#f6e3a8;border:0;border-radius:8px;font:700 14px Tajawal;cursor:pointer">🖨 طباعة / حفظ PDF</button><button onclick="window.close()" style="padding:8px 14px;border:1px solid #ccc;background:#fff;border-radius:8px;font:600 13px Tajawal;cursor:pointer">إغلاق</button></div>' +
+    '<div class="hdr"><div style="display:flex;align-items:center;gap:12px">' + logoHtml + '<div><h1 style="margin:0;font-size:21px">' + esc(stName) + '</h1><div style="color:#66758c;font-size:13px">' + esc(t.title) + ' · الفترة: ' + esc(D.f) + ' إلى ' + esc(D.t) + '</div></div></div>' +
+    '<div style="text-align:left;font-size:12px;color:#66758c">تاريخ الإصدار: ' + today() + '<br>عدد السجلات: <b>' + t.rows.length + '</b></div></div>' +
+    '<table><thead><tr>' + t.heads.map(h => '<th>' + esc(h.h) + '</th>').join('') + '</tr></thead><tbody>' +
+    t.rows.map(r => '<tr>' + r.map((c, i) => '<td>' + fmt(c, t.heads[i]) + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table>' +
+    '<div style="margin-top:24px;padding-top:10px;border-top:1px solid #dde3ee;display:flex;justify-content:space-between;font-size:11.5px;color:#66758c"><span>كشف رسمي صادر من المنصة</span><span>' + esc(stName) + '</span></div>' +
+    '</body></html>');
+  w.document.close();
 }
 function csvDownload(name, heads, rows) {
   const q = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
@@ -87,7 +135,7 @@ function trendHtml(D, cc) {
   const uniq = [...new Set(keys)], m = {}; uniq.forEach(k => { m[k] = { n: 0, s: 0, p: 0 }; });
   D.rows.forEach(o => { const k = byMonth ? dOf(o).slice(0, 7) : dOf(o); if (m[k]) { m[k].n++; m[k].s += +o.total; m[k].p += oProfit(o); } });
   const mx = Math.max(1, ...uniq.map(k => m[k].s));
-  return '<div class="card rpc"><h2>📈 الاتجاه ' + (byMonth ? '(شهرياً)' : '(يومياً)') + '</h2><div class="trend">' + uniq.map(k => '<div class="tcol" title="' + k + ' — ' + m[k].n + ' طلب · مبيعات ' + money(m[k].s) + (cc ? ' · ربح ' + money(m[k].p) : '') + '"><i style="height:' + Math.max(m[k].s ? 4 : 0, Math.round(100 * m[k].s / mx)) + '%"></i><span>' + (byMonth ? k.slice(5) : k.slice(8)) + '</span></div>').join('') + '</div><p class="m">ارتفاع العمود = قيمة المبيعات. مرّر/اضغط على العمود لعرض التفاصيل.</p></div>';
+  return '<div class="card rpc"><h2>📈 الاتجاه الزمني للمبيعات ' + (byMonth ? '(شهرياً)' : '(يومياً)') + '</h2><div class="trend">' + uniq.map(k => '<div class="tcol" title="' + k + ' — ' + m[k].n + ' طلب · مبيعات ' + money(m[k].s) + (cc ? ' · ربح ' + money(m[k].p) : '') + '"><i style="height:' + Math.max(m[k].s ? 4 : 0, Math.round(100 * m[k].s / mx)) + '%"></i><span>' + (byMonth ? k.slice(5) : k.slice(8)) + '</span></div>').join('') + '</div><p class="m">ارتفاع العمود = قيمة المبيعات. مرّر/اضغط على العمود لعرض التفاصيل.</p></div>';
 }
 function printOrderReport(D, cc) {
   const R = D.rows || [], all = D.all || [];
@@ -163,32 +211,98 @@ function waOrderReport(D, cc) {
 }
 
 function reportsHtml() {
-  S.rp = S.rp || { period: '30', from: '', to: '', basis: 'order', scope: 'delivered' };
+  S.rp = S.rp || { period: '30', from: '', to: '', basis: 'order', scope: 'delivered', sec: 'all' };
+  if (!S.rp.sec) S.rp.sec = 'all';
+  const sec = S.rp.sec;
   const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
   const curProf = typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo || 'متجرك') : {};
+  const stName = curCo ? (curProf.displayName || curCo) : 'كل الشركات والفروع';
   const curSym = curCo ? (curProf.currency || BRAND.currency || 'ر.ي') : (BRAND.currency || 'ر.ي');
   const cc = canCost(), D = rpData(), R = D.rows; RPT.t = {};
   const del = D.all.filter(o => o.status === 'delivered'), can = D.all.filter(o => o.status === 'cancelled'), done = del.length + can.length;
-  const sales = sum(R, o => +o.total), cost = sum(R, oCostTotal), fees = sum(R, o => +o.delivery_fee), gross = sum(R, oProfit);
-  const kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
+  const sales = sum(R, o => +o.total), paid = sum(R, o => +o.paid), bal = sum(R, o => Math.max(0, +o.balance));
+  const cost = sum(R, oCostTotal), fees = sum(R, o => +o.delivery_fee), gross = sum(R, oProfit);
+  const colPct = sales > 0 ? Math.min(100, Math.round(100 * paid / sales)) : 0;
+  const marginPct = rpct(gross, sales - fees);
+  const coList = typeof companiesList === 'function' ? companiesList() : ['متجرك'];
+  const superAdm = typeof isSuperAdmin === 'function' && isSuperAdmin();
   const items = R.flatMap(o => oItems(o.id).map(i => ({ o, i, line: +i.line_total, cost: (+i.qty) * costOf(i.id) })));
   const H = (h, t) => ({ h, t: t || 'n' }), C = (arr, extra) => cc ? arr.concat(extra) : arr;
-  let h = '<div class="tools rpf" style="align-items:flex-end"><label>الفترة<select id="rp_p">' + [['1', 'اليوم'], ['7', 'آخر 7 أيام'], ['30', 'آخر 30 يوماً'], ['m', 'هذا الشهر'], ['pm', 'الشهر الماضي'], ['y', 'هذه السنة'], ['all', 'الكل'], ['x', 'مخصص']].map(([v, l]) => '<option value="' + v + '"' + (S.rp.period === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+  const debts = (S.orders || []).filter(o => o.status === 'delivered' && +o.balance > 0).map(o => ({ o, age: Math.max(0, Math.round((Date.now() - new Date(o.delivered_at || o.created_at)) / 864e5)) })).sort((a, b) => b.o.balance - a.o.balance);
+  const totalDebts = sum(debts, d => +d.o.balance);
+
+  // البانر التنفيذي الفاخر للتقارير المالية
+  let h = '<div class="rpt-exec-hero">' +
+    '<div class="reh-top">' +
+      '<div class="reh-brand">' +
+        (typeof companyLogoHtml === 'function' ? companyLogoHtml(curCo || 'متجرك', 48) : '') +
+        '<div>' +
+          '<div class="reh-badge">📊 المركز المالي والتقارير التنفيذية</div>' +
+          '<h2>' + esc(stName) + '</h2>' +
+          '<div class="reh-sub">📅 الفترة: ' + esc(D.f) + ' إلى ' + esc(D.t) + ' · إجمالي طلبات الفترة: <b>' + D.all.length + '</b></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="reh-actions">' +
+        '<button class="gold" id="rp_print" type="button">🖨 طباعة تقرير رسمي (PDF)</button>' +
+        '<button class="reh-btn" id="rp_wa" type="button">💬 ملخص واتساب</button>' +
+        '<button class="reh-btn" id="rp_all" type="button">⬇ تصدير الكل CSV</button>' +
+      '</div>' +
+    '</div>' +
+    (superAdm && coList.length > 1 ? '<div class="reh-co-pills">' +
+      '<span class="reh-plbl">🏢 المتجر:</span>' +
+      '<button type="button" class="reh-pill' + (!curCo ? ' on' : '') + '" data-rp-co="">🌐 كل الشركات (' + coList.length + ')</button>' +
+      coList.map(c => {
+        const cp = typeof getCompanyProfile === 'function' ? getCompanyProfile(c) : { displayName: c };
+        return '<button type="button" class="reh-pill' + (same(curCo, c) ? ' on' : '') + '" data-rp-co="' + esc(c) + '">🏢 ' + esc(cp.displayName || c) + '</button>';
+      }).join('') +
+    '</div>' : '') +
+    '<div class="reh-kpis">' +
+      '<div class="reh-kpi">' +
+        '<span class="reh-klbl">💰 إجمالي المبيعات المحتسبة</span>' +
+        '<b class="reh-kval">' + money(sales) + ' <small>' + esc(curSym) + '</small></b>' +
+        '<div class="reh-kfoot"><span>' + R.length + ' طلب محتسب</span><span>متوسط: ' + money(R.length ? sales / R.length : 0) + '</span></div>' +
+      '</div>' +
+      '<div class="reh-kpi">' +
+        '<span class="reh-klbl">💵 التحصيل الفعلي (' + colPct + '%)</span>' +
+        '<b class="reh-kval" style="color:#6fcf9f">' + money(paid) + ' <small>' + esc(curSym) + '</small></b>' +
+        '<div class="reh-bar"><i style="width:' + colPct + '%;background:#34d399"></i></div>' +
+      '</div>' +
+      (cc ? '<div class="reh-kpi">' +
+        '<span class="reh-klbl">📈 صافي ربح البضاعة (الهامش ' + marginPct + '%)</span>' +
+        '<b class="reh-kval" style="color:#f6e3a8">' + money(gross) + ' <small>' + esc(curSym) + '</small></b>' +
+        '<div class="reh-kfoot"><span>تكلفة الشراء: ' + money(cost) + '</span><span>توصيل: ' + money(fees) + '</span></div>' +
+      '</div>' : '<div class="reh-kpi">' +
+        '<span class="reh-klbl">🎯 نسبة نجاح التسليم</span>' +
+        '<b class="reh-kval" style="color:#f6e3a8">' + rpct(del.length, done) + '%</b>' +
+        '<div class="reh-kfoot"><span>مسلّم: ' + del.length + '</span><span>ملغي: ' + can.length + '</span></div>' +
+      '</div>') +
+      '<div class="reh-kpi">' +
+        '<span class="reh-klbl">⏳ إجمالي الديون المتبقية</span>' +
+        '<b class="reh-kval" style="color:#fca5a5">' + money(totalDebts) + ' <small>' + esc(curSym) + '</small></b>' +
+        '<div class="reh-kfoot"><span>' + debts.length + ' طلب مسلّم غير مسدد</span><span>متبقي الفترة: ' + money(bal) + '</span></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  // شريط الفلاتر والتبويبات الفرعية للتقارير
+  h += '<div class="tools rpf" style="align-items:flex-end;margin-bottom:10px"><label>الفترة<select id="rp_p">' + [['1', 'اليوم'], ['7', 'آخر 7 أيام'], ['30', 'آخر 30 يوماً'], ['m', 'هذا الشهر'], ['pm', 'الشهر الماضي'], ['y', 'هذه السنة'], ['all', 'الكل'], ['x', 'مخصص']].map(([v, l]) => '<option value="' + v + '"' + (S.rp.period === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     (S.rp.period === 'x' ? '<label>من<input id="rp_f" type="date" value="' + esc(S.rp.from) + '"></label><label>إلى<input id="rp_t" type="date" value="' + esc(S.rp.to) + '"></label>' : '') +
     '<label>الاعتماد على<select id="rp_b"><option value="order"' + (S.rp.basis === 'order' ? ' selected' : '') + '>تاريخ الطلب</option><option value="delivered"' + (S.rp.basis === 'delivered' ? ' selected' : '') + '>تاريخ التوصيل</option></select></label>' +
-    '<label>الطلبات المحتسبة<select id="rp_s"><option value="delivered"' + (S.rp.scope === 'delivered' ? ' selected' : '') + '>المسلّمة فقط</option><option value="live"' + (S.rp.scope === 'live' ? ' selected' : '') + '>كل غير الملغية</option><option value="all"' + (S.rp.scope === 'all' ? ' selected' : '') + '>الكل</option></select></label>' +
-    '<div class="row s" style="margin-inline-start:auto;gap:6px;flex-wrap:wrap">' +
-      '<button class="gold" id="rp_print" type="button">🖨 طباعة تقرير رسمي (PDF)</button>' +
-      '<button class="s" id="rp_wa" type="button">📋 نسخ ملخص واتساب</button>' +
-      '<button class="s" id="rp_all" type="button">⬇ تصدير الكل CSV</button>' +
-    '</div></div>';
-  h += '<div class="stats kpis rpk">' + kc(R.length, 'طلبات محتسبة') + kc(rpct(del.length, done) + '%', 'نسبة النجاح', 'ok') + kc(money(sales), 'المبيعات (' + esc(curSym) + ')') + kc(money(sum(R, o => +o.paid)), 'المحصّل') + kc(money(sum(R, o => Math.max(0, +o.balance))), 'المتبقي', 'late') + kc(money(R.length ? sales / R.length : 0), 'متوسط الطلب') +
-    (cc ? kc(money(cost), 'تكلفة الشراء') + kc(money(gross), 'ربح البضاعة', gross >= 0 ? 'ok' : 'late') + kc(rpct(gross, sales - fees) + '%', 'هامش الربح') + kc(money(fees), 'رسوم توصيل محصّلة') : '') + '</div>';
-  if (cc) h += '<p class="m" style="margin:-4px 4px 12px">ربح البضاعة = (مجموع الأصناف − الخصم) − سعر الشراء. رسوم التوصيل المحصّلة تُعرض منفصلة.</p>';
-  h += rptChartsGridHtml(D, items, cc);
-  h += trendHtml(D, cc);
-  // مقارنة أداء الشركات والمتاجر (تظهر عند وجود أكثر من متجر أو عرض الكل)
-  if (typeof orderCompany === 'function' && (!curCo || (typeof companiesList === 'function' && companiesList().length > 1))) {
+    '<label>الطلبات المحتسبة<select id="rp_s"><option value="delivered"' + (S.rp.scope === 'delivered' ? ' selected' : '') + '>المسلّمة فقط</option><option value="live"' + (S.rp.scope === 'live' ? ' selected' : '') + '>كل غير الملغية</option><option value="all"' + (S.rp.scope === 'all' ? ' selected' : '') + '>الكل</option></select></label></div>';
+
+  h += '<div class="rpt-subtabs">' +
+    [['all', '🌟 التقرير الشامل'], ['stores', '🏢 مقارنة المتاجر'], ['reps', '🛵 المناديب والمسجّلين'], ['suppliers', '🏪 التجار والأصناف'], ['debts', '💳 العملاء والديون (' + debts.length + ')']].map(([k, l]) =>
+      '<button type="button" class="rpt-stab' + (sec === k ? ' on' : '') + '" data-rp-sec="' + k + '">' + l + '</button>'
+    ).join('') +
+  '</div>';
+
+  if (sec === 'all') {
+    h += rptChartsGridHtml(D, items, cc);
+    h += trendHtml(D, cc);
+  }
+
+  // مقارنة أداء الشركات والمتاجر
+  if ((sec === 'all' || sec === 'stores') && typeof orderCompany === 'function') {
     const coRows = groupBy(D.all, o => orderCompany(o) || 'متجرك').map(([k, a]) => {
       const r = a.filter(o => R.includes(o)), d = a.filter(o => o.status === 'delivered'), c = a.filter(o => o.status === 'cancelled');
       return C([k, a.length, d.length, c.length, rpct(d.length, d.length + c.length), sum(r, o => +o.total), sum(r, o => +o.paid), sum(r, o => Math.max(0, +o.balance))], [sum(r, oProfit)]);
@@ -197,40 +311,41 @@ function reportsHtml() {
       h += tcard('stores', '🏢 مقارنة أداء المتاجر والشركات', C([H('المتجر / الشركة', 's'), H('إجمالي الطلبات'), H('المسلّمة'), H('الملغية'), H('نسبة النجاح', 'p'), H('المبيعات'), H('المحصّل'), H('الديون المتبقية')], [H('صافي الربح')]), coRows, 'مقارنة شاملة لأداء كل متجر أو فرع خلال الفترة المحددة.');
     }
   }
-  // حسب المندوب
-  const repRows = groupBy(D.all.filter(o => o.rep_email), o => repName(o.rep_email)).map(([k, a]) => { const d = a.filter(o => o.status === 'delivered'), c = a.filter(o => o.status === 'cancelled'), tt = d.filter(o => o.delivered_at).map(o => hrs(o.created_at, o.delivered_at)); return [k, a.length, d.length, c.length, rpct(d.length, d.length + c.length), sum(d, o => +o.total), tt.length ? tt.reduce((x, y) => x + y, 0) / tt.length : 0]; }).sort((a, b) => b[2] - a[2]);
-  h += tcard('rep', '🛵 أداء المناديب', [H('المندوب', 's'), H('طلبات مسندة'), H('تم التوصيل'), H('ملغية'), H('نسبة النجاح', 'p'), H('قيمة المسلّم'), H('متوسط زمن الإنجاز', 'h')], repRows, 'يعتمد على كل طلبات الفترة (وليس فقط المحتسبة). زمن الإنجاز = من تسجيل الطلب حتى التسليم.');
-  // حسب مسجّل الطلب
-  const crRows = groupBy(D.all, o => creatorName(o.created_by)).map(([k, a]) => { const r = a.filter(o => R.includes(o)); return C([k, a.length, a.filter(o => o.status === 'delivered').length, a.filter(o => o.status === 'cancelled').length, rpct(a.filter(o => o.status === 'cancelled').length, a.length), sum(r, o => +o.total), r.length ? sum(r, o => +o.total) / r.length : 0], [sum(r, oProfit)]); }).sort((a, b) => b[5] - a[5]);
-  h += tcard('creator', '🧑‍💼 مسجّلو الطلبات', C([H('المسجّل', 's'), H('طلبات'), H('مسلّمة'), H('ملغية'), H('نسبة الإلغاء', 'p'), H('المبيعات'), H('متوسط الطلب')], [H('الربح')]), crRows);
-  // حسب التاجر
-  const supRows = groupBy(items, x => x.i.supplier).map(([k, a]) => C([k, a.length, sum(a, x => +x.i.qty), sum(a, x => x.line)], [sum(a, x => x.cost), sum(a, x => x.line - x.cost), rpct(sum(a, x => x.line - x.cost), sum(a, x => x.line))])).sort((a, b) => b[3] - a[3]);
-  h += tcard('supplier', '🏪 التجار / مصادر الشراء', C([H('التاجر', 's'), H('عدد الأصناف'), H('الكمية'), H('قيمة البيع')], [H('مستحق للتاجر (الشراء)'), H('الربح'), H('الهامش', 'p')]), supRows, 'قيمة الشراء هي ما تدفعه للتاجر عن الأصناف المحتسبة.');
-  // حسب الصنف
-  const itRows = groupBy(items, x => x.i.name).map(([k, a]) => C([k, sum(a, x => +x.i.qty), sum(a, x => x.line)], [sum(a, x => x.cost), sum(a, x => x.line - x.cost)])).sort((a, b) => b[2] - a[2]).slice(0, 25);
-  h += tcard('items', '📦 أكثر الأصناف مبيعاً', C([H('الصنف', 's'), H('الكمية'), H('المبيعات')], [H('التكلفة'), H('الربح')]), itRows);
-  // العملاء
-  const cuRows = groupBy(R, o => digits(o.phone) || o.customer_name).map(([k, a]) => [a[0].customer_name, a[0].phone || '', a.length, sum(a, o => +o.total), sum(a, o => Math.max(0, +o.balance))]).sort((a, b) => b[3] - a[3]).slice(0, 25);
-  h += tcard('customers', '👥 أفضل العملاء', [H('العميل', 's'), H('الهاتف', 's'), H('طلبات'), H('المشتريات'), H('متبقي عليه')], cuRows);
-  // القنوات
-  const chRows = groupBy(D.all, o => o.channel || 'غير محدد').map(([k, a]) => { const d = a.filter(o => o.status === 'delivered'); return [k, a.length, d.length, rpct(d.length, a.length), sum(d, o => +o.total)]; }).sort((a, b) => b[1] - a[1]);
-  h += tcard('channels', '📣 قنوات الطلب', [H('القناة', 's'), H('طلبات'), H('مسلّمة'), H('نسبة التسليم', 'p'), H('المبيعات')], chRows);
-  // أسباب الإلغاء
-  const rsRows = groupBy(can, o => String(o.cancel_reason || '').trim()).map(([k, a]) => [k, a.length, rpct(a.length, can.length), [...new Set(a.map(o => o.rep_email ? repName(o.rep_email) : creatorName(o.created_by)))].join('، ')]).sort((a, b) => b[1] - a[1]);
-  h += tcard('cancel', '❌ أسباب الإلغاء', [H('السبب', 's'), H('العدد'), H('النسبة', 'p'), H('المندوب/المسجّل', 's')], rsRows);
-  // الديون (كل الفترات)
-  const debts = (S.orders || []).filter(o => o.status === 'delivered' && +o.balance > 0).map(o => ({ o, age: Math.max(0, Math.round((Date.now() - new Date(o.delivered_at || o.created_at)) / 864e5)) })).sort((a, b) => b.o.balance - a.o.balance);
-  RPT.t.debts = { title: 'ديون العملاء', heads: [H('العميل', 's'), H('الهاتف', 's'), H('رقم الطلب', 's'), H('المتبقي'), H('أيام منذ التسليم')], rows: debts.map(d => [d.o.customer_name, d.o.phone || '', '#' + d.o.order_no, +d.o.balance, d.age]) };
-  h += '<div class="card rpc"><div class="bar"><h2 style="margin:0">💳 ديون العملاء (طلبات مسلّمة غير مسدّدة)</h2><button class="s" data-ex="debts">⬇ CSV</button></div><p class="m" style="margin:4px 0 8px">الإجمالي: <b style="color:var(--late)">' + money(sum(debts, d => +d.o.balance)) + ' ' + esc(curSym) + '</b> — بغضّ النظر عن الفترة المختارة</p>' +
-    (debts.length ? debts.slice(0, 40).map(d => '<div class="bar pr-r"><span><b>' + esc(d.o.customer_name) + '</b> <span class="m">#' + d.o.order_no + ' · منذ ' + d.age + ' يوم</span></span><span><b style="color:var(--late)">' + money(d.o.balance) + ' ' + esc(bcurr(d.o)) + '</b> ' + (d.o.phone ? '<button class="s" data-rem="' + d.o.id + '">📲 تذكير</button>' : '') + ' <button class="s" data-rpay="' + d.o.id + '">💰</button></span></div>').join('') : '<div class="empty">لا توجد ديون 🎉</div>') + '</div>';
+  if (sec === 'all' || sec === 'reps') {
+    const repRows = groupBy(D.all.filter(o => o.rep_email), o => repName(o.rep_email)).map(([k, a]) => { const d = a.filter(o => o.status === 'delivered'), c = a.filter(o => o.status === 'cancelled'), tt = d.filter(o => o.delivered_at).map(o => hrs(o.created_at, o.delivered_at)); return [k, a.length, d.length, c.length, rpct(d.length, d.length + c.length), sum(d, o => +o.total), tt.length ? tt.reduce((x, y) => x + y, 0) / tt.length : 0]; }).sort((a, b) => b[2] - a[2]);
+    h += tcard('rep', '🛵 أداء المناديب', [H('المندوب', 's'), H('طلبات مسندة'), H('تم التوصيل'), H('ملغية'), H('نسبة النجاح', 'p'), H('قيمة المسلّم'), H('متوسط زمن الإنجاز', 'h')], repRows, 'يعتمد على كل طلبات الفترة (وليس فقط المحتسبة). زمن الإنجاز = من تسجيل الطلب حتى التسليم.');
+    const crRows = groupBy(D.all, o => creatorName(o.created_by)).map(([k, a]) => { const r = a.filter(o => R.includes(o)); return C([k, a.length, a.filter(o => o.status === 'delivered').length, a.filter(o => o.status === 'cancelled').length, rpct(a.filter(o => o.status === 'cancelled').length, a.length), sum(r, o => +o.total), r.length ? sum(r, o => +o.total) / r.length : 0], [sum(r, oProfit)]); }).sort((a, b) => b[5] - a[5]);
+    h += tcard('creator', '🧑‍💼 مسجّلو الطلبات', C([H('المسجّل', 's'), H('طلبات'), H('مسلّمة'), H('ملغية'), H('نسبة الإلغاء', 'p'), H('المبيعات'), H('متوسط الطلب')], [H('الربح')]), crRows);
+  }
+  if (sec === 'all' || sec === 'suppliers') {
+    const supRows = groupBy(items, x => x.i.supplier).map(([k, a]) => C([k, a.length, sum(a, x => +x.i.qty), sum(a, x => x.line)], [sum(a, x => x.cost), sum(a, x => x.line - x.cost), rpct(sum(a, x => x.line - x.cost), sum(a, x => x.line))])).sort((a, b) => b[3] - a[3]);
+    h += tcard('supplier', '🏪 التجار / مصادر الشراء', C([H('التاجر', 's'), H('عدد الأصناف'), H('الكمية'), H('قيمة البيع')], [H('مستحق للتاجر (الشراء)'), H('الربح'), H('الهامش', 'p')]), supRows, 'قيمة الشراء هي ما تدفعه للتاجر عن الأصناف المحتسبة.');
+    const itRows = groupBy(items, x => x.i.name).map(([k, a]) => C([k, sum(a, x => +x.i.qty), sum(a, x => x.line)], [sum(a, x => x.cost), sum(a, x => x.line - x.cost)])).sort((a, b) => b[2] - a[2]).slice(0, 25);
+    h += tcard('items', '📦 أكثر الأصناف مبيعاً', C([H('الصنف', 's'), H('الكمية'), H('المبيعات')], [H('التكلفة'), H('الربح')]), itRows);
+  }
+  if (sec === 'all' || sec === 'debts') {
+    const cuRows = groupBy(R, o => digits(o.phone) || o.customer_name).map(([k, a]) => [a[0].customer_name, a[0].phone || '', a.length, sum(a, o => +o.total), sum(a, o => Math.max(0, +o.balance))]).sort((a, b) => b[3] - a[3]).slice(0, 25);
+    h += tcard('customers', '👥 أفضل العملاء', [H('العميل', 's'), H('الهاتف', 's'), H('طلبات'), H('المشتريات'), H('متبقي عليه')], cuRows);
+    const chRows = groupBy(D.all, o => o.channel || 'غير محدد').map(([k, a]) => { const d = a.filter(o => o.status === 'delivered'); return [k, a.length, d.length, rpct(d.length, a.length), sum(d, o => +o.total)]; }).sort((a, b) => b[1] - a[1]);
+    h += tcard('channels', '📣 قنوات الطلب', [H('القناة', 's'), H('طلبات'), H('مسلّمة'), H('نسبة التسليم', 'p'), H('المبيعات')], chRows);
+    const rsRows = groupBy(can, o => String(o.cancel_reason || '').trim()).map(([k, a]) => [k, a.length, rpct(a.length, can.length), [...new Set(a.map(o => o.rep_email ? repName(o.rep_email) : creatorName(o.created_by)))].join('، ')]).sort((a, b) => b[1] - a[1]);
+    h += tcard('cancel', '❌ أسباب الإلغاء', [H('السبب', 's'), H('العدد'), H('النسبة', 'p'), H('المندوب/المسجّل', 's')], rsRows);
+    RPT.t.debts = { title: 'ديون العملاء', heads: [H('العميل', 's'), H('الهاتف', 's'), H('رقم الطلب', 's'), H('المتبقي'), H('أيام منذ التسليم')], rows: debts.map(d => [d.o.customer_name, d.o.phone || '', '#' + d.o.order_no, +d.o.balance, d.age]) };
+    h += '<div class="card rpc"><div class="bar"><h2 style="margin:0">💳 ديون العملاء (طلبات مسلّمة غير مسدّدة)</h2><div class="row s" style="gap:6px"><button class="s" type="button" data-pr-tbl="debts">🖨 طباعة كشف الديون</button><button class="s" type="button" data-ex="debts">⬇ CSV</button></div></div><p class="m" style="margin:4px 0 8px">الإجمالي: <b style="color:var(--late)">' + money(totalDebts) + ' ' + esc(curSym) + '</b> — بغضّ النظر عن الفترة المختارة</p>' +
+      (debts.length ? debts.slice(0, 40).map(d => '<div class="bar pr-r"><span><b>' + esc(d.o.customer_name) + '</b> <span class="m">#' + d.o.order_no + ' · منذ ' + d.age + ' يوم</span></span><span><b style="color:var(--late)">' + money(d.o.balance) + ' ' + esc(bcurr(d.o)) + '</b> ' + (d.o.phone ? '<button class="s" data-rem="' + d.o.id + '">📲 تذكير</button>' : '') + ' <button class="s" data-rpay="' + d.o.id + '">💰 تحصيل</button></span></div>').join('') : '<div class="empty">لا توجد ديون 🎉</div>') + '</div>';
+  }
   return h;
 }
 function bindReports() {
   const set = (k, v) => { S.rp[k] = v; render(); };
-  $('rp_p').onchange = e => set('period', e.target.value);
+  if ($('rp_p')) $('rp_p').onchange = e => set('period', e.target.value);
   if ($('rp_f')) { $('rp_f').onchange = e => set('from', e.target.value); $('rp_t').onchange = e => set('to', e.target.value); }
-  $('rp_b').onchange = e => set('basis', e.target.value); $('rp_s').onchange = e => set('scope', e.target.value);
+  if ($('rp_b')) $('rp_b').onchange = e => set('basis', e.target.value);
+  if ($('rp_s')) $('rp_s').onchange = e => set('scope', e.target.value);
+  document.querySelectorAll('[data-rp-sec]').forEach(b => b.onclick = () => set('sec', b.dataset.rpSec));
+  document.querySelectorAll('[data-rp-co]').forEach(b => b.onclick = () => { S.activeCompany = b.dataset.rpCo; applyCompanyScope(); render(); });
   document.querySelectorAll('[data-ex]').forEach(b => b.onclick = () => { const t = RPT.t[b.dataset.ex]; if (t) csvDownload('تقرير-' + t.title.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g, '-'), t.heads, t.rows); });
+  document.querySelectorAll('[data-pr-tbl]').forEach(b => b.onclick = () => printTableStatement(b.dataset.prTbl));
   if ($('rp_all')) $('rp_all').onclick = () => Object.keys(RPT.t).forEach((k, i) => setTimeout(() => csvDownload('تقرير-' + k, RPT.t[k].heads, RPT.t[k].rows), i * 350));
   if ($('rp_print')) $('rp_print').onclick = () => printOrderReport(rpData(), canCost());
   if ($('rp_wa')) $('rp_wa').onclick = () => waOrderReport(rpData(), canCost());

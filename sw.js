@@ -19,8 +19,15 @@ self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Prom
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return;
-  e.respondWith(caches.open(C).then(async c => (await c.match(e.request, { ignoreSearch: true })) ||
-    fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; })));
+  e.respondWith(caches.open(C).then(async c => {
+    try {
+      const r = await fetch(e.request);
+      if (r.ok) c.put(e.request, r.clone());
+      return r;
+    } catch (err) {
+      return (await c.match(e.request, { ignoreSearch: true })) || Response.error();
+    }
+  }));
 });
 
 // ===== الجلسة والمزامنة (تعمل حتى والتطبيق مغلق) =====

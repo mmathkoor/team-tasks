@@ -60,12 +60,12 @@ function toggleCoPopover(e) {
 
   const pop = document.createElement('div');
   pop.id = 'co_pop_menu';
-  pop.className = 'co-pop';
+  pop.className = 'co-pop-menu';
   pop.innerHTML =
-    '<div class="co-pop-hd"><span>🏢 التبديل بين الشركات والمتاجر</span><small>' + coList.length + ' متاجر</small></div>' +
+    '<div class="co-pop-head"><span>🏢 التبديل بين الشركات والمتاجر</span><small>' + coList.length + ' متاجر</small></div>' +
     '<button type="button" class="co-pop-item' + (!curCo ? ' on' : '') + '" data-copick="">' +
-      '<div class="co-pop-ic all">🌐</div>' +
-      '<div class="co-pop-info">' +
+      '<div class="co-pop-ic">🌐</div>' +
+      '<div class="co-pop-txt">' +
         '<b>كل الشركات والمتاجر (' + coList.length + ')</b>' +
         '<small>عرض شامل لجميع الفروع · ' + allO.length + ' طلب · ' + allT.length + ' مهمة</small>' +
       '</div>' +
@@ -81,7 +81,7 @@ function toggleCoPopover(e) {
         return '<div class="co-pop-row' + (isAct ? ' on' : '') + '">' +
           '<button type="button" class="co-pop-item" data-copick="' + esc(c) + '">' +
             companyLogoHtml(c, 36) +
-            '<div class="co-pop-info">' +
+            '<div class="co-pop-txt">' +
               '<b>' + esc(cp.displayName || c) + (same(c, 'متجرك') ? ' <span class="co-pop-def">الأساسي</span>' : '') + '</b>' +
               '<small>👥 ' + empN + ' موظف · 🛒 ' + ordN + ' طلب · 📋 ' + tskN + ' مهمة · ' + esc(cp.currency || 'ر.ي') + '</small>' +
             '</div>' +
@@ -91,23 +91,17 @@ function toggleCoPopover(e) {
         '</div>';
       }).join('') +
     '</div>' +
-    '<div class="co-pop-ft">' +
+    '<div class="co-pop-foot">' +
       '<button type="button" class="s" id="co_pop_manage" style="width:100%;justify-content:center;font-size:12.5px">⚙️ إدارة الشركات وإضافة متجر جديد</button>' +
     '</div>';
 
   document.body.appendChild(pop);
   const rect = btn.getBoundingClientRect();
-  const isRtl = document.documentElement.dir !== 'ltr';
-  const popW = Math.min(340, window.innerWidth - 24);
+  const popW = Math.min(350, window.innerWidth - 20);
   pop.style.width = popW + 'px';
-  pop.style.top = Math.round(rect.bottom + 8) + 'px';
-  if (isRtl) {
-    const leftPos = Math.max(12, Math.min(window.innerWidth - popW - 12, rect.left));
-    pop.style.left = Math.round(leftPos) + 'px';
-  } else {
-    const rightPos = Math.max(12, window.innerWidth - rect.right);
-    pop.style.right = Math.round(rightPos) + 'px';
-  }
+  pop.style.top = Math.min(window.innerHeight - 360, Math.max(10, Math.round(rect.bottom + 8))) + 'px';
+  const leftPos = Math.max(10, Math.min(window.innerWidth - popW - 10, rect.left));
+  pop.style.left = Math.round(leftPos) + 'px';
 
   const closePop = ev => {
     if (!pop.contains(ev.target) && ev.target !== btn && !btn.contains(ev.target)) {
@@ -176,16 +170,24 @@ function headerHtml() {
   const prof = curCo && typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo) : null;
   const swHtml = canSw ? (
     '<button type="button" id="co_sw_btn" class="co-sw-btn" title="تبديل الشركة / المتجر المعروض">' +
-      (curCo ? companyLogoHtml(curCo, 24) + '<span class="co-sw-txt">' + esc((prof && prof.displayName) || curCo) + '</span>' : '<span class="co-sw-globe">🌐</span><span class="co-sw-txt">كل الشركات (' + coList.length + ')</span>') +
-      '<span class="co-sw-arr">▾</span>' +
+      '<span class="co-sw-main">' +
+        (curCo ? companyLogoHtml(curCo, 22) + '<span class="co-sw-txt">' + esc((prof && prof.displayName) || curCo) + '</span>' : '<span class="co-sw-emo">🌐</span><span class="co-sw-txt">كل الشركات (' + coList.length + ')</span>') +
+      '</span>' +
+      '<span class="co-sw-arr">تبديل ▾</span>' +
     '</button>'
   ) : (curCo ? '<span class="co-tag">🏢 ' + esc((prof && prof.displayName) || curCo) + '</span>' : '');
   const roleSub = [S.me.title, myMeta.department].filter(Boolean).join(' · ');
   const sloganTxt = prof && prof.slogan ? ' · ' + prof.slogan : '';
-  return '<div class="top"><div class="brand">' +
-    companyLogoHtml(curCo || 'متجرك', 42) +
-    '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (roleSub ? ' (' + esc(roleSub) + ')' : '') + esc(sloganTxt) + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
-    '<div class="hbtns">' + swHtml + '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
-    '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
-    '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button></div></div>';
+  return '<div class="top">' +
+    '<div class="brand">' +
+      companyLogoHtml(curCo || 'متجرك', 42) +
+      '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (roleSub ? ' (' + esc(roleSub) + ')' : '') + esc(sloganTxt) + (d ? ' · ' + esc(d) : '') + '</div></div>' +
+    '</div>' +
+    '<div class="hbtns">' +
+      '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
+      '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
+      '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +
+    '</div>' +
+    (swHtml ? '<div class="top-co-bar">' + swHtml + '</div>' : '') +
+  '</div>';
 }
