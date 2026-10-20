@@ -16,7 +16,7 @@ grant usage on schema storage to authenticated; grant all on storage.objects to 
 base = open(ROOT + '/sql/000_base.sql', encoding='utf-8').read().replace("lower(created_by) = lower(auth.jwt() ->> 'email')) with check (is_member());", "lower(created_by) = lower(auth.jwt() ->> 'email'));")
 ac.execute(base)
 for f in ['001_features','002_workflow','003_recurring_for_all','004_activity_checklist','005_priority_realtime','007_group_inbox_meetings']:
-    ac.execute(open(fROOT + '/sql/{f}.sql', encoding='utf-8').read())
+    ac.execute(open(f'{ROOT}/sql/{f}.sql', encoding='utf-8').read())
 ac.execute("grant all on all tables in schema public to authenticated;")
 ac.execute("insert into members (email,name,role) values ('boss@x.com','المالك','admin'),('staff@x.com','موظف','member'),('next@x.com','التالي','member'),('other@x.com','آخر','member')")
 def as_(email):
