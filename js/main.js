@@ -1,7 +1,7 @@
 // ===== تسجيل عامل الخدمة + شريط التحديث =====
 if ('serviceWorker' in navigator) {
   let had = !!navigator.serviceWorker.controller, rld = false;
-  navigator.serviceWorker.register('/sw.js?v=4.0.0').then(reg => {
+  navigator.serviceWorker.register('/sw.js').then(reg => {
     reg.update().catch(() => {});
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
   });
