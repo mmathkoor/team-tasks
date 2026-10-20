@@ -202,7 +202,7 @@ function headerHtml() {
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +
-      '<button id="hdr_out" class="s iconbtn" aria-label="تسجيل الخروج" title="تسجيل الخروج">⎋</button>' +
+      '<button id="hdr_out" class="s iconbtn" aria-label="تسجيل الخروج" title="تسجيل الخروج">' + svgIc('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>') + '</button>' +
     '</div>' +
     (swHtml ? '<div class="top-co-bar">' + swHtml + '</div>' : '') +
   '</div>';
