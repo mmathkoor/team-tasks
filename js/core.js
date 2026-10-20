@@ -120,7 +120,7 @@ function parseMemberMeta(m) {
   }
   co = String(co || '').trim();
   dep = String(dep || '').trim();
-  // جميع الموظفين (غير المدير العام) يتبعون تلقائياً شركة «متجرك» ما لم تُحدَّد لهم شركة أخرى
+  // جميع الموظفين والمناديب (غير المدير العام) يتبعون تلقائياً شركة «متجرك» ما لم تُحدَّد لهم شركة أخرى أو __all للمندوب المشترك
   if (!co && m.role !== 'admin') co = DEFAULT_COMPANY;
   return { company: co, department: dep };
 }
@@ -132,7 +132,8 @@ function memberCompany(email) {
   if (!email) return DEFAULT_COMPANY;
   const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
   if (!m) return DEFAULT_COMPANY;
-  return parseMemberMeta(m).company || DEFAULT_COMPANY;
+  const c = parseMemberMeta(m).company;
+  return (!c || c === '__all') ? DEFAULT_COMPANY : c;
 }
 function memberDept(email) {
   if (!email) return '';
@@ -176,7 +177,9 @@ function getCompanyProfile(coName) {
     accent: p.accent || '#d4af6a',
     logo: p.logo || '',
     footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
-    taxNo: p.taxNo || ''
+    taxNo: p.taxNo || '',
+    staffCanCost: p.staffCanCost !== undefined ? !!p.staffCanCost : !!(S.ordSet && S.ordSet.staff_can_cost),
+    imageKeepDays: p.imageKeepDays !== undefined ? +p.imageKeepDays : (S.ordSet && S.ordSet.image_keep_days != null ? +S.ordSet.image_keep_days : 1)
   };
 }
 function activeBrand() {
@@ -193,15 +196,16 @@ function orderCompany(o) {
   const tag = extractRecordCompany(o.notes);
   if (tag) return tag;
   if (o.rep_email) {
-    const rc = memberCompany(o.rep_email);
-    if (rc) return rc;
+    const mRep = (S.rawMembers || S.allMembers || []).find(x => same(x.email, o.rep_email));
+    const rc = mRep ? parseMemberMeta(mRep).company : '';
+    if (rc && rc !== '__all') return rc;
   }
   if (o.created_by) {
     const m = (S.rawMembers || S.allMembers || []).find(x => same(x.email, o.created_by));
     if (m && m.role !== 'admin') return parseMemberMeta(m).company || DEFAULT_COMPANY;
     if (m) {
       const mc = String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim();
-      if (mc) return mc;
+      if (mc && mc !== '__all') return mc;
     }
   }
   return DEFAULT_COMPANY;
@@ -215,7 +219,7 @@ function taskCompany(t) {
     if (m && m.role !== 'admin') return parseMemberMeta(m).company || DEFAULT_COMPANY;
     if (m) {
       const mc = String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim();
-      if (mc) return mc;
+      if (mc && mc !== '__all') return mc;
     }
   }
   if (t.created_by) {
@@ -226,11 +230,12 @@ function taskCompany(t) {
 }
 function companiesList() {
   const set = new Set([DEFAULT_COMPANY]);
+  const addCo = v => { const s = String(v || '').trim(); if (s && s !== '__all') set.add(s); };
   const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
-  hv.forEach(x => { if (String(x).startsWith('__co:')) { const v = String(x).slice(5).trim(); if (v) set.add(v); } });
-  Object.keys(companyProfilesMap()).forEach(k => { if (k && k.trim()) set.add(k.trim()); });
-  (getLocalOrgMeta().companies || []).forEach(v => { if (v && String(v).trim()) set.add(String(v).trim()); });
-  (S.rawMembers || S.allMembers || S.members || []).forEach(m => { const c = parseMemberMeta(m).company; if (c) set.add(c); });
+  hv.forEach(x => { if (String(x).startsWith('__co:')) addCo(String(x).slice(5)); });
+  Object.keys(companyProfilesMap()).forEach(addCo);
+  (getLocalOrgMeta().companies || []).forEach(addCo);
+  (S.rawMembers || S.allMembers || S.members || []).forEach(m => addCo(parseMemberMeta(m).company));
   return [...set];
 }
 function departmentsList() {
@@ -242,7 +247,7 @@ function departmentsList() {
   return [...set];
 }
 async function persistOrgLists(companies, departments, profilesOpt) {
-  const cleanCo = [...new Set([DEFAULT_COMPANY].concat((companies || []).map(x => String(x || '').trim()).filter(Boolean)))];
+  const cleanCo = [...new Set([DEFAULT_COMPANY].concat((companies || []).map(x => String(x || '').trim()).filter(x => x && x !== '__all')))];
   const cleanDep = [...new Set((departments || []).map(x => String(x || '').trim()).filter(Boolean))];
   const profs = profilesOpt || companyProfilesMap();
   try { localStorage.setItem('org_meta_v1', JSON.stringify({ companies: cleanCo, departments: cleanDep, profiles: profs })); } catch (e) {}
@@ -272,7 +277,12 @@ async function saveCompanyProfile(coName, profileData) {
     if (profileData.phone !== undefined) patch.store_phone = profileData.phone || null;
     if (profileData.address !== undefined) patch.store_address = profileData.address || null;
     if (profileData.appTitle !== undefined && profileData.appTitle) patch.app_name = profileData.appTitle;
-    if (Object.keys(patch).length) await sb.from('ord_settings').update(patch).eq('id', true);
+    if (profileData.staffCanCost !== undefined) patch.staff_can_cost = !!profileData.staffCanCost;
+    if (profileData.imageKeepDays !== undefined) patch.image_keep_days = +profileData.imageKeepDays;
+    if (Object.keys(patch).length) {
+      Object.assign(S.ordSet, patch);
+      await sb.from('ord_settings').update(patch).eq('id', true);
+    }
   }
 }
 const isSuperAdmin = () => isAdmin() && !String(S.me && (S.me.company || (S.me.telegram_chat_id && S.me.telegram_chat_id.startsWith('{') ? (JSON.parse(S.me.telegram_chat_id).co || '') : '')) || '').trim();
@@ -296,7 +306,10 @@ function applyCompanyScope() {
     S.props = (S.rawProps || []).slice();
     return;
   }
-  S.allMembers = S.rawMembers.filter(m => same(parseMemberMeta(m).company, co) || same(m.email, S.me && S.me.email));
+  S.allMembers = S.rawMembers.filter(m => {
+    const mc = parseMemberMeta(m).company;
+    return same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email);
+  });
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');
   S.tasks = (S.rawTasks || []).filter(t => same(taskCompany(t), co));

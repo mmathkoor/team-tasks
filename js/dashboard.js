@@ -19,7 +19,12 @@ function dashUnits(tasks, done, members) {
 
 function dashCompute(units, f, now, members) {
   const todayS = ymd(now), start = f.period === 'all' ? null : new Date(now.getTime() - +f.period * DAY);
-  const mine = u => (!f.who || same(u.who, f.who)) && (!f.meet || u.meeting_id === f.meet);
+  const depOf = email => {
+    const m = (S.allMembers || members || []).find(x => same(x.email, email));
+    return m && typeof parseMemberMeta === 'function' ? (parseMemberMeta(m).department || '') : '';
+  };
+  const coOf = u => typeof taskCompany === 'function' ? taskCompany(u.t) : 'متجرك';
+  const mine = u => (!f.who || same(u.who, f.who)) && (!f.meet || u.meeting_id === f.meet) && (!f.dep || depOf(u.who) === f.dep);
   const U = units.filter(u => mine(u) && (!u.done || !start || new Date(u.completed_at || u.created_at || 0) >= start));
   const done = U.filter(u => u.done), open = U.filter(u => !u.done);
   const isLate = u => !u.done && u.due_on && u.due_on < todayS;
@@ -36,6 +41,12 @@ function dashCompute(units, f, now, members) {
   const emails = f.who ? [f.who] : members.map(m => m.email);
   const people = emails.map(e => { const m = U.filter(u => same(u.who, e)), d = m.filter(u => u.done).length, l = m.filter(isLate).length; return { email: e, done: d, late: l, open: m.length - d - l, total: m.length }; });
   const un = U.filter(u => !u.who); if (un.length) people.push({ email: '', done: un.filter(u => u.done).length, late: un.filter(isLate).length, open: un.filter(u => !u.done && !isLate(u)).length, total: un.length });
+  // الأقسام والإدارات
+  const dm = {}; U.forEach(u => { const k = depOf(u.who) || 'عام / غير محدد'; const r = dm[k] || (dm[k] = { dep: k, total: 0, done: 0, late: 0 }); r.total++; if (u.done) r.done++; else if (isLate(u)) r.late++; });
+  const deps = Object.values(dm).sort((a, b) => b.total - a.total);
+  // المتاجر والشركات
+  const cm = {}; U.forEach(u => { const k = coOf(u) || 'متجرك'; const r = cm[k] || (cm[k] = { co: k, total: 0, done: 0, late: 0 }); r.total++; if (u.done) r.done++; else if (isLate(u)) r.late++; });
+  const stores = Object.values(cm).sort((a, b) => b.total - a.total);
   // الاجتماعات
   const mm = {}; U.forEach(u => { const k = u.meeting_id || ''; const r = mm[k] || (mm[k] = { id: k, total: 0, done: 0 }); r.total++; if (u.done) r.done++; });
   const meets = Object.values(mm).sort((a, b) => b.total - a.total).slice(0, 6);
@@ -48,7 +59,7 @@ function dashCompute(units, f, now, members) {
     onTimePct: withDue.length ? Math.round(100 * onTime / withDue.length) : null, onTimeN: withDue.length,
     avgDays: durs.length ? +(durs.reduce((a, b) => a + b, 0) / durs.length).toFixed(1) : null,
     week: done.filter(u => u.completed_at && now - new Date(u.completed_at) <= 7 * DAY).length,
-    noTime: done.filter(u => !u.completed_at).length, weeks, people, meets, age,
+    noTime: done.filter(u => !u.completed_at).length, weeks, people, deps, stores, meets, age,
     oldest: open.slice().sort((a, b) => ts(a.created_at) - ts(b.created_at)).slice(0, 5),
     attention: late.slice().sort((a, b) => (a.due_on < b.due_on ? -1 : 1)).slice(0, 5),
     recent: done.filter(u => u.completed_at).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).slice(0, 8)
@@ -77,18 +88,42 @@ const kpi = (v, l, hint, cls) => '<div class="dsh-kpi ' + (cls || '') + '"><b>' 
 const dshRow = x => { const t = x.t, d = x.due_on ? ' · الموعد ' + x.due_on : ''; return '<div class="dsh-li" data-open="' + t.id + '"><b>' + esc(t.title) + '</b><span class="m">' + esc(x.who ? nm(x.who) : 'غير مُسند') + d + '</span>' + (x.note ? '<div class="dnote">📝 ' + esc(x.note) + '</div>' : '') + '</div>'; };
 const ageDays = x => x.created_at ? Math.max(0, Math.floor((Date.now() - new Date(x.created_at)) / DAY)) + ' يوماً' : '—';
 
+function dashWaSummary(D, f, per) {
+  const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
+  const prof = typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo || 'متجرك') : {};
+  const stName = curCo ? (prof.displayName || curCo) : (BRAND.orgName || 'كل الشركات والفروع');
+  const topPeople = D.people.filter(p => p.total && p.email).map(p => ({ name: nm(p.email), r: pct(p.done, p.total), done: p.done, tot: p.total })).sort((a, b) => b.r - a.r).slice(0, 5);
+  const txt = [
+    '📋 *تقرير إنجاز المهام التنفيذي — ' + stName + '*',
+    '📅 الفترة: ' + (per[f.period] || 'الكل') + (f.dep ? ' · القسم: ' + f.dep : ''),
+    '━━━━━━━━━━━━━━',
+    '✅ نسبة الإنجاز: *' + D.rate + '%* (' + D.done + ' من ' + D.total + ')',
+    '⏱ الإنجاز في الموعد: *' + (D.onTimePct == null ? '—' : D.onTimePct + '%') + '*',
+    '📂 مهام مفتوحة: *' + D.open + '* (' + D.doingOk + ' قيد العمل)',
+    '⚠️ مهام متأخرة: *' + D.late + '*',
+    topPeople.length ? '━━━━━━━━━━━━━━\n🏆 *أعلى الأعضاء إنجازاً:*\n' + topPeople.map((p, i) => (i + 1) + '. ' + p.name + ': ' + p.r + '% (' + p.done + '/' + p.tot + ')').join('\n') : ''
+  ].filter(Boolean).join('\n');
+  navigator.clipboard?.writeText(txt);
+  toast('تم نسخ ملخص إنجاز المهام للحافظة 📋');
+}
+
 function dashView() {
-  const f = S.dash || (S.dash = { period: 'all', who: '', meet: '' });
+  const f = S.dash || (S.dash = { period: 'all', who: '', dep: '', meet: '' });
   const D = dashCompute(dashUnits(S.tasks, S.done, S.members), f, new Date(), S.members), mx = Math.max(1, ...D.people.map(p => p.total));
   const opt = (v, l, cur) => '<option value="' + esc(v) + '" ' + (cur === v ? 'selected' : '') + '>' + esc(l) + '</option>';
   const per = { all: 'كل الفترات', 7: 'آخر 7 أيام', 30: 'آخر 30 يوماً', 90: 'آخر 90 يوماً' };
   const mname = id => id ? (S.meetings.find(m => m.id === id) || {}).title || 'اجتماع' : 'بدون اجتماع';
   const empty = '<div class="m" style="padding:8px 0">لا توجد بيانات لهذه الفترة.</div>';
-  return '<div class="dsh-printhead"><h2>تقرير لوحة الأرقام</h2><div class="m">' + new Date().toLocaleDateString('ar') + ' — ' + per[f.period] + (f.who ? ' — ' + esc(nm(f.who)) : '') + (f.meet ? ' — ' + esc(mname(f.meet)) : '') + '</div></div>' +
+  const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
+  const prof = typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo || 'متجرك') : {};
+  const stName = curCo ? (prof.displayName || curCo) : (BRAND.orgName || 'كل الشركات والفروع');
+  const allDeps = typeof departmentsList === 'function' ? departmentsList() : [];
+  return '<div class="dsh-printhead"><h2>📊 تقرير أداء وإنجاز المهام — ' + esc(stName) + '</h2><div class="m">' + new Date().toLocaleDateString('ar') + ' — ' + per[f.period] + (f.dep ? ' — قسم: ' + esc(f.dep) : '') + (f.who ? ' — ' + esc(nm(f.who)) : '') + (f.meet ? ' — ' + esc(mname(f.meet)) : '') + '</div></div>' +
     '<div class="dsh-toolbar"><select id="ds_p">' + Object.entries(per).map(([k, v]) => opt(k, v, String(f.period))).join('') + '</select>' +
-    '<select id="ds_w">' + opt('', 'كل الأعضاء', f.who) + S.members.map(m => opt(m.email, m.name, f.who)).join('') + '</select>' +
-    '<select id="ds_m">' + opt('', 'كل الاجتماعات', f.meet) + S.meetings.map(m => opt(m.id, m.title, f.meet)).join('') + '</select>' +
-    '<span style="flex:1"></span><button id="ds_csv" class="s">⬇ تصدير CSV</button><button id="ds_pr" class="s">🖨 طباعة / PDF</button></div>' +
+    '<select id="ds_dep">' + opt('', '🏛️ كل الأقسام والإدارات', f.dep || '') + allDeps.map(d => opt(d, d, f.dep || '')).join('') + '</select>' +
+    '<select id="ds_w">' + opt('', '👤 كل الأعضاء', f.who) + S.members.map(m => opt(m.email, m.name, f.who)).join('') + '</select>' +
+    '<select id="ds_m">' + opt('', '📅 كل الاجتماعات', f.meet) + S.meetings.map(m => opt(m.id, m.title, f.meet)).join('') + '</select>' +
+    '<span style="flex:1"></span><button id="ds_wa" class="s" type="button">📋 ملخص واتساب</button><button id="ds_csv" class="s" type="button">⬇ تصدير CSV</button><button id="ds_pr" class="gold" type="button">🖨 طباعة / PDF</button></div>' +
     '<div class="dsh-grid">' + kpi(D.rate + '%', 'نسبة الإنجاز', D.done + ' من ' + D.total, D.rate >= 70 ? 'ok' : '') +
       kpi(D.onTimePct == null ? '—' : D.onTimePct + '%', 'الإنجاز في الموعد', D.onTimePct == null ? 'يحتاج مهاماً منتهية بموعد' : 'من ' + D.onTimeN + ' مهمة') +
       kpi(D.late, 'متأخرة الآن', D.late ? 'تحتاج متابعة' : 'ممتاز', D.late ? 'bad' : 'ok') + kpi(D.open, 'مفتوحة', D.doingOk + ' قيد العمل') +
@@ -98,7 +133,9 @@ function dashView() {
     '<div class="dsh-card"><h2>توزيع الحالات</h2>' + (D.total ? '<div class="dsh-flex">' + svgDonut([{ l: 'منجزة', n: D.done, c: 'var(--c-done)' }, { l: 'قيد العمل', n: D.doingOk, c: 'var(--c-doing)' }, { l: 'للتنفيذ', n: D.todoOk, c: 'var(--c-todo)' }, { l: 'متأخرة', n: D.late, c: 'var(--c-late)' }], D.rate + '%', 'منجزة') +
       '<div class="dsh-legend">' + [['منجزة', D.done, 'var(--c-done)'], ['قيد العمل', D.doingOk, 'var(--c-doing)'], ['للتنفيذ', D.todoOk, 'var(--c-todo)'], ['متأخرة', D.late, 'var(--c-late)']].map(([l, n, c]) => '<div><i style="background:' + c + '"></i>' + l + ' <b>' + n + '</b></div>').join('') + '</div></div>' : empty) + '</div>' +
     '<div class="dsh-card"><h2>الاتجاه الأسبوعي (8 أسابيع)</h2>' + svgTrend(D.weeks) + '<div class="dsh-legend row-l"><div><i style="background:var(--c-todo)"></i>مهام جديدة</div><div><i style="background:var(--c-done)"></i>مهام منجزة</div></div></div>' +
-    '<div class="dsh-card"><h2>🏆 ترتيب الأعضاء (نسبة الإنجاز)</h2>' + (D.people.some(p => p.total) ? D.people.filter(p => p.total && p.email).map(p => ({ p, r: pct(p.done, p.total) })).sort((a, b) => b.r - a.r || b.p.done - a.p.done).map((x, i) => '<div class="dsh-rw"><span>' + ['🥇', '🥈', '🥉'][i] + ' ' + esc(nm(x.p.email)) + '</span><div class="dsh-bar" style="width:100%"><i style="width:' + x.r + '%;background:var(--c-done)"></i></div><small>' + x.r + '% · ' + x.p.done + '/' + x.p.total + (x.p.late ? ' · <span style="color:var(--c-late)">' + x.p.late + ' متأخرة</span>' : '') + '</small></div>').join('') : empty) + '</div>' +
+    '<div class="dsh-card"><h2>🏆 ترتيب الأعضاء (نسبة الإنجاز)</h2>' + (D.people.some(p => p.total) ? D.people.filter(p => p.total && p.email).map(p => ({ p, r: pct(p.done, p.total) })).sort((a, b) => b.r - a.r || b.p.done - a.p.done).map((x, i) => '<div class="dsh-rw"><span>' + (['🥇', '🥈', '🥉'][i] || '•') + ' ' + esc(nm(x.p.email)) + '</span><div class="dsh-bar" style="width:100%"><i style="width:' + x.r + '%;background:var(--c-done)"></i></div><small>' + x.r + '% · ' + x.p.done + '/' + x.p.total + (x.p.late ? ' · <span style="color:var(--c-late)">' + x.p.late + ' متأخرة</span>' : '') + '</small></div>').join('') : empty) + '</div>' +
+    '<div class="dsh-card"><h2>🏛️ أداء الأقسام والإدارات</h2>' + (D.deps && D.deps.length ? D.deps.map(d => { const r = pct(d.done, d.total); return '<div class="dsh-rw"><span>' + esc(d.dep) + '</span><div class="dsh-bar" style="width:100%">' + seg(d.done, d.total, 'var(--c-done)') + seg(d.total - d.done - d.late, d.total, 'var(--c-todo)') + seg(d.late, d.total, 'var(--c-late)') + '</div><small>' + r + '% (' + d.done + '/' + d.total + ')</small></div>'; }).join('') : empty) + '</div>' +
+    (D.stores && D.stores.length > 1 ? '<div class="dsh-card"><h2>🏢 الإنجاز حسب الشركة / الفرع</h2>' + D.stores.map(s => { const r = pct(s.done, s.total); return '<div class="dsh-rw"><span>' + esc(s.co) + '</span><div class="dsh-bar" style="width:100%">' + seg(s.done, s.total, 'var(--c-done)') + seg(s.total - s.done - s.late, s.total, 'var(--c-todo)') + seg(s.late, s.total, 'var(--c-late)') + '</div><small>' + r + '% (' + s.done + '/' + s.total + ')</small></div>'; }).join('') + '</div>' : '') +
     '<div class="dsh-card"><h2>توزيع حمل العمل</h2>' + (D.people.some(p => p.total) ? D.people.filter(p => p.total).map(p => '<div class="dsh-rw"><span>' + esc(p.email ? nm(p.email) : 'غير مُسند') + '</span><div class="dsh-bar" style="width:' + (100 * p.total / mx).toFixed(1) + '%">' + seg(p.done, p.total, 'var(--c-done)') + seg(p.open, p.total, 'var(--c-todo)') + seg(p.late, p.total, 'var(--c-late)') + '</div><small>' + p.done + '/' + p.total + '</small></div>').join('') +
       '<div class="dsh-legend row-l"><div><i style="background:var(--c-done)"></i>منجزة</div><div><i style="background:var(--c-todo)"></i>مفتوحة</div><div><i style="background:var(--c-late)"></i>متأخرة</div></div>' : empty) + '</div>' +
     '<div class="dsh-card"><h2>الإنجاز حسب الاجتماع</h2>' + (D.meets.length ? D.meets.map(r => '<div class="dsh-rw"><span>' + esc(mname(r.id)) + '</span><div class="dsh-bar" style="width:100%">' + seg(r.done, r.total || 1, 'var(--c-done)') + '</div><small>' + pct(r.done, r.total) + '%</small></div>').join('') : empty) + '</div>' +
@@ -109,8 +146,13 @@ function dashView() {
 }
 function dashCsv(units) {
   const q = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };   // يمنع تنفيذ صيغ Excel من نص المهمة
-  const rows = [['العنوان', 'المسؤول', 'الحالة', 'الموعد', 'تاريخ الإنشاء', 'تاريخ الإنجاز', 'الاجتماع', 'جماعية', 'ما أُنجز'].map(q).join(',')];
-  units.forEach(u => rows.push([u.t.title, u.who ? nm(u.who) : 'غير مُسند', u.done ? 'منجزة' : (ST[u.t.status] || u.t.status), u.due_on || '', (u.created_at || '').slice(0, 10), (u.completed_at || '').slice(0, 10), (S.meetings.find(m => m.id === u.meeting_id) || {}).title || '', (u.t.for_all || u.group) ? 'نعم' : 'لا', u.note || ''].map(q).join(',')));
+  const rows = [['العنوان', 'الشركة/الفرع', 'المسؤول', 'القسم', 'الحالة', 'الموعد', 'تاريخ الإنشاء', 'تاريخ الإنجاز', 'الاجتماع', 'جماعية', 'ما أُنجز'].map(q).join(',')];
+  units.forEach(u => {
+    const m = (S.allMembers || S.members || []).find(x => same(x.email, u.who));
+    const meta = m && typeof parseMemberMeta === 'function' ? parseMemberMeta(m) : { company: '', department: '' };
+    const co = typeof taskCompany === 'function' ? taskCompany(u.t) : (meta.company || 'متجرك');
+    rows.push([u.t.title, co, u.who ? nm(u.who) : 'غير مُسند', meta.department || '', u.done ? 'منجزة' : (ST[u.t.status] || u.t.status), u.due_on || '', (u.created_at || '').slice(0, 10), (u.completed_at || '').slice(0, 10), (S.meetings.find(m => m.id === u.meeting_id) || {}).title || '', (u.t.for_all || u.group) ? 'نعم' : 'لا', u.note || ''].map(q).join(','));
+  });
   return '\ufeff' + rows.join('\r\n');
 }
 function downloadText(name, text, type) {
@@ -119,10 +161,13 @@ function downloadText(name, text, type) {
 }
 function bindDash() {
   const f = S.dash;
+  const per = { all: 'كل الفترات', 7: 'آخر 7 أيام', 30: 'آخر 30 يوماً', 90: 'آخر 90 يوماً' };
   $('ds_p').onchange = e => { f.period = e.target.value; render(); };
+  if ($('ds_dep')) $('ds_dep').onchange = e => { f.dep = e.target.value; render(); };
   $('ds_w').onchange = e => { f.who = e.target.value; render(); };
   $('ds_m').onchange = e => { f.meet = e.target.value; render(); };
   $('ds_pr').onclick = () => window.print();
+  if ($('ds_wa')) $('ds_wa').onclick = () => dashWaSummary(dashCompute(dashUnits(S.tasks, S.done, S.members), f, new Date(), S.members), f, per);
   $('ds_csv').onclick = () => downloadText('tasks-' + ymd(new Date()) + '.csv', dashCsv(dashCompute(dashUnits(S.tasks, S.done, S.members), f, new Date(), S.members).U), 'text/csv;charset=utf-8');
   document.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { const t = S.tasks.find(x => x.id === el.dataset.open); if (t) taskDialog(t); });
 }

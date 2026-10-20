@@ -46,10 +46,110 @@ function moreDialog() {
 const THEME_I = { auto: '◐', light: '☀', dark: '☾' }, THEME_L = { auto: 'تلقائي', light: 'فاتح', dark: 'داكن' };
 const curTheme = () => localStorage.getItem('theme') || 'auto';
 const applyTheme = t => document.documentElement.setAttribute('data-theme', t);
+function toggleCoPopover(e) {
+  if (e) e.stopPropagation();
+  const ex = $('co_pop_menu');
+  if (ex) { ex.remove(); return; }
+  const btn = $('co_sw_btn');
+  if (!btn) return;
+  const coList = typeof companiesList === 'function' ? companiesList() : ['متجرك'];
+  const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
+  const allM = S.rawMembers || S.allMembers || S.members || [];
+  const allT = S.rawTasks || S.tasks || [];
+  const allO = S.rawOrders || S.orders || [];
+
+  const pop = document.createElement('div');
+  pop.id = 'co_pop_menu';
+  pop.className = 'co-pop';
+  pop.innerHTML =
+    '<div class="co-pop-hd"><span>🏢 التبديل بين الشركات والمتاجر</span><small>' + coList.length + ' متاجر</small></div>' +
+    '<button type="button" class="co-pop-item' + (!curCo ? ' on' : '') + '" data-copick="">' +
+      '<div class="co-pop-ic all">🌐</div>' +
+      '<div class="co-pop-info">' +
+        '<b>كل الشركات والمتاجر (' + coList.length + ')</b>' +
+        '<small>عرض شامل لجميع الفروع · ' + allO.length + ' طلب · ' + allT.length + ' مهمة</small>' +
+      '</div>' +
+      (!curCo ? '<span class="co-pop-chk">✓</span>' : '') +
+    '</button>' +
+    '<div class="co-pop-list">' +
+      coList.map(c => {
+        const cp = typeof getCompanyProfile === 'function' ? getCompanyProfile(c) : { displayName: c, currency: 'ر.ي' };
+        const isAct = same(curCo, c);
+        const empN = allM.filter(m => m.role !== 'rep' && m.role !== 'admin' && same(parseMemberMeta(m).company, c)).length;
+        const ordN = allO.filter(o => same(orderCompany(o), c)).length;
+        const tskN = allT.filter(t => same(taskCompany(t), c)).length;
+        return '<div class="co-pop-row' + (isAct ? ' on' : '') + '">' +
+          '<button type="button" class="co-pop-item" data-copick="' + esc(c) + '">' +
+            companyLogoHtml(c, 36) +
+            '<div class="co-pop-info">' +
+              '<b>' + esc(cp.displayName || c) + (same(c, 'متجرك') ? ' <span class="co-pop-def">الأساسي</span>' : '') + '</b>' +
+              '<small>👥 ' + empN + ' موظف · 🛒 ' + ordN + ' طلب · 📋 ' + tskN + ' مهمة · ' + esc(cp.currency || 'ر.ي') + '</small>' +
+            '</div>' +
+            (isAct ? '<span class="co-pop-chk">✓</span>' : '') +
+          '</button>' +
+          '<button type="button" class="co-pop-cfg" data-cocfg="' + esc(c) + '" title="تهيئة الشعار والهوية">🎨</button>' +
+        '</div>';
+      }).join('') +
+    '</div>' +
+    '<div class="co-pop-ft">' +
+      '<button type="button" class="s" id="co_pop_manage" style="width:100%;justify-content:center;font-size:12.5px">⚙️ إدارة الشركات وإضافة متجر جديد</button>' +
+    '</div>';
+
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  const isRtl = document.documentElement.dir !== 'ltr';
+  const popW = Math.min(340, window.innerWidth - 24);
+  pop.style.width = popW + 'px';
+  pop.style.top = Math.round(rect.bottom + 8) + 'px';
+  if (isRtl) {
+    const leftPos = Math.max(12, Math.min(window.innerWidth - popW - 12, rect.left));
+    pop.style.left = Math.round(leftPos) + 'px';
+  } else {
+    const rightPos = Math.max(12, window.innerWidth - rect.right);
+    pop.style.right = Math.round(rightPos) + 'px';
+  }
+
+  const closePop = ev => {
+    if (!pop.contains(ev.target) && ev.target !== btn && !btn.contains(ev.target)) {
+      pop.remove();
+      document.removeEventListener('pointerdown', closePop);
+    }
+  };
+  setTimeout(() => document.addEventListener('pointerdown', closePop), 10);
+
+  pop.querySelectorAll('[data-copick]').forEach(b => {
+    b.onclick = () => {
+      S.activeCompany = b.dataset.copick;
+      pop.remove();
+      document.removeEventListener('pointerdown', closePop);
+      applyCompanyScope();
+      render();
+    };
+  });
+  pop.querySelectorAll('[data-cocfg]').forEach(b => {
+    b.onclick = ev => {
+      ev.stopPropagation();
+      const targetCo = b.dataset.cocfg;
+      pop.remove();
+      document.removeEventListener('pointerdown', closePop);
+      if (typeof companyConfigDialog === 'function') companyConfigDialog(targetCo);
+    };
+  });
+  if ($('co_pop_manage')) {
+    $('co_pop_manage').onclick = () => {
+      pop.remove();
+      document.removeEventListener('pointerdown', closePop);
+      S.view = 'set';
+      render();
+    };
+  }
+}
+
 function bindHeader() {
   $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
+  if ($('co_sw_btn')) $('co_sw_btn').onclick = toggleCoPopover;
   if ($('co_sw')) $('co_sw').onchange = e => { S.activeCompany = e.target.value; applyCompanyScope(); render(); };
   updateBell();
 }
@@ -74,11 +174,12 @@ function headerHtml() {
   const canSw = typeof isSuperAdmin === 'function' && isSuperAdmin() && coList.length > 0;
   const curCo = typeof activeCompanyFilter === 'function' ? activeCompanyFilter() : '';
   const prof = curCo && typeof getCompanyProfile === 'function' ? getCompanyProfile(curCo) : null;
-  const swHtml = canSw ? '<select id="co_sw" class="co-sw" title="تبديل الشركة المعروضة"><option value="">🌐 كل الشركات (' + coList.length + ')</option>' + coList.map(c => {
-    const cp = typeof getCompanyProfile === 'function' ? getCompanyProfile(c) : { displayName: c };
-    return '<option value="' + esc(c) + '"' + (same(S.activeCompany, c) ? ' selected' : '') + '>🏢 ' + esc(cp.displayName || c) + '</option>';
-  }).join('') + '</select>' :
-    (curCo ? '<span class="co-tag">🏢 ' + esc((prof && prof.displayName) || curCo) + '</span>' : '');
+  const swHtml = canSw ? (
+    '<button type="button" id="co_sw_btn" class="co-sw-btn" title="تبديل الشركة / المتجر المعروض">' +
+      (curCo ? companyLogoHtml(curCo, 24) + '<span class="co-sw-txt">' + esc((prof && prof.displayName) || curCo) + '</span>' : '<span class="co-sw-globe">🌐</span><span class="co-sw-txt">كل الشركات (' + coList.length + ')</span>') +
+      '<span class="co-sw-arr">▾</span>' +
+    '</button>'
+  ) : (curCo ? '<span class="co-tag">🏢 ' + esc((prof && prof.displayName) || curCo) + '</span>' : '');
   const roleSub = [S.me.title, myMeta.department].filter(Boolean).join(' · ');
   const sloganTxt = prof && prof.slogan ? ' · ' + prof.slogan : '';
   return '<div class="top"><div class="brand">' +

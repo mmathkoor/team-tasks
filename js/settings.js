@@ -67,7 +67,6 @@ function orgSettingsHtml() {
         '<b>🏢 الشركات والفروع المسجلة (' + cos.length + ')</b>' +
         '<div class="row s">' +
           (curCo ? '<span class="co-tag">المعروض حالياً: ' + esc(curCo) + ' <button class="s" id="co_reset" style="padding:2px 8px;font-size:12px">🌐 عرض كل الشركات</button></span>' : '<span class="chip all">👑 وضع المدير العام: ترى كل الشركات</span>') +
-          '<button class="s" id="co_claim_matjark" type="button" style="background:var(--goldsoft);border-color:var(--gold);font-weight:700" title="ربط جميع المهام والطلبات والموظفين الحاليين بشركة متجرك">🔄 اعتماد كل المدخلات السابقة لشركة «متجرك»</button>' +
         '</div>' +
       '</div>' +
       '<div class="co-cards-grid">' + coCards + '</div>' +
@@ -182,7 +181,11 @@ function settingsView() {
   if (isAdmin()) {
     const cos = companiesList(), deps = departmentsList();
     const myCo = isSuperAdmin() ? '' : parseMemberMeta(S.me).company;
-    const listMembers = myCo ? S.members : (S.rawMembers || S.allMembers || S.members).filter(m => m.role !== 'rep');
+    if (S.setAdmCo === undefined) S.setAdmCo = activeCompanyFilter() || '';
+    const admCo = myCo || S.setAdmCo || '';
+    const allStaff = (S.rawMembers || S.allMembers || S.members || []).filter(m => m.role !== 'rep');
+    const listMembers = admCo ? allStaff.filter(m => same(parseMemberMeta(m).company, admCo) || (S.me && same(m.email, S.me.email))) : allStaff;
+
     let memList = listMembers.map(m => {
         const meta = parseMemberMeta(m);
         const isMeSuper = S.me && same(m.email, S.me.email) && m.role === 'admin';
@@ -204,23 +207,46 @@ function settingsView() {
           '<button class="s p" data-mts="' + esc(m.email) + '">حفظ</button>' + rmBtn + '</div></div>';
     }).join('');
     
-    let optDeps = deps.map(d => '<option value="__dep:' + esc(d) + '">🏛️ قسم: ' + esc(d) + '</option>').join('');
-    let optMembers = '<option value="">-- اختر الموظف أو القسم --</option>' + optDeps + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + (memberDept(m.email) ? ' (' + esc(memberDept(m.email)) + ')' : '') + '</option>').join('');
-    const defNewCo = activeCompanyFilter() || 'متجرك';
+    const optCos = !myCo ? cos.map(c => {
+      const cnt = allStaff.filter(m => same(parseMemberMeta(m).company, c)).length;
+      return '<option value="__co:' + esc(c) + '">🏢 كل موظفي متجر: ' + esc(c) + ' (' + cnt + ')</option>';
+    }).join('') : '';
+    const optDeps = deps.map(d => '<option value="__dep:' + esc(d) + '">🏛️ قسم: ' + esc(d) + (admCo ? ' (' + esc(admCo) + ')' : '') + '</option>').join('');
+    const optMembers = listMembers.map(m => {
+      const meta = parseMemberMeta(m);
+      const tags = [meta.company ? '🏢 ' + meta.company : '', meta.department ? '🏛️ ' + meta.department : ''].filter(Boolean).join(' · ');
+      return '<option value="' + esc(m.email) + '">👤 ' + esc(m.name) + (tags ? ' (' + esc(tags) + ')' : '') + '</option>';
+    }).join('');
+    const allLabel = admCo ? ('👥 كل موظفي «' + admCo + '» (' + listMembers.length + ')') : ('🌐 الكل (جميع المتاجر والأعضاء: ' + allStaff.length + ')');
+    const remindLabel = admCo ? ('إرسال تذكير شامل لموظفي «' + admCo + '» 🔔') : 'إرسال تذكير شامل لجميع المتاجر 🔔';
+
+    const defNewCo = admCo || activeCompanyFilter() || 'متجرك';
     const newCoOpts = (myCo ? [myCo] : cos).map(c => '<option value="' + esc(c) + '"' + (same(defNewCo, c) ? ' selected' : '') + '>🏢 ' + esc(c) + '</option>').join('');
     const newDepOpts = '<option value="">-- الإدارة / القسم (اختياري) --</option>' + deps.map(d => '<option value="' + esc(d) + '">🏛️ ' + esc(d) + '</option>').join('');
 
+    const scopeBar = isSuperAdmin() ? (
+      '<div class="store-scope-bar">' +
+        '<span>🏢 تخصيص المتجر للتنبيهات والأعضاء:</span>' +
+        '<select id="adm_co_scope">' +
+          '<option value=""' + (!admCo ? ' selected' : '') + '>🌐 جميع المتاجر والشركات (' + cos.length + ')</option>' +
+          cos.map(c => '<option value="' + esc(c) + '"' + (same(admCo, c) ? ' selected' : '') + '>🏢 متجر: ' + esc(getCompanyProfile(c).displayName || c) + '</option>').join('') +
+        '</select>' +
+      '</div>'
+    ) : '';
+
     adminHtml = orgSettingsHtml() +
-      '<div class="card" style="border-color:var(--accsoft)"><h2>👑 إدارة الأعضاء والتنبيهات والصلاحيات</h2>' +
-      '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon)">إرسال تذكير شامل للفريق 🔔</button>' +
-      '<h3 style="font-size:14px;margin-top:16px;color:var(--acc)">إرسال إشعار مخصص لموظف أو إدارة:</h3>' +
-      '<div class="row" style="margin-bottom:8px"><select id="ping_to"><option value="__all">👥 الكل (جميع الأعضاء)</option>' + optMembers + '</select></div>' +
+      '<div class="card" style="border-color:var(--accsoft)">' +
+      '<div class="bar" style="margin-bottom:12px"><h2 style="margin:0">👑 إدارة الأعضاء والتنبيهات والصلاحيات</h2>' + scopeBar + '</div>' +
+      '<button class="p" id="admin_remind" style="width:100%;margin-bottom:16px;background:var(--soon);border-color:var(--soon);color:#fff">' + esc(remindLabel) + '</button>' +
+      '<h3 style="font-size:14px;margin-top:16px;color:var(--acc)">إرسال إشعار مخصص لموظف أو متجر أو إدارة:</h3>' +
+      '<div class="row" style="margin-bottom:8px"><select id="ping_to"><option value="__all">' + esc(allLabel) + '</option>' + optCos + optDeps + optMembers + '</select></div>' +
       '<div class="row" style="margin-bottom:8px"><input id="ping_msg" placeholder="اكتب رسالة التنبيه (اختياري)..."></div>' +
-      '<div class="row" style="margin-bottom:16px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين تذكير بالمهام غير المنجزة (لكل شخص مهامه هو)</label></div>' +
-      '<div class="row" style="margin-bottom:16px"><button class="p s" id="send_ping">إرسال الإشعار للموظف 🔔</button></div>' +
+      '<div class="row" style="margin-bottom:16px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين تذكير بالمهام غير المنجزة (لكل شخص مهامه في متجره)</label></div>' +
+      '<div class="row" style="margin-bottom:16px"><button class="p s" id="send_ping">إرسال الإشعار الآن 🔔</button></div>' +
       '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
+      '<div class="bar" style="margin-bottom:8px"><b>👥 قائمة الأعضاء والموظفين (' + listMembers.length + (admCo ? ' في ' + esc(admCo) : '') + ')</b></div>' +
       memList + 
-      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو / موظف جديد وتحديد شركته وإدارته:</h3>' +
+      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو / موظف جديد وتحديد متجره وإدارته:</h3>' +
       '<div class="row" style="gap:6px"><input id="nn" placeholder="اسم الموظف" style="flex:1 1 140px"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني" style="flex:1 1 170px"><input id="ntitle" placeholder="المسمى الوظيفي (اختياري)" style="flex:1 1 140px"></div>' +
       '<div class="row" style="margin-top:8px;gap:6px"><select id="nco" style="flex:1 1 140px">' + newCoOpts + '</select><select id="ndep" style="flex:1 1 140px">' + newDepOpts + '</select><select id="nr" style="flex:0 1 130px"><option value="member">👤 صلاحية: عضو</option><option value="admin">👑 صلاحية: مدير</option></select><button class="p s" id="addm">إضافة</button></div></div>';
   }
@@ -242,6 +268,12 @@ function bindSettings() {
   if (isAdmin()) bindOrdAdmin();
   bindTools();
 
+  if ($('adm_co_scope')) {
+    $('adm_co_scope').onchange = e => {
+      S.setAdmCo = e.target.value;
+      render();
+    };
+  }
   if ($('co_add')) {
     $('co_add').onclick = async () => {
       const v = $('co_in').value.trim(); if (!v) return $('co_in').focus();
@@ -253,32 +285,6 @@ function bindSettings() {
     };
   }
   document.querySelectorAll('[data-coedit]').forEach(b => b.onclick = () => companyConfigDialog(b.dataset.coedit));
-  if ($('co_claim_matjark')) {
-    $('co_claim_matjark').onclick = async () => {
-      if (!confirm('سيتم تثبيت جميع الموظفين (غير المدير العام) وجميع المهام والطلبات المدخلة سابقاً تحت شركة «متجرك»، بينما يبقى حسابك أنت فقط (المدير العام) مشرفاً على كل الشركات.\nهل تريد المتابعة؟')) return;
-      $('co_claim_matjark').disabled = true;
-      $('co_claim_matjark').textContent = '⏳ جارٍ ربط المدخلات بمتجرك...';
-      try {
-        const allM = S.rawMembers || S.allMembers || [];
-        for (const m of allM) {
-          if (S.me && same(m.email, S.me.email)) continue; // المدير العام يبقى على كل الشركات
-          const meta = parseMemberMeta(m);
-          const targetCo = meta.company || 'متجرك';
-          const encoded = encodeMemberMeta(targetCo, meta.department);
-          if (m.telegram_chat_id !== encoded) {
-            await sb.from('members').update({ telegram_chat_id: encoded }).eq('email', m.email);
-          }
-        }
-        const cos = companiesList();
-        if (!cos.some(c => same(c, 'متجرك'))) cos.unshift('متجرك');
-        await persistOrgLists(cos, departmentsList());
-        alert('تم بنجاح! جميع المدخلات والموظفين الحاليين مرتبطون الآن بشركة «متجرك»، وحسابك أنت فقط يملك صلاحية كل الشركات ✅');
-        await load();
-      } catch (e) {
-        alert('حدث خطأ: ' + e.message);
-      }
-    };
-  }
   document.querySelectorAll('[data-corm]').forEach(b => b.onclick = async () => {
     const c = b.dataset.corm;
     if (same(c, 'متجرك')) return alert('شركة «متجرك» هي الشركة الأساسية ولا يمكن حذفها.');
@@ -290,9 +296,11 @@ function bindSettings() {
   });
   document.querySelectorAll('[data-cosw]').forEach(b => b.onclick = () => {
     S.activeCompany = same(S.activeCompany, b.dataset.cosw) ? '' : b.dataset.cosw;
+    S.setAdmCo = S.activeCompany;
+    S.ordCfgCo = S.activeCompany || 'متجرك';
     applyCompanyScope(); render();
   });
-  if ($('co_reset')) $('co_reset').onclick = () => { S.activeCompany = ''; applyCompanyScope(); render(); };
+  if ($('co_reset')) $('co_reset').onclick = () => { S.activeCompany = ''; S.setAdmCo = ''; applyCompanyScope(); render(); };
 
   if ($('dep_add')) {
     $('dep_add').onclick = async () => {
@@ -319,12 +327,15 @@ function bindSettings() {
 
   if ($('admin_remind')) {
     $('admin_remind').onclick = async () => {
+        const admCo = (!isSuperAdmin() ? parseMemberMeta(S.me).company : (S.setAdmCo || '')) || '';
+        const origTxt = $('admin_remind').textContent;
         $('admin_remind').textContent = 'جاري إرسال التذكيرات...';
         try {
-            const rr = await apiGet('/api/remind');
-            alert(rr.ok ? 'تم إرسال تذكير شامل لجميع أعضاء الفريق!' : 'تعذّر الإرسال (' + rr.status + ')');
+            const url = '/api/remind' + (admCo ? '?company=' + encodeURIComponent(admCo) : '');
+            const rr = await apiGet(url);
+            alert(rr.ok ? ('تم إرسال تذكير شامل ' + (admCo ? 'لموظفي «' + admCo + '»' : 'لجميع أعضاء الفريق') + ' بنجاح! ✅') : 'تعذّر الإرسال (' + rr.status + ')');
         } catch(e) {}
-        $('admin_remind').textContent = 'إرسال تذكير شامل للفريق 🔔';
+        if ($('admin_remind')) $('admin_remind').textContent = origTxt;
     };
   }
 
@@ -333,19 +344,34 @@ function bindSettings() {
           const to = $('ping_to').value;
           const msg = $('ping_msg').value.trim();
           const includeTasks = $('ping_tasks').checked;
+          const admCo = (!isSuperAdmin() ? parseMemberMeta(S.me).company : (S.setAdmCo || '')) || '';
+          const allStaff = (S.rawMembers || S.allMembers || S.members || []).filter(m => m.role !== 'rep');
 
-          if (!to) return alert('الرجاء اختيار الموظف أو القسم أولاً.');
+          if (!to) return alert('الرجاء اختيار المستلم أولاً.');
           if (!msg && !includeTasks) return alert('يجب كتابة رسالة أو اختيار تضمين المهام.');
           
           $('send_ping').disabled = true; $('send_ping').textContent = '...';
           
           try {
-              if (to.startsWith('__dep:')) {
+              if (to.startsWith('__co:')) {
+                  const targetCo = to.slice(5);
+                  const targets = allStaff.filter(m => same(parseMemberMeta(m).company, targetCo));
+                  if (!targets.length) { alert('لا يوجد موظفون مسجلون في متجر «' + targetCo + '» حالياً.'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; return; }
+                  await Promise.all(targets.map(m => apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري (' + targetCo + ') 🔔', body: msg, assignee_email: m.email, for_all: false, is_custom: true, include_tasks: includeTasks }))));
+                  alert('تم إرسال الإشعار إلى ' + targets.length + ' موظف في متجر «' + targetCo + '» ✅');
+                  $('ping_msg').value = '';
+              } else if (to.startsWith('__dep:')) {
                   const dep = to.slice(6);
-                  const targets = S.members.filter(m => same(memberDept(m.email), dep));
-                  if (!targets.length) { alert('لا يوجد موظفون في هذا القسم حالياً.'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار للموظف 🔔'; return; }
+                  const targets = allStaff.filter(m => same(parseMemberMeta(m).department, dep) && (!admCo || same(parseMemberMeta(m).company, admCo)));
+                  if (!targets.length) { alert('لا يوجد موظفون في هذا القسم حالياً.'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; return; }
                   await Promise.all(targets.map(m => apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري (' + dep + ') 🔔', body: msg, assignee_email: m.email, for_all: false, is_custom: true, include_tasks: includeTasks }))));
                   alert('تم إرسال الإشعار إلى ' + targets.length + ' موظف في «' + dep + '» ✅');
+                  $('ping_msg').value = '';
+              } else if (to === '__all' && admCo) {
+                  const targets = allStaff.filter(m => same(parseMemberMeta(m).company, admCo));
+                  if (!targets.length) { alert('لا يوجد موظفون في متجر «' + admCo + '».'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; return; }
+                  await Promise.all(targets.map(m => apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري (' + admCo + ') 🔔', body: msg, assignee_email: m.email, for_all: false, is_custom: true, include_tasks: includeTasks }))));
+                  alert('تم إرسال الإشعار إلى جميع موظفي «' + admCo + '» (' + targets.length + ' موظف) ✅');
                   $('ping_msg').value = '';
               } else {
                   const all = to === '__all';
@@ -355,7 +381,7 @@ function bindSettings() {
                   if (rr.ok) $('ping_msg').value = '';
               }
           } catch(e) {}
-          $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار للموظف 🔔';
+          if ($('send_ping')) { $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; }
       };
   }
 
