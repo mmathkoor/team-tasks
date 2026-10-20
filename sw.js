@@ -1,26 +1,51 @@
-importScripts('/js/version.js');
-const C = 'tasks-' + VERSION;
+// Build version: 5.1.0 (timestamp: 2026-10-20-07-47)
+const SW_BUILD_VERSION = '5.1.0';
+try { importScripts('/js/version.js'); } catch (e) {}
+const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
 const kget = k => idb().then(d => new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(undefined); })).catch(() => undefined);
 const kset = (k, v) => idb().then(d => new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = () => ok(); })).catch(() => {});
 
-// ===== التخزين المؤقت: نسخة كاملة متسقة لكل إصدار (الملفات تُقرأ من index.html تلقائياً) =====
+// ===== التخزين المؤقت: نسخة كاملة متسقة لكل إصدار =====
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil((async () => {
     const c = await caches.open(C);
-    const r = await fetch('/', { cache: 'reload' }); const html = await r.clone().text(); await c.put('/', r);
+    const r = await fetch('/?_t=' + Date.now(), { cache: 'reload' }); const html = await r.clone().text(); await c.put('/', r);
     const urls = new Set(['/manifest.json', '/icon-192.png']);
     for (const m of html.matchAll(/(?:src|href)="(\/[^"]+)"/g)) urls.add(m[1]);
     await Promise.allSettled([...urls].map(u => fetch(u, { cache: 'reload' }).then(res => res.ok && c.put(u, res))));
   })());
 });
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => clients.claim())));
+self.addEventListener('activate', e => e.waitUntil((async () => {
+  const ks = await caches.keys();
+  await Promise.all(ks.map(k => k !== C ? caches.delete(k) : Promise.resolve()));
+  await clients.claim();
+  const allClients = await clients.matchAll({ type: 'window' });
+  allClients.forEach(c => c.postMessage({ type: 'version_updated', version: SW_BUILD_VERSION }));
+})()));
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return;
-  e.respondWith(caches.open(C).then(async c => (await c.match(e.request, { ignoreSearch: true })) ||
-    fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; })));
+  // sw.js و version.js دائماً بدون كاش
+  if (u.pathname === '/sw.js' || u.pathname === '/js/version.js') {
+    e.respondWith(fetch(e.request, { cache: 'no-store' }));
+    return;
+  }
+  e.respondWith((async () => {
+    try {
+      const r = await fetch(e.request, { cache: 'no-cache' });
+      if (r && r.ok) {
+        const c = await caches.open(C);
+        c.put(e.request, r.clone());
+        return r;
+      }
+    } catch (err) {}
+    const c = await caches.open(C);
+    const cached = await c.match(e.request, { ignoreSearch: true });
+    if (cached) return cached;
+    return Response.error();
+  })());
 });
 
 // ===== الجلسة والمزامنة (تعمل حتى والتطبيق مغلق) =====
