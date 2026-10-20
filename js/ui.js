@@ -40,6 +40,7 @@ function bindHeader() {
   $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
+  if ($('co_sw')) $('co_sw').onchange = e => { S.activeCompany = e.target.value; applyCompanyScope(); render(); };
   updateBell();
 }
 function greetingText() {
@@ -49,10 +50,16 @@ function greetingText() {
 function headerHtml() {
   let d = '';
   try { d = new Date().toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) {}
+  const myMeta = typeof parseMemberMeta === 'function' ? parseMemberMeta(S.me) : { company: '', department: '' };
+  const coList = typeof companiesList === 'function' ? companiesList() : [];
+  const canSw = typeof isSuperAdmin === 'function' && isSuperAdmin() && coList.length > 0;
+  const swHtml = canSw ? '<select id="co_sw" class="co-sw" title="تبديل الشركة المعروضة"><option value="">🏢 كل الشركات (' + coList.length + ')</option>' + coList.map(c => '<option value="' + esc(c) + '"' + (S.activeCompany === c ? ' selected' : '') + '>🏢 ' + esc(c) + '</option>').join('') + '</select>' :
+    (myMeta.company ? '<span class="co-tag">🏢 ' + esc(myMeta.company) + '</span>' : '');
+  const roleSub = [S.me.title, myMeta.department].filter(Boolean).join(' · ');
   return '<div class="top"><div class="brand">' +
     '<svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-    '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (S.me.title ? ' (' + esc(S.me.title) + ')' : '') + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
-    '<div class="hbtns"><button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
+    '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (roleSub ? ' (' + esc(roleSub) + ')' : '') + (d ? ' · ' + esc(d) : '') + '</div></div></div>' +
+    '<div class="hbtns">' + swHtml + '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
     '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
     '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button></div></div>';
 }

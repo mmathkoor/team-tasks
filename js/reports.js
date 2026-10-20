@@ -35,6 +35,50 @@ function csvDownload(name, heads, rows) {
   const csv = '\uFEFF' + [heads.map(h => q(h.h)).join(',')].concat(rows.map(r => r.map(q).join(','))).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = name + '-' + today() + '.csv'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+function rptChartsGridHtml(D, items, cc) {
+  const all = D.all || [];
+  const nDel = all.filter(o => o.status === 'delivered').length;
+  const nPrep = all.filter(o => o.status === 'preparing').length;
+  const nNew = all.filter(o => o.status === 'new').length;
+  const nCan = all.filter(o => o.status === 'cancelled' || o.status === 'returned').length;
+  const rate = (nDel + nCan) ? Math.round(100 * nDel / (nDel + nCan)) : 0;
+
+  const donut = typeof svgDonut === 'function' ? svgDonut([
+    { l: 'تم التوصيل', n: nDel, c: 'var(--c-done)' },
+    { l: 'قيد التجهيز', n: nPrep, c: 'var(--c-doing)' },
+    { l: 'جديد', n: nNew, c: 'var(--c-todo)' },
+    { l: 'ملغي/مرتجع', n: nCan, c: 'var(--c-late)' }
+  ], rate + '%', 'نجاح') : '';
+
+  const repList = groupBy(all.filter(o => o.rep_email), o => repName(o.rep_email)).map(([k, a]) => {
+    const d = a.filter(o => o.status === 'delivered').length;
+    return { name: k, total: a.length, del: d, pct: rpct(d, a.length) };
+  }).sort((a, b) => b.del - a.del).slice(0, 5);
+
+  const prodList = groupBy(items, x => x.i.name).map(([k, a]) => ({
+    name: k, qty: sum(a, x => +x.i.qty), sales: sum(a, x => x.line)
+  })).sort((a, b) => b.sales - a.sales).slice(0, 5);
+  const maxProd = prodList.length ? Math.max(1, prodList[0].sales) : 1;
+
+  return '<div class="ord-viz-grid" style="margin-bottom:12px">' +
+    '<div class="ord-vcard"><div class="ov-title">🎯 توزيع حالات الفترة (' + all.length + ' طلب)</div>' +
+      '<div class="dsh-flex">' + donut +
+        '<div class="dsh-legend">' +
+          '<div><i style="background:var(--c-done)"></i>تم التوصيل <b>' + nDel + '</b></div>' +
+          '<div><i style="background:var(--c-doing)"></i>قيد التجهيز <b>' + nPrep + '</b></div>' +
+          '<div><i style="background:var(--c-todo)"></i>جديد <b>' + nNew + '</b></div>' +
+          '<div><i style="background:var(--c-late)"></i>ملغي/مرتجع <b>' + nCan + '</b></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ord-vcard"><div class="ov-title">🛵 مؤشر إنجاز المناديب</div>' +
+      (repList.length ? '<div class="ov-bars">' + repList.map(r => '<div class="ov-bar-row"><div class="bar" style="font-size:12.5px"><span>' + esc(r.name) + '</span><b style="font-variant-numeric:tabular-nums">' + r.del + '/' + r.total + ' (' + r.pct + '%)</b></div><div class="dsh-bar"><i style="width:' + Math.max(5, r.pct) + '%;background:var(--c-done)"></i></div></div>').join('') + '</div>' : '<div class="m" style="padding:14px 0;text-align:center">لا توجد طلبات مسندة لمناديب في هذه الفترة</div>') +
+    '</div>' +
+    '<div class="ord-vcard"><div class="ov-title">📦 أعلى الأصناف مبيعاً (رسومي)</div>' +
+      (prodList.length ? '<div class="ov-bars">' + prodList.map(p => '<div class="ov-bar-row"><div class="bar" style="font-size:12.5px"><span>' + esc(p.name) + ' <small class="m">(×' + p.qty + ')</small></span><b style="font-variant-numeric:tabular-nums">' + money(p.sales) + '</b></div><div class="dsh-bar"><i style="width:' + Math.max(6, Math.round(100 * p.sales / maxProd)) + '%;background:var(--gold)"></i></div></div>').join('') + '</div>' : '<div class="m" style="padding:14px 0;text-align:center">لا توجد مبيعات أصناف في هذه الفترة</div>') +
+    '</div>' +
+  '</div>';
+}
 function trendHtml(D, cc) {
   const days = Math.round((new Date(D.t) - new Date(D.f)) / 864e5) + 1, byMonth = days > 62;
   let from = D.f; if (S.rp.period === 'all' && D.rows.length) from = D.rows.map(dOf).sort()[0];
@@ -60,6 +104,7 @@ function reportsHtml() {
   h += '<div class="stats kpis rpk">' + kc(R.length, 'طلبات محتسبة') + kc(rpct(del.length, done) + '%', 'نسبة النجاح', 'ok') + kc(money(sales), 'المبيعات (' + BRAND.currency + ')') + kc(money(sum(R, o => +o.paid)), 'المحصّل') + kc(money(sum(R, o => Math.max(0, +o.balance))), 'المتبقي', 'late') + kc(money(R.length ? sales / R.length : 0), 'متوسط الطلب') +
     (cc ? kc(money(cost), 'تكلفة الشراء') + kc(money(gross), 'ربح البضاعة', gross >= 0 ? 'ok' : 'late') + kc(rpct(gross, sales - fees) + '%', 'هامش الربح') + kc(money(fees), 'رسوم توصيل محصّلة') : '') + '</div>';
   if (cc) h += '<p class="m" style="margin:-4px 4px 12px">ربح البضاعة = (مجموع الأصناف − الخصم) − سعر الشراء. رسوم التوصيل المحصّلة تُعرض منفصلة.</p>';
+  h += rptChartsGridHtml(D, items, cc);
   h += trendHtml(D, cc);
   // حسب المندوب
   const repRows = groupBy(D.all.filter(o => o.rep_email), o => repName(o.rep_email)).map(([k, a]) => { const d = a.filter(o => o.status === 'delivered'), c = a.filter(o => o.status === 'cancelled'), tt = d.filter(o => o.delivered_at).map(o => hrs(o.created_at, o.delivered_at)); return [k, a.length, d.length, c.length, rpct(d.length, d.length + c.length), sum(d, o => +o.total), tt.length ? tt.reduce((x, y) => x + y, 0) / tt.length : 0]; }).sort((a, b) => b[2] - a[2]);

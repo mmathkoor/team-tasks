@@ -1,19 +1,16 @@
-const { createClient } = require('@supabase/supabase-js');
 const webpush = require('web-push');
-const { member, isCron } = require('../lib/auth');
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const { supabase, member, isCron } = require('../lib/auth');
 
 const publicVapidKey = process.env.VAPID_PUBLIC_KEY || '';
 const privateVapidKey = process.env.VAPID_PRIVATE_KEY || '';
 
-webpush.setVapidDetails(
-  'mailto:admin@matjark.com',
-  publicVapidKey,
-  privateVapidKey
-);
+if (publicVapidKey && privateVapidKey) {
+  webpush.setVapidDetails(
+    'mailto:admin@matjark.com',
+    publicVapidKey,
+    privateVapidKey
+  );
+}
 
 module.exports = async (req, res) => {
   if (!isCron(req)) { const me = await member(req); if (!me || me.role !== 'admin') return res.status(401).json({ error: 'unauthorized — اضبط CRON_SECRET في Vercel أو سجّل كأدمن' }); }

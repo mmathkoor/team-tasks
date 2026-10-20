@@ -1,11 +1,9 @@
 // ينشئ المهام المتكررة المستحقة اليوم. يعمل يومياً 07:30 بتوقيت اليمن (04:30 UTC)،
 // ويُستدعى أيضاً عند فتح التطبيق من أي عضو (آمن: كل قاعدة تُنفَّذ مرة واحدة في اليوم).
-const { createClient } = require('@supabase/supabase-js');
 const { randomUUID } = require('crypto');
-const { member, isCron } = require('./../lib/auth');
+const { supabase, member, isCron } = require('./../lib/auth');
 const { deliver } = require('../lib/push');
 const { purgeImages } = require('../lib/purge');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 module.exports = async (req, res) => {
   if (!isCron(req)) { const me = await member(req); if (!me) return res.status(401).json({ error: 'unauthorized' }); }

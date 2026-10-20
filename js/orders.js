@@ -77,13 +77,80 @@ function oBoardHtml() {
         (items.length ? items.map(ocard).join('') : '<div class="empty">لا طلبات</div>') + (more ? '<button class="s" data-omore="1" style="width:100%">عرض ' + more + ' أخرى</button>' : '') + '</div>';
     }).join('') + '</div>';
 }
+function ordVizStripHtml() {
+  const O = S.orders || [];
+  if (!O.length && S.hideOrdViz) return '';
+  const nNew = O.filter(o => o.status === 'new').length;
+  const nPrep = O.filter(o => o.status === 'preparing').length;
+  const nDel = O.filter(o => o.status === 'delivered').length;
+  const nClosed = O.filter(o => o.status === 'cancelled' || o.status === 'returned').length;
+  const tot = O.length || 1;
+  const delRate = O.length ? Math.round(100 * nDel / O.length) : 0;
+
+  const live = O.filter(o => o.status !== 'cancelled' && o.status !== 'returned');
+  const totSales = live.reduce((a, o) => a + (+o.total || 0), 0);
+  const totPaid = live.reduce((a, o) => a + (+o.paid || 0), 0);
+  const totDue = live.reduce((a, o) => a + Math.max(0, +o.balance || 0), 0);
+  const payPct = totSales > 0 ? Math.min(100, Math.round(100 * totPaid / totSales)) : 0;
+  const cc = canCost();
+  const totProfit = cc ? live.reduce((a, o) => a + oProfit(o), 0) : 0;
+
+  // قناة الطلب (أعلى 4 قنوات)
+  const chMap = {};
+  live.forEach(o => { const c = o.channel || 'مباشر / غير محدد'; chMap[c] = (chMap[c] || 0) + (+o.total || 0); });
+  const chList = Object.entries(chMap).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const maxCh = chList.length ? Math.max(1, chList[0][1]) : 1;
+
+  const donutSvg = typeof svgDonut === 'function' ? svgDonut([
+    { l: 'تم التوصيل', n: nDel, c: 'var(--c-done)' },
+    { l: 'قيد التجهيز', n: nPrep, c: 'var(--c-doing)' },
+    { l: 'جديد', n: nNew, c: 'var(--c-todo)' },
+    { l: 'ملغي/مرتجع', n: nClosed, c: 'var(--c-late)' }
+  ], delRate + '%', 'توصيل') : '';
+
+  if (S.hideOrdViz) {
+    return '<div class="bar" style="margin:6px 0 10px"><button class="s" id="ov_tog" type="button">📊 إظهار لوحة الرسوم البيانية للطلبات</button></div>';
+  }
+
+  return '<div class="ord-viz-wrap">' +
+    '<div class="bar" style="margin-bottom:8px"><span style="font-weight:700;font-size:14px">📊 المؤشرات الرسومية والتحليل الفوري</span><div class="row s"><button class="s" data-otab="reports" type="button" style="font-size:12px">التقارير التفصيلية ⬅</button><button class="s" id="ov_tog" type="button" style="font-size:12px">إخفاء ▲</button></div></div>' +
+    '<div class="ord-viz-grid">' +
+      '<div class="ord-vcard">' +
+        '<div class="ov-title">توزيع حالات الطلبات (' + O.length + ')</div>' +
+        '<div class="dsh-flex">' + donutSvg +
+          '<div class="dsh-legend">' +
+            '<div data-oc-jump="delivered" style="cursor:pointer"><i style="background:var(--c-done)"></i>تم التوصيل <b>' + nDel + '</b></div>' +
+            '<div data-oc-jump="preparing" style="cursor:pointer"><i style="background:var(--c-doing)"></i>قيد التجهيز <b>' + nPrep + '</b></div>' +
+            '<div data-oc-jump="new" style="cursor:pointer"><i style="background:var(--c-todo)"></i>جديد <b>' + nNew + '</b></div>' +
+            '<div data-oc-jump="closed" style="cursor:pointer"><i style="background:var(--c-late)"></i>ملغي/مرتجع <b>' + nClosed + '</b></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ord-vcard">' +
+        '<div class="ov-title">كفاءة التحصيل والسيولة المالية</div>' +
+        '<div class="ov-fin-main"><span class="m">إجمالي المبيعات الفعّالة</span><b style="font-size:18px;font-variant-numeric:tabular-nums">' + money(totSales) + ' ' + BRAND.currency + '</b></div>' +
+        '<div class="ov-gauge"><i style="width:' + payPct + '%;background:var(--c-done)" title="محصّل ' + payPct + '%"></i></div>' +
+        '<div class="bar" style="font-size:12.5px;margin-top:6px"><span style="color:var(--ok)">✓ المحصّل: <b style="font-variant-numeric:tabular-nums">' + money(totPaid) + '</b> (' + payPct + '%)</span><span style="color:var(--late)">⏳ المتبقي: <b style="font-variant-numeric:tabular-nums">' + money(totDue) + '</b></span></div>' +
+        (cc ? '<div class="bar" style="font-size:12.5px;margin-top:8px;padding-top:6px;border-top:1px dashed var(--line)"><span>صافي ربح البضاعة</span><b style="color:' + (totProfit >= 0 ? 'var(--ok)' : 'var(--late)') + ';font-variant-numeric:tabular-nums">' + money(totProfit) + ' ' + BRAND.currency + '</b></div>' : '') +
+      '</div>' +
+      '<div class="ord-vcard">' +
+        '<div class="ov-title">أعلى قنوات المبيعات إيراداً</div>' +
+        (chList.length ? '<div class="ov-bars">' + chList.map(([ch, val]) => {
+          const w = Math.max(6, Math.round(100 * val / maxCh));
+          return '<div class="ov-bar-row"><div class="bar" style="font-size:12.5px"><span>' + esc(ch) + '</span><b style="font-variant-numeric:tabular-nums">' + money(val) + ' ' + BRAND.currency + '</b></div><div class="dsh-bar"><i style="width:' + w + '%;background:var(--acc)"></i></div></div>';
+        }).join('') + '</div>' : '<div class="m" style="padding:14px 0;text-align:center">تظهر القنوات فور تسجيل الطلبات</div>') +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
 function ordersView() {
   if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات <code dir="ltr">sql/008_orders.sql</code> ثم <code>009</code> ثم <code>010</code> في Supabase ← SQL Editor ثم اضغط تحديث.</p></div>';
   S.of = S.of || { q: '', rep: '', all: false }; S.ocol = S.ocol || 'new'; S.otab = S.otab || 'orders';
-  const tabs = '<div class="seg otabs"><button data-otab="orders" class="' + (S.otab === 'orders' ? 'on' : '') + '">🛒 الطلبات</button><button data-otab="reports" class="' + (S.otab === 'reports' ? 'on' : '') + '">📊 التقارير</button></div>';
+  const tabs = '<div class="seg otabs"><button data-otab="orders" class="' + (S.otab === 'orders' ? 'on' : '') + '">🛒 الطلبات</button><button data-otab="reports" class="' + (S.otab === 'reports' ? 'on' : '') + '">📊 الداشبورد والتقارير</button></div>';
   if (S.otab === 'reports') return tabs + reportsHtml();
   const K = oKpis(), kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
   return tabs + '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + kc(money(K.sales), 'مبيعات الشهر (' + BRAND.currency + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
+    ordVizStripHtml() +
     '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب…" value="' + esc(S.of.q) + '" style="flex:2 1 220px">' +
     '<select id="o_fr"><option value="">كل المندوبين</option><option value="_none"' + (S.of.rep === '_none' ? ' selected' : '') + '>بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(S.of.rep, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select>' +
     '<button class="p" id="o_new">＋ طلب جديد</button></div><div id="o_board">' + oBoardHtml() + '</div><button class="fab" id="o_fab" aria-label="طلب جديد">＋</button>';
@@ -92,6 +159,8 @@ function bindOrders() {
   if (S.ordErr) return;
   document.querySelectorAll('[data-otab]').forEach(b => b.onclick = () => { S.otab = b.dataset.otab; render(); });
   if (S.otab === 'reports') return bindReports();
+  if ($('ov_tog')) $('ov_tog').onclick = () => { S.hideOrdViz = !S.hideOrdViz; render(); };
+  document.querySelectorAll('[data-oc-jump]').forEach(el => el.onclick = () => { S.ocol = el.dataset.ocJump; drawOBoard(); });
   $('o_q').oninput = e => { S.of.q = e.target.value; drawOBoard(); };
   $('o_fr').onchange = e => { S.of.rep = e.target.value; drawOBoard(); };
   $('o_new').onclick = $('o_fab').onclick = () => orderDialog(null);

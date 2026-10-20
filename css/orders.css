@@ -65,8 +65,8 @@
 .prof{color:var(--ok)}.otot .prof{display:flex;justify-content:space-between;padding:2px 0}
 .rsup{display:block;font-size:13px;color:var(--mute);font-weight:400}
 .ritem{align-items:center;gap:10px}.ritem>span{flex:1}.ritem .thumb{width:56px;height:56px}
-/* التقارير */
-.otabs{margin-bottom:12px;max-width:340px}.otabs button{flex:1}
+/* التقارير والداشبورد الرسومي + الشركات والأقسام + تحديد الموظفين */
+.otabs{margin-bottom:12px;max-width:380px}.otabs button{flex:1}
 .rpf{align-items:flex-end}.rpf label{display:flex;flex-direction:column;font-size:12.5px;color:var(--mute);gap:2px}
 .rpc{padding:14px}.rpt-w{overflow-x:auto}
 .rpt{width:100%;border-collapse:collapse;font-size:14px}
@@ -77,3 +77,32 @@
 .tcol{flex:1 0 14px;max-width:34px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;font-size:10px;color:var(--mute)}
 .tcol i{display:block;width:100%;background:linear-gradient(180deg,#ecd08a,#b8923a);border-radius:5px 5px 0 0;min-height:0}
 @media (max-width:768px){.rpk{display:flex!important}.rpk .stat{flex:0 0 120px}}
+
+.ord-viz-wrap{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
+.ord-viz-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:960px){.ord-viz-grid{grid-template-columns:1fr}}
+.ord-vcard{background:var(--col);border:1px solid var(--line);border-radius:12px;padding:12px}
+.ov-title{font-weight:700;font-size:13.5px;margin-bottom:10px;color:var(--ink)}
+.ov-fin-main{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.ov-gauge{height:10px;background:var(--latesoft);border-radius:99px;overflow:hidden;display:flex}
+.ov-gauge i{display:block;height:100%;border-radius:99px;transition:width .2s}
+.ov-bars{display:flex;flex-direction:column;gap:8px}
+.ov-bar-row{display:flex;flex-direction:column;gap:3px}
+
+.co-sw{padding:6px 10px;border-radius:10px;font-size:13px;font-weight:600;max-width:190px;background:var(--card);border:1px solid var(--gold)}
+.co-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:10px;background:var(--accsoft);color:var(--acc);font-size:12.5px;font-weight:600}
+.org-tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.org-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:var(--col);border:1px solid var(--line);border-radius:10px;font-size:13px}
+.org-tag.on{border-color:var(--gold);background:var(--goldsoft)}
+.org-tag button{padding:2px 6px;font-size:11px;min-height:24px}
+
+.multi-emp-box{margin-top:10px;padding:12px;background:var(--col);border:1px solid var(--line);border-radius:12px}
+.dep-picks{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
+.dep-btn{padding:4px 10px!important;font-size:12px!important;min-height:30px!important}
+.emp-chk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:6px;max-height:175px;overflow-y:auto;padding:2px}
+.emp-chk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;padding:7px 10px;background:var(--card);border:1px solid var(--line);border-radius:9px;cursor:pointer;margin:0!important;user-select:none}
+.emp-chk:hover{border-color:var(--acc)}
+.emp-chk input[type="checkbox"]{width:17px;height:17px;margin:0;flex:none}
+.emp-chk div{display:flex;flex-direction:column;line-height:1.3;overflow:hidden}
+.emp-chk b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.emp-chk small{font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
