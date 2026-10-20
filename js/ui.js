@@ -12,11 +12,21 @@ const MORE_ITEMS = [
   { id: 'log', long: 'سجل النشاط', ic: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
   { id: 'set', long: 'الإعدادات', ic: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>' }
 ];
- // إخفاء/إظهار الشاشات (إعداد المدير). الإعدادات لا تُخفى أبداً.
+ // إخفاء/إظهار الشاشات (إعداد المدير + صلاحيات الموظف الدقيقة). الإعدادات لا تظهر إلا للأدمن.
 const viewHidden = id => id !== 'set' && !!(S.ordSet && (S.ordSet.hidden_views || []).includes(id));
-const visNav = () => NAV_ITEMS.filter(n => n.id === 'more' || !viewHidden(n.id));
-const visMore = () => MORE_ITEMS.filter(m => !viewHidden(m.id));
-const firstView = () => (visNav().find(n => n.id !== 'more') || { id: 'set' }).id;
+const visNav = () => NAV_ITEMS.filter(n => {
+  if (n.id === 'more') return visMore().length > 0;
+  if (viewHidden(n.id)) return false;
+  if (typeof canMemberAccessScreen === 'function' && !canMemberAccessScreen(n.id)) return false;
+  return true;
+});
+const visMore = () => MORE_ITEMS.filter(m => {
+  if (viewHidden(m.id)) return false;
+  if (m.id === 'set') return isAdmin();
+  if (typeof canMemberAccessScreen === 'function' && !canMemberAccessScreen(m.id)) return false;
+  return true;
+});
+const firstView = () => (visNav().find(n => n.id !== 'more') || visMore()[0] || { id: 'board' }).id;
 const appName = () => {
   if (typeof activeCompanyFilter === 'function') {
     const co = activeCompanyFilter();

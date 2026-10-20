@@ -166,14 +166,100 @@ function companyConfigDialog(coName) {
   dlg.showModal();
 }
 
-function vercelGuideHtml() {
-  if (!isAdmin()) return '';
-  return '<div class="card"><h2>🔑 كيف تجلب متغيرات البيئة من Vercel و Supabase؟</h2>' +
-    '<p class="m" style="margin-bottom:8px;line-height:1.7">إذا أردت نسخ متغيرات البيئة الخاصة بك من حسابك في <b>Vercel</b> أو <b>Supabase</b>:</p>' +
-    '<div class="obox m" style="line-height:1.85;margin-top:6px">' +
-    '<div><b>1) من لوحة تحكم Vercel:</b> ادخل إلى <code dir="ltr">vercel.com/dashboard</code> ← اختر مشروعك ← اضغط تبويب <b>Settings</b> في الأعلى ← من القائمة الجانبية اختر <b>Environment Variables</b> ← اضغط أيقونة العين 👁 بجانب كل متغير (<code dir="ltr">SUPABASE_URL</code>, <code dir="ltr">SUPABASE_ANON_KEY</code>, <code dir="ltr">SUPABASE_SERVICE_ROLE_KEY</code>, <code dir="ltr">VAPID_PUBLIC_KEY</code>, <code dir="ltr">VAPID_PRIVATE_KEY</code>) لنسخ قيمته.</div>' +
-    '<div style="margin-top:6px"><b>2) أو مباشرة من Supabase:</b> ادخل إلى <code dir="ltr">supabase.com/dashboard</code> ← اختر مشروعك ← <b>Project Settings (⚙️)</b> ← <b>API</b> ← ستجد <code dir="ltr">Project URL</code> و <code dir="ltr">anon public</code> و <code dir="ltr">service_role secret</code>.</div>' +
-    '</div></div>';
+function memberPermsDialog(email) {
+  const m = (S.rawMembers || S.allMembers || S.members || []).find(x => same(x.email, email));
+  if (!m) return;
+  const meta = parseMemberMeta(m);
+  const p = memberPerms(m);
+  const co = meta.company || 'متجرك';
+  const prof = getCompanyProfile(co);
+  const isAdm = m.role === 'admin';
+
+  const screens = [
+    ['board', '📋 المهام والمشاريع', 'لوحة المهام ومتابعة سير العمل اليومي'],
+    ['orders', '🛒 إدارة الطلبات', 'تسجيل الطلبات، إسناد للمناديب، طباعة الفواتير'],
+    ['erp', '💼 الحسابات والعهد', 'حسابات الموردين، عهدة المناديب، والمصروفات'],
+    ['dash', '📊 لوحة الأرقام والتقارير', 'مؤشرات الأداء ورسوم وتحليلات المبيعات والإنجاز'],
+    ['props', '🗳️ القرارات والتصويت', 'تقديم المقترحات ومشاركة الفريق في التصويت'],
+    ['log', '📜 سجل النشاط', 'متابعة سجل حركات وتعديلات النظام']
+  ];
+
+  dlg.innerHTML = '<h2>🔒 صلاحيات الشاشات والطلبات: ' + esc(m.name) + '</h2>' +
+    '<div class="m" style="margin-bottom:14px">البريد: <b dir="ltr">' + esc(m.email) + '</b> · المتجر: <b>' + esc(prof.displayName || co) + '</b> ' + (isAdm ? '<span class="chip all">مدير عام</span>' : '') + '</div>' +
+    (isAdm ? '<div class="m" style="margin-bottom:12px;background:var(--col);padding:10px;border-radius:10px">👑 هذا الحساب يحمل رتبة «مدير» ويملك تلقائياً صلاحية كاملة على كل شاشات وطلبات النظام.</div>' : '') +
+    '<div class="obox" style="margin-bottom:12px">' +
+      '<b style="display:block;margin-bottom:8px">1. الشاشات المسموح للموظف بالوصول إليها:</b>' +
+      screens.map(([k, l, desc]) =>
+        '<label class="chk" style="margin-bottom:8px">' +
+          '<input type="checkbox" data-pm-screen="' + k + '" ' + (isAdm || p.screens.includes(k) ? 'checked' : '') + (isAdm ? ' disabled' : '') + '> ' +
+          '<span><b>' + l + '</b><small class="m" style="display:block;font-size:11.5px">' + desc + '</small></span>' +
+        '</label>'
+      ).join('') +
+    '</div>' +
+    '<div class="obox" style="margin-bottom:12px">' +
+      '<b style="display:block;margin-bottom:8px">2. نطاق رؤية الطلبات في المتجر (خاص بالطلبات):</b>' +
+      '<label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer">' +
+        '<input type="radio" name="pm_ord_scope" value="all" ' + (isAdm || p.ordersScope === 'all' ? 'checked' : '') + (isAdm ? ' disabled' : '') + ' style="margin-top:4px">' +
+        '<span><b>🌐 رؤية جميع طلبات الشركة</b><small class="m" style="display:block;font-size:11.5px">يحق للموظف متابعة ورؤية طلبات زملائه الآخرين في نفس الشركة/المتجر.</small></span>' +
+      '</label>' +
+      '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">' +
+        '<input type="radio" name="pm_ord_scope" value="own" ' + (!isAdm && p.ordersScope === 'own' ? 'checked' : '') + (isAdm ? ' disabled' : '') + ' style="margin-top:4px">' +
+        '<span><b>🔒 رؤية طلباته الشخصية فقط (محجوبة عن طلبات زملائه)</b><small class="m" style="display:block;font-size:11.5px">لا يرى الموظف إلا الطلبات التي قام بتسجيلها بنفسه، وتُحجب عنه طلبات زملائه في نفس الشركة تماماً.</small></span>' +
+      '</label>' +
+    '</div>' +
+    '<div class="obox" style="margin-bottom:14px">' +
+      '<b style="display:block;margin-bottom:8px">3. التكاليف والبيانات المالية:</b>' +
+      '<label class="chk">' +
+        '<input type="checkbox" id="pm_can_cost" ' + (isAdm || p.canCost ? 'checked' : '') + (isAdm ? ' disabled' : '') + '> ' +
+        '<span><b>💰 إظهار تكلفة شراء البضاعة وهوامش الربح</b><small class="m" style="display:block;font-size:11.5px">السماح لهذا الموظف برؤية وإدخال سعر شراء البضاعة والاطلاع على أرباح الطلبات.</small></span>' +
+      '</label>' +
+    '</div>' +
+    '<div class="row dact">' +
+      '<button class="p s" id="pm_save" ' + (isAdm ? 'disabled' : '') + '>💾 حفظ الصلاحيات</button>' +
+      '<button class="s" id="pm_cancel">إغلاق</button>' +
+    '</div>';
+
+  $('pm_cancel').onclick = () => dlg.close();
+  if (!isAdm) {
+    $('pm_save').onclick = async () => {
+      const allowedScreens = [...document.querySelectorAll('[data-pm-screen]')].filter(c => c.checked).map(c => c.dataset.pmScreen);
+      if (!allowedScreens.length) return alert('يجب تحديد شاشة واحدة على الأقل للموظف.');
+      const ordScopeEl = document.querySelector('input[name="pm_ord_scope"]:checked');
+      const ordersScope = ordScopeEl ? ordScopeEl.value : 'all';
+      const canCostVal = $('pm_can_cost').checked;
+
+      const perms = {
+        screens: allowedScreens,
+        ordersScope: ordersScope,
+        canCost: canCostVal
+      };
+
+      $('pm_save').disabled = true; $('pm_save').textContent = 'جارٍ الحفظ...';
+
+      const patch = {
+        permissions: perms,
+        telegram_chat_id: encodeMemberMeta(meta.company, meta.department, meta.phone, perms)
+      };
+
+      let { error } = await sb.from('members').update(patch).eq('email', email);
+      if (error && /permissions/i.test(error.message)) {
+        delete patch.permissions;
+        ({ error } = await sb.from('members').update(patch).eq('email', email));
+      }
+
+      m.permissions = perms;
+      m.telegram_chat_id = patch.telegram_chat_id;
+      if (S.me && same(S.me.email, email)) {
+        S.me.permissions = perms;
+        S.me.telegram_chat_id = patch.telegram_chat_id;
+      }
+      dlg.close();
+      applyCompanyScope();
+      render();
+      if (typeof toast === 'function') toast('تم تحديث صلاحيات «' + m.name + '» بنجاح ✓');
+    };
+  }
+  dlg.showModal();
 }
 
 function settingsView() {
@@ -188,18 +274,21 @@ function settingsView() {
 
     let memList = listMembers.map(m => {
         const meta = parseMemberMeta(m);
+        const p = memberPerms(m);
         const isMeSuper = S.me && same(m.email, S.me.email) && m.role === 'admin';
         let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
-        // المدير العام فقط يظهر له خيار «كل الشركات»، أما أي موظف فيلتزم بشركة محددة (افتراضياً: متجرك)
         const allowedCos = myCo ? [myCo] : (isMeSuper ? [''].concat(cos) : cos);
         const selectedCo = isMeSuper ? (String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim()) : (meta.company || 'متجرك');
         const coOpts = allowedCos.map(c => '<option value="' + esc(c) + '"' + (same(selectedCo, c) ? ' selected' : '') + '>' + (c ? '🏢 ' + esc(c) : '👑 كل الشركات (المدير العام فقط)') + '</option>').join('');
         const depSet = new Set(deps); if (meta.department) depSet.add(meta.department);
         const depOpts = '<option value="">-- بدون إدارة/قسم --</option>' + [...depSet].map(d => '<option value="' + esc(d) + '"' + (same(meta.department, d) ? ' selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
+        const ordScopeBadge = m.role === 'admin' ? '' : (p.ordersScope === 'own' ? '<span class="chip late" style="font-size:11px" title="لا يرى إلا طلباته الشخصية">🔒 طلباته فقط</span>' : '<span class="chip ok" style="font-size:11px" title="يرى كل طلبات الشركة">🌐 كل الطلبات</span>');
         return '<div class="bar mem-row" style="background:var(--col);padding:10px 12px;border-radius:10px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span> <span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '">' + ({ admin: 'مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span>' +
           (selectedCo ? '<span class="chip">🏢 ' + esc(selectedCo) + '</span>' : '<span class="chip all">🌐 كل الشركات</span>') +
           (meta.department ? '<span class="chip">🏛️ ' + esc(meta.department) + '</span>' : '') +
           (meta.phone ? '<span class="chip ok" dir="ltr">📱 ' + esc(meta.phone) + '</span>' : '') +
+          ordScopeBadge +
+          '<button class="s" type="button" data-mperms="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px;background:var(--card);border-color:var(--line)" title="صلاحيات الشاشات ونطاق رؤية الطلبات">🔒 الصلاحيات والشاشات</button>' +
           '<button class="s" type="button" data-mwa="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px" title="إرسال تذكير واتساب بمهام الموظف">📲 تذكير واتساب</button>' +
           '</div><div class="row" style="flex:1 1 100%;margin-top:8px;gap:6px">' +
           '<input data-mt="' + esc(m.email) + '" value="' + esc(m.title || '') + '" placeholder="المسمى الوظيفي (مثال: مسؤول التسويق)" style="flex:2 1 140px">' +
@@ -263,7 +352,7 @@ function settingsView() {
     '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card"><h2>تغيير كلمة المرور</h2><div class="row"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
-  alertSettingsHtml() + adminHtml + (isAdmin() ? repsCardHtml() + ordSettingsHtml() + vercelGuideHtml() : '') + recurHtml() + toolsHtml() +
+  alertSettingsHtml() + adminHtml + (isAdmin() ? repsCardHtml() + ordSettingsHtml() : '') + recurHtml() + toolsHtml() +
   '<div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>';
 }
 
@@ -410,6 +499,7 @@ function bindSettings() {
   document.querySelectorAll('[data-mwa]').forEach(b => b.onclick = () => {
     if (typeof waRemindDialog === 'function') waRemindDialog(b.dataset.mwa, 'late');
   });
+  document.querySelectorAll('[data-mperms]').forEach(b => b.onclick = () => memberPermsDialog(b.dataset.mperms));
   document.querySelectorAll('[data-mts]').forEach(b => b.onclick = async () => {
     const em = b.dataset.mts;
     const i = document.querySelector('[data-mt="' + em + '"]');

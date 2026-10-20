@@ -157,6 +157,8 @@ const logout = async () => { await sb.auth.signOut(); localStorage.clear(); loca
 function render() {
   if (S.me && S.me.role === 'rep') return repRender();
   if (typeof viewHidden === 'function' && viewHidden(S.view)) S.view = firstView();
+  if (typeof canMemberAccessScreen === 'function' && !canMemberAccessScreen(S.view)) S.view = firstView();
+  if (S.view === 'set' && !isAdmin()) S.view = firstView();
   try { document.title = appName(); updateBadge(); saveCache(); } catch (e) {}
   if (!S.me) return;
   const props = S.props || [];

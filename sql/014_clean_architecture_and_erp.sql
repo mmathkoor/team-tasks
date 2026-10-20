@@ -29,6 +29,7 @@ on conflict (id) do nothing;
 alter table members add column if not exists company text default 'متجرك';
 alter table members add column if not exists department text default '';
 alter table members add column if not exists phone text;
+alter table members add column if not exists permissions jsonb default '{}'::jsonb;
 
 -- ترحيل بيانات الأعضاء المخزنة سابقاً كـ JSON في telegram_chat_id إلى الأعمدة الصريحة
 update members

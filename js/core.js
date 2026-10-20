@@ -150,14 +150,20 @@ function waSummaryDialog(title, txt, phoneOpt) {
 const DEFAULT_COMPANY = 'متجرك';
 
 function parseMemberMeta(m) {
-  if (!m) return { company: '', department: '', phone: '' };
+  if (!m) return { company: '', department: '', phone: '', perms: {} };
   let co = m.company || '', dep = m.department || '', ph = m.phone || '';
+  let perms = {};
+  if (m.permissions) {
+    if (typeof m.permissions === 'object') perms = Object.assign({}, m.permissions);
+    else { try { perms = JSON.parse(m.permissions); } catch (e) {} }
+  }
   if (m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
     try {
       const j = JSON.parse(m.telegram_chat_id);
       if (!co) co = j.co || j.company || '';
       if (!dep) dep = j.dep || j.department || '';
       if (!ph) ph = j.ph || j.phone || '';
+      if (!Object.keys(perms).length && j.perms && typeof j.perms === 'object') perms = Object.assign({}, j.perms);
     } catch (e) {}
   }
   co = String(co || '').trim();
@@ -165,15 +171,52 @@ function parseMemberMeta(m) {
   ph = String(ph || '').trim();
   // جميع الموظفين والمناديب (غير المدير العام) يتبعون تلقائياً شركة «متجرك» ما لم تُحدَّد لهم شركة أخرى أو __all للمندوب المشترك
   if (!co && m.role !== 'admin') co = DEFAULT_COMPANY;
-  return { company: co, department: dep, phone: ph };
+  return { company: co, department: dep, phone: ph, perms };
 }
-function encodeMemberMeta(co, dep, ph) {
+
+function encodeMemberMeta(co, dep, ph, perms) {
   const c = String(co || '').trim(), d = String(dep || '').trim(), p = String(ph || '').trim();
   const obj = {};
   if (c) obj.co = c;
   if (d) obj.dep = d;
   if (p) obj.ph = p;
+  if (perms && typeof perms === 'object' && Object.keys(perms).length) obj.perms = perms;
   return Object.keys(obj).length ? JSON.stringify(obj) : null;
+}
+
+// استرجاع صلاحيات الموظف الدقيقة
+function memberPerms(mOrEmail) {
+  const m = typeof mOrEmail === 'string'
+    ? (S.allMembers || S.members || S.rawMembers || []).find(x => same(x.email, mOrEmail))
+    : mOrEmail;
+  if (!m) return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false };
+  if (m.role === 'admin') return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true };
+  if (m.role === 'rep') return { screens: ['rep'], ordersScope: 'own', canCost: false };
+
+  const meta = parseMemberMeta(m);
+  const p = meta.perms || {};
+  return {
+    screens: Array.isArray(p.screens) && p.screens.length ? p.screens : ['board', 'orders', 'dash', 'props', 'log'],
+    ordersScope: p.ordersScope === 'own' ? 'own' : 'all',
+    canCost: !!p.canCost
+  };
+}
+
+function canMemberAccessScreen(screenId, m) {
+  const member = m || S.me;
+  if (!member) return false;
+  if (member.role === 'admin') return true;
+  if (screenId === 'set') return false; // الإعدادات للمدير فقط
+  const p = memberPerms(member);
+  return p.screens.includes(screenId);
+}
+
+function canMemberViewOtherOrders(m) {
+  const member = m || S.me;
+  if (!member) return false;
+  if (member.role === 'admin') return true;
+  const p = memberPerms(member);
+  return p.ordersScope !== 'own';
 }
 function memberCompany(email) {
   if (!email) return DEFAULT_COMPANY;
@@ -415,7 +458,12 @@ function applyCompanyScope() {
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');
   S.tasks = (S.rawTasks || []).filter(t => same(taskCompany(t), co));
-  S.orders = (S.rawOrders || []).filter(o => same(orderCompany(o), co));
+  let compOrders = (S.rawOrders || []).filter(o => same(orderCompany(o), co));
+  // عزل صلاحيات الطلبات: إذا لم يُسمح للموظف برؤية طلبات زملائه يرى طلباته الخاصة فقط
+  if (S.me && S.me.role !== 'admin' && typeof canMemberViewOtherOrders === 'function' && !canMemberViewOtherOrders(S.me)) {
+    compOrders = compOrders.filter(o => same(o.created_by, S.me.email) || same(o.rep_email, S.me.email));
+  }
+  S.orders = compOrders;
   const ordIds = new Set(S.orders.map(o => o.id));
   S.oitems = (S.rawOitems || []).filter(i => ordIds.has(i.order_id));
   S.opay = (S.rawOpay || []).filter(p => ordIds.has(p.order_id));

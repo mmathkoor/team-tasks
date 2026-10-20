@@ -801,14 +801,12 @@ function erpView() {
       '<button type="button" data-etab="suppliers" class="' + (S.erpTab === 'suppliers' ? 'on' : '') + '">🏪 1. حساب الموردين (التجار)</button>' +
       '<button type="button" data-etab="reps" class="' + (S.erpTab === 'reps' ? 'on' : '') + '">🛵 2. عهدة المندوب والتحصيل</button>' +
       '<button type="button" data-etab="expenses" class="' + (S.erpTab === 'expenses' ? 'on' : '') + '">💸 3. المصروفات وصافي الربح</button>' +
-      (isAdmin() ? '<button type="button" data-etab="arch" class="' + (S.erpTab === 'arch' ? 'on' : '') + '">🛡️ العزل المعماري</button>' : '') +
     '</div>' +
   '</div>';
 
-  const body = S.erpTab === 'suppliers' ? suppliersTabHtml(rng, cur)
-    : S.erpTab === 'reps' ? repCustodyTabHtml(rng, cur)
+  const body = S.erpTab === 'reps' ? repCustodyTabHtml(rng, cur)
     : S.erpTab === 'expenses' ? expensesAndProfitTabHtml(rng, cur)
-    : archStatusTabHtml();
+    : suppliersTabHtml(rng, cur);
 
   return headerBar + body;
 }

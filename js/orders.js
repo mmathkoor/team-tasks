@@ -46,7 +46,7 @@ function invoiceText(o) {
     .concat(['💰 *الإجمالي النهائي: ' + money(o.total) + ' ' + cur + '*', '✅ المدفوع: ' + money(o.paid) + ' ' + cur, '⏳ *المتبقي: ' + money(o.balance) + ' ' + cur + '*'])
     .concat(bphone(o) ? ['', '📞 للتواصل: ' + bphone(o)] : []).concat(baddr(o) ? ['📍 ' + baddr(o)] : []).concat(['', p.footer || 'شكراً لتعاملكم معنا 🌹']).join('\n');
 }
-const canCost = o => isAdmin() || !!bProf(o).staffCanCost;
+const canCost = o => isAdmin() || (typeof memberPerms === 'function' && memberPerms(S.me).canCost) || !!bProf(o).staffCanCost;
 const costOf = id => (S.ocost || {})[id] || 0;
 const oCostTotal = o => oItems(o.id).reduce((a, i) => a + (+i.qty) * costOf(i.id), 0);
 const oProfit = o => (+o.subtotal) - (+o.discount) - oCostTotal(o);
@@ -162,21 +162,17 @@ function ordVizStripHtml() {
   '</div>';
 }
 function ordersView() {
-  if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات <code dir="ltr">sql/008_orders.sql</code> ثم <code>009</code> ثم <code>010</code> في Supabase ← SQL Editor ثم اضغط تحديث.</p></div>';
+  if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات SQL في Supabase ثم اضغط تحديث.</p></div>';
   S.of = S.of || { q: '', rep: '', all: false }; S.ocol = S.ocol || 'new';
   const cur = bcurr();
   const K = oKpis(), kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
   return '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + kc(money(K.sales), 'مبيعات الشهر (' + esc(cur) + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
-    ordVizStripHtml() +
     '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب…" value="' + esc(S.of.q) + '" style="flex:2 1 220px">' +
     '<select id="o_fr"><option value="">كل المندوبين</option><option value="_none"' + (S.of.rep === '_none' ? ' selected' : '') + '>بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(S.of.rep, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select>' +
     '<button class="p" id="o_new">＋ طلب جديد</button></div><div id="o_board">' + oBoardHtml() + '</div><button class="fab" id="o_fab" aria-label="طلب جديد">＋</button>';
 }
 function bindOrders() {
   if (S.ordErr) return;
-  if ($('ov_tog')) $('ov_tog').onclick = () => { S.hideOrdViz = !S.hideOrdViz; render(); };
-  if ($('ov_go_dash')) $('ov_go_dash').onclick = () => { S.tab = 'dash'; S.dtab = 'sales'; render(); };
-  document.querySelectorAll('[data-oc-jump]').forEach(el => el.onclick = () => { S.ocol = el.dataset.ocJump; drawOBoard(); });
   $('o_q').oninput = e => { S.of.q = e.target.value; drawOBoard(); };
   $('o_fr').onchange = e => { S.of.rep = e.target.value; drawOBoard(); };
   $('o_new').onclick = $('o_fab').onclick = () => orderDialog(null);
@@ -400,6 +396,12 @@ function invoiceDialog(o) {
 }
 /* ---------- نافذة الطلب (إنشاء / تعديل) ---------- */
 function orderDialog(o) {
+  if (o && S.me && S.me.role !== 'admin' && typeof canMemberViewOtherOrders === 'function' && !canMemberViewOtherOrders(S.me)) {
+    if (!same(o.created_by, S.me.email) && !same(o.rep_email, S.me.email)) {
+      alert('ليس لديك صلاحية لعرض هذا الطلب (مسموح لك بعرض ومتابعة طلباتك الخاصة فقط).');
+      return;
+    }
+  }
   const edit = !!o, x = o || {}, cc = canCost(o);
   const cos = typeof companiesList === 'function' ? companiesList() : ['متجرك'];
   const initCo = edit ? orderCompany(o) : (activeCompanyFilter() || 'متجرك');
