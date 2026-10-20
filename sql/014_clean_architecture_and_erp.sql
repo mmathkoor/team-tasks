@@ -60,7 +60,22 @@ set
   notes = nullif(trim(regexp_replace(coalesce(notes, ''), '\[شركة:\s*[^\]]+\]\n?', '', 'g')), '')
 where notes like '%[شركة:%';
 
--- 4) دوال العزل الحقيقي على مستوى قاعدة البيانات (Row-Level Security)
+-- 4) دوال التحقق والعزل الحقيقي على مستوى قاعدة البيانات (Row-Level Security)
+create or replace function is_member() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from members m where lower(m.email) = lower(auth.jwt() ->> 'email') and coalesce(m.role, 'member') <> 'rep');
+$$;
+
+create or replace function is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from members m where lower(m.email) = lower(auth.jwt() ->> 'email') and m.role = 'admin');
+$$;
+
+create or replace function is_rep() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from members m where lower(m.email) = lower(auth.jwt() ->> 'email') and m.role = 'rep');
+$$;
+
 create or replace function current_user_company() returns text
 language sql stable security definer set search_path = public as $$
   select case
