@@ -92,24 +92,51 @@ function normRepPhoneClient(p) {
 }
 
 function loginView() {
-  $app.innerHTML = '<div class="card" id="login"><h1><svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><br>مدير المهام</h1><p class="m">سجّل الدخول بالبريد الإلكتروني (للموظفين) أو برقم الجوال / الاسم (للمندوب)</p>' +
-  '<div class="row"><input id="em" type="text" inputmode="email" autocomplete="username" placeholder="البريد الإلكتروني أو رقم الجوال (مثال: 777123456)" dir="ltr" style="width:100%"></div>' +
-  '<div class="row" style="margin-top:12px"><input id="pw" type="password" placeholder="كلمة المرور" dir="ltr" style="width:100%"></div>' +
-  '<button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button><p class="m" id="msg" style="margin-top:12px;color:var(--late)"></p></div>';
-  
+  $app.innerHTML = '<div class="card" id="login"><h1><svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><br>مدير المهام</h1><p class="m">سجّل الدخول برقم الجوال أو البريد الإلكتروني أو اسم المستخدم مع كلمة المرور</p>' +
+  '<div class="row"><input id="em" type="text" autocomplete="username" placeholder="رقم الجوال (77...) أو البريد الإلكتروني أو الاسم" dir="ltr" style="width:100%"></div>' +
+  '<div class="row" style="margin-top:12px;position:relative">' +
+    '<input id="pw" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr" style="width:100%;padding-inline-end:42px">' +
+    '<button type="button" id="pw_tog" title="إظهار/إخفاء كلمة المرور" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;padding:4px 8px;font-size:16px;cursor:pointer;color:var(--mute)">👁</button>' +
+  '</div>' +
+  '<button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button>' +
+  '<p class="m" id="msg" style="margin-top:12px;color:var(--late);font-size:13px;line-height:1.5"></p></div>';
+
+  if ($('pw_tog')) {
+    $('pw_tog').onclick = () => {
+      const inp = $('pw');
+      if (inp.type === 'password') { inp.type = 'text'; $('pw_tog').textContent = '🙈'; }
+      else { inp.type = 'password'; $('pw_tog').textContent = '👁'; }
+    };
+  }
+
   const doLogin = async () => {
     $('msg').textContent = 'جارٍ الدخول...'; $('msg').style.color = 'inherit';
     const id = $('em').value.trim(), pw = $('pw').value.trim();
     if (!id || !pw) {
-      $('msg').textContent = 'الرجاء إدخال البريد/رقم الجوال وكلمة المرور';
+      $('msg').textContent = 'الرجاء إدخال البريد / رقم الجوال وكلمة المرور';
       $('msg').style.color = 'var(--late)';
       return;
     }
+
+    // تنبيه لطيف عند وجود خطأ إملائي شائع في النطاق (مثل .ocm بدل .com)
+    if (/@.*\.(ocm|con|cpm|vom|cm)$/i.test(id)) {
+      $('msg').textContent = '⚠️ يبدو أن هناك خطأ في كتابة نهاية البريد (كتبت ' + id.split('@')[1] + ' بدلاً من com). تحقّق من الإملاء أو جرّب الدخول برقم الجوال مباشرة.';
+      $('msg').style.color = 'var(--soon)';
+    }
+
     let error = null;
+    let loggedIn = false;
+
+    // 1) محاولة الدخول المباشر إذا كان المدخل بريداً إلكترونياً
     if (id.includes('@')) {
-      ({ error } = await sb.auth.signInWithPassword({ email: id, password: pw }));
+      const res = await sb.auth.signInWithPassword({ email: id, password: pw });
+      if (!res.error) {
+        loggedIn = true;
+      } else {
+        error = res.error;
+      }
     } else {
-      // مندوب: الدخول برقم الجوال أو الاسم — نجرب الدخول المباشر السريع عبر حساب المندوب القياسي ثم عبر /api/rep-login
+      // تجربة الكاش المحلي للمناديب والموظفين للدخول السريع
       const normP = normRepPhoneClient(id);
       const rawD = id.replace(/\D/g, '');
       let cachedDir = [];
@@ -121,33 +148,43 @@ function loginView() {
 
       const directCandidates = [...new Set([
         ...cachedMatches,
-        ...(rawD.length >= 7 ? [normP + '@rep.invalid', rawD + '@rep.invalid'] : [])
+        ...(rawD.length >= 7 ? [normP + '@staff.local', rawD + '@staff.local', normP + '@rep.local', rawD + '@rep.local', normP + '@rep.invalid', rawD + '@rep.invalid'] : [])
       ].filter(Boolean))];
 
-      let loggedIn = false;
       for (const candEmail of directCandidates) {
         const res = await sb.auth.signInWithPassword({ email: candEmail, password: pw });
         if (!res.error) { loggedIn = true; break; }
       }
-      if (!loggedIn) {
-        try {
-          const r = await fetch('/api/rep-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: id, password: pw }) });
-          const j = await r.json().catch(() => ({}));
-          const sess = (j && j.session && j.session.access_token) ? j.session : (j && j.access_token ? j : null);
-          if (r.ok && sess) {
-            sess.expires_at = sess.expires_at || Math.floor(Date.now() / 1000) + (sess.expires_in || 3600);
-            saveS(sess);
-            init();
-            loggedIn = true;
-          } else {
-            error = { message: j.error || 'رقم الجوال أو كلمة المرور غير صحيحة' };
-          }
-        } catch (e) {
-          error = { message: 'رقم الجوال أو كلمة المرور غير صحيحة' };
+    }
+
+    // 2) إذا لم ينجح الدخول المباشر، نستعين بخادم المصادقة الذكي /api/rep-login للتحقق بالاسم أو رقم الجوال أو البريد
+    if (!loggedIn) {
+      try {
+        const r = await fetch('/api/rep-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: id, password: pw }) });
+        const j = await r.json().catch(() => ({}));
+        const sess = (j && j.session && j.session.access_token) ? j.session : (j && j.access_token ? j : null);
+        if (r.ok && sess) {
+          sess.expires_at = sess.expires_at || Math.floor(Date.now() / 1000) + (sess.expires_in || 3600);
+          saveS(sess);
+          init();
+          loggedIn = true;
+          error = null;
+        } else {
+          error = { message: j.error || (error ? error.message : 'البريد أو رقم الجوال أو كلمة المرور غير صحيحة') };
         }
+      } catch (e) {
+        if (!error) error = { message: 'تعذّر الاتصال بخادم تسجيل الدخول' };
       }
     }
-    if (error) { $('msg').textContent = error.message; $('msg').style.color = 'var(--late)'; }
+
+    if (error && !loggedIn) {
+      let emMsg = error.message || '';
+      if (/invalid_credentials|invalid login/i.test(emMsg)) {
+        emMsg = 'البريد أو رقم الجوال أو كلمة المرور غير صحيحة. (تأكد من صحة الحروف أو جرّب رقم الجوال المسجل).';
+      }
+      $('msg').textContent = emMsg;
+      $('msg').style.color = 'var(--late)';
+    }
   };
   $('go').onclick = doLogin;
   $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
