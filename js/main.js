@@ -9,6 +9,11 @@ if ('serviceWorker' in navigator) {
     if (had && !rld) { rld = true; location.reload(); }
     had = true;
   });
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'version_updated') {
+      if (!rld) { rld = true; location.reload(); }
+    }
+  });
 }
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !dlg.open) { flushNow(); load(); } });

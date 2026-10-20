@@ -57,7 +57,8 @@ function repsCardHtml() {
     '</div></div>';
 }
 
-function ordSettingsHtml() {
+
+function ordSettingsOnlyHtml() {
   const cos = typeof companiesList === 'function' ? companiesList() : ['متجرك'];
   const myCo = isSuperAdmin() ? '' : parseMemberMeta(S.me).company;
   const targetCo = myCo || S.ordCfgCo || activeCompanyFilter() || 'متجرك';
@@ -73,7 +74,7 @@ function ordSettingsHtml() {
     '</div>'
   ) : '<span class="co-tag">🏢 متجر: ' + esc(p.displayName || targetCo) + '</span>';
 
-  return '<div class="card">' +
+  return '<div class="card" style="margin:0;border:0;box-shadow:none;padding:0">' +
     '<div class="bar" style="margin-bottom:12px"><h2 style="margin:0">⚙ إعدادات الطلبات والفواتير (لكل متجر)</h2>' + coSelector + '</div>' +
     '<div class="row">' +
       '<label>اسم المتجر (على الفاتورة)<input id="os_n" value="' + esc(p.displayName || '') + '" placeholder="' + esc(targetCo) + '"></label>' +
@@ -86,7 +87,10 @@ function ordSettingsHtml() {
     '<label style="margin-top:8px">عبارة تذييل الفاتورة ورسائل الواتساب<input id="os_foot" value="' + esc(p.footer || 'شكراً لتعاملكم معنا 🌹') + '"></label>' +
     '<label class="chk" style="margin-top:12px"><input type="checkbox" id="os_c" ' + (p.staffCanCost ? 'checked' : '') + '> يرى موظفو متجر «' + esc(p.displayName || targetCo) + '» سعر الشراء ويدخلونه (افتراضياً: للمدير فقط)</label>' +
     '<label style="margin-top:10px">حذف صور الأصناف بعد انتهاء الطلب<select id="os_k">' + [[0, 'فوراً عند التسليم/الإلغاء'], [1, 'بعد يوم'], [2, 'بعد يومين'], [3, 'بعد 3 أيام'], [7, 'بعد أسبوع']].map(([v, l]) => '<option value="' + v + '"' + ((p.imageKeepDays == null ? 1 : +p.imageKeepDays) === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
-    '<div class="row" style="margin-top:12px"><button class="p s" id="os_sv">💾 حفظ إعدادات متجر «' + esc(p.displayName || targetCo) + '»</button></div></div>' + viewsCardHtml() + dupCardHtml();
+    '<div class="row" style="margin-top:12px"><button class="p s" id="os_sv">💾 حفظ إعدادات متجر «' + esc(p.displayName || targetCo) + '»</button></div></div>';
+}
+function ordSettingsHtml() {
+  return ordSettingsOnlyHtml() + viewsCardHtml() + dupCardHtml();
 }
 const VIEW_LIST = [['board', 'المهام والمشاريع'], ['orders', 'إدارة الطلبات'], ['erp', 'الحسابات والعهد والمصروفات'], ['dash', 'لوحة الأرقام'], ['props', 'القرارات والتصويت'], ['log', 'سجل النشاط']];
 function viewsCardHtml() {
@@ -153,9 +157,9 @@ function bindOrdAdmin() {
       if (typeof companyConfigDialog === 'function') companyConfigDialog(targetCo);
     };
   }
-  $('rp_g').onclick = () => { $('rp_w').value = genPw(); };
-  $('rp_add').onclick = async () => {
-    const n = $('rp_n').value.trim(), p = $('rp_p').value.trim(), w = $('rp_w').value.trim();
+  if ($('rp_g')) $('rp_g').onclick = () => { if ($('rp_w')) $('rp_w').value = genPw(); };
+  if ($('rp_add')) $('rp_add').onclick = async () => {
+    const n = $('rp_n') ? $('rp_n').value.trim() : '', p = $('rp_p') ? $('rp_p').value.trim() : '', w = $('rp_w') ? $('rp_w').value.trim() : '';
     const co = ($('rp_co') && $('rp_co').value) || activeCompanyFilter() || 'متجرك';
     if (!n || !p || w.length < 6) return alert('اكتب الاسم ورقم الجوال وكلمة مرور من 6 أحرف على الأقل');
     $('rp_add').disabled = true; const r = await repApi({ action: 'create', name: n, phone: p, password: w, company: co }); $('rp_add').disabled = false;
@@ -185,7 +189,7 @@ function bindOrdAdmin() {
     if (!confirm('إزالة المندوب ' + (rep ? rep.name : '') + ' وحذف حسابه؟ (طلباته السابقة تبقى محفوظة)')) return;
     const r = await repApi({ action: 'remove', email: b.dataset.rrm }); if (!r.ok) return alert(r.error); load();
   });
-  $('os_sv').onclick = async () => {
+  if ($('os_sv')) $('os_sv').onclick = async () => {
     const myCo = isSuperAdmin() ? '' : parseMemberMeta(S.me).company;
     const targetCo = myCo || ($('os_co') && $('os_co').value) || S.ordCfgCo || activeCompanyFilter() || 'متجرك';
     $('os_sv').disabled = true; $('os_sv').textContent = 'جارٍ الحفظ...';

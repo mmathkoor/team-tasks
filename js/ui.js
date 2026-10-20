@@ -22,7 +22,7 @@ const visNav = () => NAV_ITEMS.filter(n => {
 });
 const visMore = () => MORE_ITEMS.filter(m => {
   if (viewHidden(m.id)) return false;
-  if (m.id === 'set') return isAdmin();
+  if (m.id === 'set') return isAdmin() || (typeof canMemberAccessScreen === 'function' && canMemberAccessScreen('set'));
   if (typeof canMemberAccessScreen === 'function' && !canMemberAccessScreen(m.id)) return false;
   return true;
 });
@@ -152,6 +152,7 @@ function toggleCoPopover(e) {
 
 function bindHeader() {
   $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
+  if ($('ver_badge_btn')) $('ver_badge_btn').onclick = () => { if (typeof forceAppUpdate === 'function') forceAppUpdate(); else location.reload(true); };
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
   if ($('co_sw_btn')) $('co_sw_btn').onclick = toggleCoPopover;
@@ -195,6 +196,7 @@ function headerHtml() {
       '<div class="bt"><h1>' + esc(appName()) + '</h1><div class="sub">' + greetingText() + '، ' + esc(S.me.name) + (roleSub ? ' (' + esc(roleSub) + ')' : '') + esc(sloganTxt) + (d ? ' · ' + esc(d) : '') + '</div></div>' +
     '</div>' +
     '<div class="hbtns">' +
+      '<button id="ver_badge_btn" class="s iconbtn" style="width:auto;padding:0 8px;font-size:11.5px;font-weight:700;color:var(--gold);border-color:var(--line)" title="إصدار النظام v' + VERSION + ' - انقر للتحديث الفوري ومسح الكاش">v' + VERSION + ' ↻</button>' +
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +

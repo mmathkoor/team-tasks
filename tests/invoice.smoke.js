@@ -1,6 +1,6 @@
 const { JSDOM } = require('jsdom'); const fs = require('fs'); const path = require('path').resolve(__dirname, '..') + '/';
 let base = fs.readFileSync(path + 'index.html', 'utf8');
-base = base.replace(/<script src="([^"]+)"><\/script>/g, (m, s) => s === '/api/config' ? '' : '<script>' + fs.readFileSync(path + s.replace(/^\//, ''), 'utf8').replace(/<\/script>/g, '<\\/script>') + '</script>');
+base = base.replace(/<script src="([^"]+)"><\/script>/g, (m, s) => '<script>' + fs.readFileSync(path + s.replace(/^\//, ''), 'utf8').replace(/<\/script>/g, '<\\/script>') + '</script>');
 base = base.replace(/<link rel="stylesheet"[^>]*>/g, '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const data = { members: [{ email: 'm@x.com', name: 'مروان', role: 'admin' }],

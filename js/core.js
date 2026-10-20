@@ -189,16 +189,21 @@ function memberPerms(mOrEmail) {
   const m = typeof mOrEmail === 'string'
     ? (S.allMembers || S.members || S.rawMembers || []).find(x => same(x.email, mOrEmail))
     : mOrEmail;
-  if (!m) return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false };
-  if (m.role === 'admin') return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true };
-  if (m.role === 'rep') return { screens: ['rep'], ordersScope: 'own', canCost: false };
+  if (!m) return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false, settingsTabs: [] };
+  if (m.role === 'admin') return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true, settingsTabs: ['staff', 'reps', 'stores', 'orders_cfg', 'notify', 'recur', 'tools', 'account'] };
+  if (m.role === 'rep') return { screens: ['rep'], ordersScope: 'own', canCost: false, settingsTabs: ['account'] };
 
   const meta = parseMemberMeta(m);
   const p = meta.perms || {};
+  const setTabs = Array.isArray(p.settingsTabs) ? p.settingsTabs : [];
+  const screens = Array.isArray(p.screens) && p.screens.length ? p.screens.slice() : ['board', 'orders', 'dash', 'props', 'log'];
+  if (!screens.includes('set')) screens.push('set');
+
   return {
-    screens: Array.isArray(p.screens) && p.screens.length ? p.screens : ['board', 'orders', 'dash', 'props', 'log'],
+    screens: screens,
     ordersScope: p.ordersScope === 'own' ? 'own' : 'all',
-    canCost: !!p.canCost
+    canCost: !!p.canCost,
+    settingsTabs: setTabs
   };
 }
 
@@ -206,9 +211,18 @@ function canMemberAccessScreen(screenId, m) {
   const member = m || S.me;
   if (!member) return false;
   if (member.role === 'admin') return true;
-  if (screenId === 'set') return false; // الإعدادات للمدير فقط
   const p = memberPerms(member);
+  if (screenId === 'set') return true;
   return p.screens.includes(screenId);
+}
+
+function canMemberAccessSettingsTab(tabId, m) {
+  const member = m || S.me;
+  if (!member) return false;
+  if (tabId === 'account') return true;
+  if (member.role === 'admin') return true;
+  const p = memberPerms(member);
+  return Array.isArray(p.settingsTabs) && p.settingsTabs.includes(tabId);
 }
 
 function canMemberViewOtherOrders(m) {
