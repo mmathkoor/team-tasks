@@ -12,7 +12,7 @@ const MORE_ITEMS = [
   { id: 'log', long: 'سجل النشاط', ic: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
   { id: 'set', long: 'الإعدادات', ic: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>' }
 ];
- // إخفاء/إظهار الشاشات (إعداد المدير + صلاحيات الموظف الدقيقة). الإعدادات لا تظهر إلا للأدمن.
+ // إخفاء/إظهار الشاشات (إعداد المدير + صلاحيات الموظف الدقيقة). الإعدادات تظهر للجميع؛ التبويبات الحساسة فيها للأدمن أو بحسب صلاحيات الموظف.
 const viewHidden = id => id !== 'set' && !!(S.ordSet && (S.ordSet.hidden_views || []).includes(id));
 const visNav = () => NAV_ITEMS.filter(n => {
   if (n.id === 'more') return visMore().length > 0;
@@ -50,8 +50,9 @@ function navHtml(view, propsBadge) {
 function moreDialog() {
   const op = (S.props || []).filter(p => !isClosed(p)).length;
   dlg.innerHTML = '<h2>المزيد</h2><div class="more">' + visMore().map(m => '<button class="more-i" data-go="' + m.id + '">' + svgIc(m.ic) + '<span>' + m.long + '</span>' + (m.id === 'props' && op ? '<i class="n">' + op + '</i>' : '') + '</button>').join('') + '</div>' +
-    '<p class="m" style="text-align:center;margin:14px 0 0">النسخة ' + VERSION + '</p>';
+    '<button class="dng s" id="more_out" style="width:100%;margin-top:12px">تسجيل الخروج</button>' + '<p class="m" style="text-align:center;margin:14px 0 0">النسخة ' + VERSION + '</p>';
   dlg.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { S.view = b.dataset.go; dlg.close(); render(); });
+  if ($('more_out')) $('more_out').onclick = () => { dlg.close(); logout(); };
   dlg.showModal();
 }
 const THEME_I = { auto: '◐', light: '☀', dark: '☾' }, THEME_L = { auto: 'تلقائي', light: 'فاتح', dark: 'داكن' };
@@ -155,6 +156,7 @@ function bindHeader() {
   if ($('ver_badge_btn')) $('ver_badge_btn').onclick = () => { if (typeof forceAppUpdate === 'function') forceAppUpdate(); else location.reload(true); };
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
+  if ($('hdr_out')) $('hdr_out').onclick = () => { if (confirm('تسجيل الخروج؟')) logout(); };
   if ($('co_sw_btn')) $('co_sw_btn').onclick = toggleCoPopover;
   if ($('co_sw')) $('co_sw').onchange = e => { S.activeCompany = e.target.value; applyCompanyScope(); render(); };
   updateBell();
@@ -200,6 +202,7 @@ function headerHtml() {
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +
+      '<button id="hdr_out" class="s iconbtn" aria-label="تسجيل الخروج" title="تسجيل الخروج">⎋</button>' +
     '</div>' +
     (swHtml ? '<div class="top-co-bar">' + swHtml + '</div>' : '') +
   '</div>';
