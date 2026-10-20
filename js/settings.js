@@ -288,6 +288,7 @@ function settingsView() {
           (meta.department ? '<span class="chip">🏛️ ' + esc(meta.department) + '</span>' : '') +
           (meta.phone ? '<span class="chip ok" dir="ltr">📱 ' + esc(meta.phone) + '</span>' : '') +
           ordScopeBadge +
+          '<button class="s" type="button" data-mpw="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px;background:var(--card);border-color:var(--line)" title="تعيين أو تغيير كلمة مرور الموظف">🔑 كلمة المرور</button>' +
           '<button class="s" type="button" data-mperms="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px;background:var(--card);border-color:var(--line)" title="صلاحيات الشاشات ونطاق رؤية الطلبات">🔒 الصلاحيات والشاشات</button>' +
           '<button class="s" type="button" data-mwa="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px" title="إرسال تذكير واتساب بمهام الموظف">📲 تذكير واتساب</button>' +
           '</div><div class="row" style="flex:1 1 100%;margin-top:8px;gap:6px">' +
@@ -341,9 +342,22 @@ function settingsView() {
       '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
       '<div class="bar" style="margin-bottom:8px"><b>👥 قائمة الأعضاء والموظفين (' + listMembers.length + (admCo ? ' في ' + esc(admCo) : '') + ')</b></div>' +
       memList + 
-      '<h3 style="font-size:14px;margin-top:16px">إضافة عضو / موظف جديد وتحديد متجره وإدارته ورقم واتساب:</h3>' +
-      '<div class="row" style="gap:6px"><input id="nn" placeholder="اسم الموظف" style="flex:1 1 140px"><input id="ne" dir="ltr" placeholder="البريد الإلكتروني" style="flex:1 1 170px"><input id="nph" dir="ltr" inputmode="tel" placeholder="📱 رقم واتساب (اختياري)" style="flex:1 1 130px"><input id="ntitle" placeholder="المسمى الوظيفي (اختياري)" style="flex:1 1 140px"></div>' +
-      '<div class="row" style="margin-top:8px;gap:6px"><select id="nco" style="flex:1 1 140px">' + newCoOpts + '</select><select id="ndep" style="flex:1 1 140px">' + newDepOpts + '</select><select id="nr" style="flex:0 1 130px"><option value="member">👤 صلاحية: عضو</option><option value="admin">👑 صلاحية: مدير</option></select><button class="p s" id="addm">إضافة</button></div></div>';
+      '<h3 style="font-size:14px;margin-top:18px">➕ إضافة عضو / موظف جديد (مع دعم الدخول بالجوال فقط وتوليد كلمة المرور):</h3>' +
+      '<p class="m" style="margin-bottom:10px;font-size:12.5px">يمكنك إضافة موظف برقم جواله فقط (بدون إيميل) وسيتولى النظام إنشاء حساب الدخول وتعيين كلمة المرور ورسالة الواتساب الجاهزة فوراً.</p>' +
+      '<div class="row" style="gap:6px">' +
+        '<input id="nn" placeholder="اسم الموظف *" style="flex:1 1 140px">' +
+        '<input id="nph" dir="ltr" inputmode="tel" placeholder="📱 رقم الجوال للدخول (77...)" style="flex:1 1 140px">' +
+        '<input id="ne" dir="ltr" placeholder="البريد الإلكتروني (اختياري عند إدخال الجوال)" style="flex:1 1 170px">' +
+        '<input id="ntitle" placeholder="المسمى الوظيفي (اختياري)" style="flex:1 1 130px">' +
+      '</div>' +
+      '<div class="row" style="margin-top:8px;gap:6px">' +
+        '<input id="npw" dir="ltr" placeholder="🔑 كلمة المرور (6 أحرف+)" style="flex:1 1 150px">' +
+        '<button class="s" id="npw_g" type="button" style="font-size:12px;white-space:nowrap">🎲 توليد كلمة مرور</button>' +
+        '<select id="nco" style="flex:1 1 130px">' + newCoOpts + '</select>' +
+        '<select id="ndep" style="flex:1 1 130px">' + newDepOpts + '</select>' +
+        '<select id="nr" style="flex:0 1 110px"><option value="member">👤 عضو</option><option value="admin">👑 مدير</option></select>' +
+        '<button class="p s" id="addm" style="white-space:nowrap">➕ إنشاء حساب الموظف</button>' +
+      '</div></div>';
   }
 
   return '<div class="card" style="border-color:var(--oksoft)">' +
@@ -531,24 +545,149 @@ function bindSettings() {
     else if (typeof toast === 'function') toast('تم حفظ بيانات العضو ✓');
     load();
   });
+function memberCredsDialog(res) {
+  if (!res) return;
+  const storeTitle = res.company && res.company !== '__all' ? (getCompanyProfile(res.company).displayName || res.company) : (typeof bn === 'function' ? bn() : BRAND.name);
+  const localPh = res.phone ? (String(res.phone).startsWith('967') ? String(res.phone).slice(3) : res.phone) : '';
+  const loginId = localPh || res.loginIdentifier || res.email;
+  const roleName = res.role === 'admin' ? 'مدير' : (res.role === 'rep' ? 'مندوب توصيل' : 'عضو في الفريق');
+  
+  const msg = [
+    'مرحباً بك أستاذ/ة *' + res.name + '* 👋',
+    'تم إنشاء وتفعيل حسابك في نظام إدارة العمليات (*' + storeTitle + '*):',
+    '🌐 رابط النظام: ' + location.origin,
+    '👤 اسم الدخول / رقم الجوال: ' + loginId,
+    '🔑 كلمة المرور: ' + res.password,
+    (res.department ? '🏛️ الإدارة: ' + res.department : ''),
+    '📋 الصلاحية: ' + roleName,
+    '',
+    '(يمكنك الدخول مباشرة برقم جوالك ' + (localPh || loginId) + ' أو بريدك مع كلمة المرور أعلاه، ثم تفعيل الإشعارات فور الدخول).'
+  ].filter(Boolean).join('\n');
+
+  dlg.innerHTML = '<div style="text-align:center;margin-bottom:12px">' +
+    '<div style="font-size:36px;margin-bottom:4px">🎉</div>' +
+    '<h2 style="margin:0;color:var(--ok)">بيانات دخول الموظف جاهزة!</h2>' +
+    '<p class="m" style="margin-top:4px">تم إنشاء حساب الدخول وتعيين كلمة المرور بنجاح.</p>' +
+  '</div>' +
+  '<div class="card" style="background:var(--col);border:1px solid var(--line);margin-bottom:14px;padding:12px 14px">' +
+    '<div class="bar" style="margin-bottom:6px"><b>👤 ' + esc(res.name) + '</b> <span class="chip ok">' + esc(roleName) + '</span></div>' +
+    '<div style="font-size:13px;color:var(--mute);margin-bottom:8px">🏢 المتجر: <b>' + esc(storeTitle) + '</b>' + (res.department ? ' · 🏛️ ' + esc(res.department) : '') + '</div>' +
+    '<div style="background:var(--bg);padding:10px 12px;border-radius:10px;border:1px solid var(--line)">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px"><span>اسم المستخدم للدخول:</span><b dir="ltr">' + esc(loginId) + '</b></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>كلمة المرور:</span><b dir="ltr" style="font-size:15px;color:var(--gold);background:var(--card);padding:2px 8px;border-radius:6px;border:1px solid var(--line)">' + esc(res.password) + '</b></div>' +
+    '</div>' +
+  '</div>' +
+  '<div style="font-size:12.5px;font-weight:700;margin-bottom:6px">📲 نص الرسالة الترحيبية الجاهزة للموظف:</div>' +
+  '<pre class="msgp" style="max-height:160px;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;margin-bottom:12px">' + esc(msg) + '</pre>' +
+  '<div class="row dact" style="gap:8px">' +
+    '<button class="s" id="mcr_cp" type="button" style="flex:1">📋 نسخ البيانات</button>' +
+    (res.phone ? '<button class="p s" id="mcr_wa" type="button" style="flex:1;background:#15803d;border-color:#15803d">📲 إرسال عبر واتساب</button>' : '') +
+    '<button class="s" id="mcr_x" type="button">إغلاق</button>' +
+  '</div>';
+
+  $('mcr_x').onclick = () => dlg.close();
+  $('mcr_cp').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(msg);
+      $('mcr_cp').textContent = 'تم النسخ ✓';
+      if (typeof toast === 'function') toast('تم نسخ بيانات الدخول ✓');
+    } catch (e) { alert('تعذّر النسخ'); }
+  };
+  if ($('mcr_wa')) {
+    $('mcr_wa').onclick = () => {
+      const ph = typeof waPhone === 'function' ? waPhone(res.phone) : res.phone;
+      window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(msg), '_blank');
+    };
+  }
+  dlg.showModal();
+}
+
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+
+  document.querySelectorAll('[data-mpw]').forEach(b => b.onclick = async () => {
+    const em = b.dataset.mpw;
+    const all = (S.rawMembers || S.allMembers || S.members || []);
+    const m = all.find(x => same(x.email, em));
+    const gen = typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8);
+    const w = prompt('تعيين كلمة مرور جديدة للموظف ' + (m ? m.name : '') + ':\n(اتركها فارغة للتوليد التلقائي: ' + gen + ')', gen);
+    if (w === null) return;
+    const pw = w.trim() || gen;
+    if (pw.length < 6) return alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    b.disabled = true;
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'member_password', email: em, password: pw }));
+      const j = await rr.json().catch(() => ({}));
+      b.disabled = false;
+      if (!rr.ok) return alert(j.error || 'تعذّر تعيين كلمة المرور');
+      memberCredsDialog({
+        name: (m && m.name) || j.name || 'الموظف',
+        email: em,
+        phone: (m && m.phone) || j.phone || '',
+        password: pw,
+        company: (m && parseMemberMeta(m).company) || j.company || 'متجرك',
+        role: (m && m.role) || 'member',
+        department: (m && parseMemberMeta(m).department) || ''
+      });
+    } catch (e) {
+      b.disabled = false;
+      alert('تعذّر الاتصال بخادم الحسابات');
+    }
+  });
+
+  if ($('npw_g')) {
+    $('npw_g').onclick = () => {
+      const g = typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8);
+      $('npw').value = g;
+    };
+  }
+
   if ($('addm')) $('addm').onclick = async () => {
-    const e = $('ne').value.trim(), n = $('nn').value.trim();
-    if (!e || !n) return alert('الرجاء كتابة الاسم والبريد الإلكتروني.');
+    const n = $('nn').value.trim();
+    const ph = $('nph') ? $('nph').value.trim() : '';
+    const e = $('ne') ? $('ne').value.trim() : '';
+    const pw = $('npw') ? $('npw').value.trim() : '';
     const co = $('nco') ? $('nco').value : activeCompanyFilter();
     const dep = $('ndep') ? $('ndep').value : '';
-    const ph = $('nph') ? $('nph').value.trim() : '';
     const title = $('ntitle') && $('ntitle').value.trim() ? $('ntitle').value.trim() : null;
-    const row = { email: e, name: n, role: $('nr') ? $('nr').value : 'member', company: co || 'متجرك', department: dep || null, phone: ph || null };
-    if (title) row.title = title;
-    const metaStr = encodeMemberMeta(co, dep, ph);
-    if (metaStr) row.telegram_chat_id = metaStr;
-    let { error } = await sb.from('members').insert(row);
-    if (error && /(company|department|phone)/i.test(error.message)) {
-      delete row.company; delete row.department; delete row.phone;
-      ({ error } = await sb.from('members').insert(row));
+    const role = $('nr') ? $('nr').value : 'member';
+
+    if (n.length < 2) return alert('الرجاء كتابة اسم الموظف.');
+    if (!ph && !e) return alert('الرجاء إدخال رقم الجوال للدخول (أو البريد الإلكتروني).');
+
+    $('addm').disabled = true;
+    $('addm').textContent = 'جارٍ إنشاء الحساب...';
+
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({
+        action: 'create_member',
+        name: n,
+        phone: ph,
+        email: e,
+        password: pw,
+        company: co || 'متجرك',
+        department: dep || '',
+        title: title || '',
+        role: role
+      }));
+      const j = await rr.json().catch(() => ({}));
+      $('addm').disabled = false;
+      $('addm').textContent = '➕ إنشاء حساب الموظف';
+
+      if (!rr.ok) return alert(j.error || ('تعذّر إنشاء الحساب (' + rr.status + ')'));
+
+      // تفريغ الحقول بعد النجاح
+      $('nn').value = '';
+      if ($('nph')) $('nph').value = '';
+      if ($('ne')) $('ne').value = '';
+      if ($('npw')) $('npw').value = '';
+      if ($('ntitle')) $('ntitle').value = '';
+
+      await load();
+      memberCredsDialog(j);
+    } catch (e) {
+      $('addm').disabled = false;
+      $('addm').textContent = '➕ إنشاء حساب الموظف';
+      alert('تعذّر الاتصال بخادم الحسابات');
     }
-    if (error) alert('خطأ: ' + error.message);
-    load();
   };
 }
