@@ -467,7 +467,7 @@ function applyCompanyScope() {
   }
   S.allMembers = S.rawMembers.filter(m => {
     const mc = parseMemberMeta(m).company;
-    return same(mc, co) || (m.role === 'rep' && mc === '__all') || (m.role === 'admin' && !mc) || same(m.email, S.me && S.me.email);
+    return same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email);
   });
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');

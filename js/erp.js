@@ -539,8 +539,12 @@ function calcProfitAndLoss(rng) {
   // مجمل الربح (Gross Profit) قبل المصروفات التشغيلية
   const grossProfit = (totalSubtotal - totalDiscount) - totalCOGS;
 
-  // المصروفات التشغيلية مفصلة حسب الفئة
-  const exps = (S.expenses || []).filter(e => inDateRange(e.spent_on || e.created_at, rng));
+  // فصل سندات القبض العامة عن المصروفات التشغيلية
+  const allExpRows = (S.expenses || []).filter(e => inDateRange(e.spent_on || e.created_at, rng));
+  const incomeVouchers = allExpRows.filter(e => String(e.category || '').startsWith('🟢 سند قبض'));
+  const otherIncome = incomeVouchers.reduce((a, e) => a + (+e.amount || 0), 0);
+  const exps = allExpRows.filter(e => !String(e.category || '').startsWith('🟢 سند قبض'));
+
   const byCat = {};
   EXP_CATS.forEach(c => { byCat[c] = 0; });
   let adsExp = 0, salariesExp = 0, otherExp = 0;
@@ -553,7 +557,7 @@ function calcProfitAndLoss(rng) {
     else otherExp += amt;
   });
   const totalExpenses = adsExp + salariesExp + otherExp;
-  const netProfit = grossProfit - totalExpenses;
+  const netProfit = grossProfit + otherIncome - totalExpenses;
   const netMargin = totalSales > 0 ? Math.round(100 * netProfit / totalSales) : 0;
 
   return {
@@ -565,6 +569,8 @@ function calcProfitAndLoss(rng) {
     totalPaid,
     totalCOGS,
     grossProfit,
+    otherIncome,
+    incomeVouchers,
     adsExp,
     salariesExp,
     otherExp,
@@ -574,6 +580,398 @@ function calcProfitAndLoss(rng) {
     byCat,
     exps: exps.slice().sort((a, b) => String(b.spent_on || '').localeCompare(String(a.spent_on || '')))
   };
+}
+
+// ============================================================================
+// محرك النظام المحاسبي المبسط والأساسي: دفتر القيود الموحد + الصندوق والبنك + سندات القبض والصرف
+// ============================================================================
+function normalizeAccMethod(m) {
+  const s = String(m || 'نقداً').trim();
+  if (s.includes('بنك') || s.includes('تحويل') || s.includes('بطاقة') || s.includes('Visa')) return 'تحويل بنكي';
+  if (s.includes('محفظة') || s.includes('إلكترون')) return 'محفظة إلكترونية';
+  return 'نقداً';
+}
+
+function calcAccountingLedger(rng) {
+  const entries = [];
+  const ordMap = new Map((S.orders || []).map(o => [o.id, o]));
+
+  // 1) مقبوضات العملاء المباشرة المسجلة في ord_payments
+  (S.opay || []).forEach(p => {
+    const o = ordMap.get(p.order_id);
+    if (!o || o.status === 'cancelled' || o.status === 'returned') return;
+    const dt = String(p.paid_on || o.order_date || '').slice(0, 10);
+    if (!inDateRange(dt, rng)) return;
+    entries.push({
+      id: 'opay_' + p.id,
+      rawId: p.id,
+      voucherNo: 'RV-' + (o.order_no || String(p.id).slice(0, 5).toUpperCase()),
+      date: dt,
+      dir: 'in',
+      typeLabel: '🟢 سند قبض مبيعات',
+      party: o.customer_name || 'عميل',
+      title: 'تحصيل دفعة من طلب #' + o.order_no + ' — ' + (o.customer_name || ''),
+      method: normalizeAccMethod(p.method),
+      rawMethod: p.method || 'نقداً',
+      amount: +p.amount || 0,
+      note: p.note || '',
+      canDelete: false
+    });
+  });
+
+  // 2) سندات استلام وتوريد عهد المناديب (إيداعات المندوب للخزينة)
+  (S.repHand || []).forEach(h => {
+    const dt = String(h.handed_on || h.created_at || '').slice(0, 10);
+    if (!inDateRange(dt, rng)) return;
+    const rName = h.rep_name || repName(h.rep_email);
+    entries.push({
+      id: 'reph_' + h.id,
+      rawId: h.id,
+      delKind: 'rep',
+      voucherNo: 'CH-' + String(h.id).slice(0, 5).toUpperCase(),
+      date: dt,
+      dir: 'in',
+      typeLabel: '🛵 توريد عهدة مندوب',
+      party: rName,
+      title: 'استلام عهدة مالية من المندوب: ' + rName,
+      method: normalizeAccMethod(h.method),
+      rawMethod: h.method || 'نقداً',
+      amount: +h.amount || 0,
+      note: h.note || '',
+      canDelete: true,
+      infoOnlyInCash: true // لا نكرر جمعها مع دفعات الطلبات إن كانت مسجلة في ord_payments، لكن نعرضها في القيود
+    });
+  });
+
+  // 3) سندات القبض المالية العامة (إيرادات أخرى / تمويل صندوق)
+  (S.expenses || []).filter(e => String(e.category || '').startsWith('🟢 سند قبض')).forEach(e => {
+    const dt = String(e.spent_on || e.created_at || '').slice(0, 10);
+    if (!inDateRange(dt, rng)) return;
+    entries.push({
+      id: 'inc_' + e.id,
+      rawId: e.id,
+      delKind: 'exp',
+      voucherNo: 'RV-' + String(e.id).slice(0, 5).toUpperCase(),
+      date: dt,
+      dir: 'in',
+      typeLabel: '🟢 سند قبض مالي',
+      party: e.note || 'إيراد عام',
+      title: e.title || 'سند قبض مالي',
+      method: normalizeAccMethod(e.method),
+      rawMethod: e.method || 'نقداً',
+      amount: +e.amount || 0,
+      note: e.note || '',
+      canDelete: true
+    });
+  });
+
+  // 4) سندات صرف سداد الموردين والتجار
+  (S.supPay || []).filter(p => p.entry_type !== 'purchase').forEach(p => {
+    const dt = String(p.paid_on || p.created_at || '').slice(0, 10);
+    if (!inDateRange(dt, rng)) return;
+    entries.push({
+      id: 'supp_' + p.id,
+      rawId: p.id,
+      delKind: 'sup',
+      voucherNo: 'PV-' + String(p.id).slice(0, 5).toUpperCase(),
+      date: dt,
+      dir: 'out',
+      typeLabel: '🔴 سند صرف لمورد',
+      party: p.supplier_name || 'تاجر / مورد',
+      title: 'دفعة سداد للتاجر: ' + (p.supplier_name || ''),
+      method: normalizeAccMethod(p.method),
+      rawMethod: p.method || 'نقداً',
+      amount: +p.amount || 0,
+      note: p.note || '',
+      canDelete: true
+    });
+  });
+
+  // 5) سندات صرف المصروفات التشغيلية والرواتب والإعلانات
+  (S.expenses || []).filter(e => !String(e.category || '').startsWith('🟢 سند قبض')).forEach(e => {
+    const dt = String(e.spent_on || e.created_at || '').slice(0, 10);
+    if (!inDateRange(dt, rng)) return;
+    entries.push({
+      id: 'exp_' + e.id,
+      rawId: e.id,
+      delKind: 'exp',
+      voucherNo: 'PV-' + String(e.id).slice(0, 5).toUpperCase(),
+      date: dt,
+      dir: 'out',
+      typeLabel: '🔴 سند صرف (' + (e.category || 'مصروفات') + ')',
+      party: e.category || 'مصروف تشغيلي',
+      title: e.title || 'مصروف تشغيلي',
+      method: normalizeAccMethod(e.method),
+      rawMethod: e.method || 'نقداً',
+      amount: +e.amount || 0,
+      note: e.note || '',
+      canDelete: true
+    });
+  });
+
+  // ترتيب زمني تنازلي (الأحدث أولاً)
+  entries.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+  // حساب أرصدة الصناديق والحسابات البنكية
+  const boxes = {
+    'نقداً': { in: 0, out: 0, net: 0, icon: '💵', label: 'الصندوق النقدي (الكاش)' },
+    'تحويل بنكي': { in: 0, out: 0, net: 0, icon: '🏦', label: 'الحساب البنكي (تحويلات)' },
+    'محفظة إلكترونية': { in: 0, out: 0, net: 0, icon: '📱', label: 'المحافظ الإلكترونية' }
+  };
+
+  let totalIn = 0, totalOut = 0;
+  entries.forEach(en => {
+    // لتفادي ازدواجية العد بين دفعة الطلب وتوريد المندوب، نحسب المقبوضات الفعلية من الطلبات + سندات القبض العامة
+    if (en.infoOnlyInCash) return;
+    const b = boxes[en.method] || boxes['نقداً'];
+    if (en.dir === 'in') {
+      b.in += en.amount;
+      totalIn += en.amount;
+    } else {
+      b.out += en.amount;
+      totalOut += en.amount;
+    }
+    b.net = b.in - b.out;
+  });
+
+  const netCash = totalIn - totalOut;
+
+  // الذمم المدينة (ديون العملاء المتبقية) والذمم الدائنة (ديون الموردين علينا)
+  const customerReceivables = (S.orders || [])
+    .filter(o => o.status === 'delivered' && inDateRange(o.order_date, rng))
+    .reduce((a, o) => a + Math.max(0, +o.balance || 0), 0);
+  const supD = calcSuppliersData(rng);
+  const repD = calcRepCustodyData(rng);
+  const pnl = calcProfitAndLoss(rng);
+
+  return {
+    entries,
+    boxes,
+    totalIn,
+    totalOut,
+    netCash,
+    customerReceivables,
+    repCustodyDue: repD.totalBalance,
+    supplierPayables: supD.totalBalance,
+    netProfit: pnl.netProfit,
+    grossProfit: pnl.grossProfit,
+    totalSales: pnl.totalSales,
+    totalExpenses: pnl.totalExpenses
+  };
+}
+
+function receiptVoucherDialog() {
+  const co = activeCompanyFilter() || 'متجرك';
+  const cur = getCompanyProfile(co).currency || BRAND.currency || 'ر.ي';
+  dlg.innerHTML = '<h2>🟢 إصدار سند قبض مالي (إيراد / تغذية صندوق)</h2>' +
+    '<div class="row">' +
+      '<label style="flex:1 1 160px">نوع الإيراد / القبض<select id="rv_sub">' +
+        '<option value="🟢 سند قبض — إيراد عام">🟢 إيراد عام / متنوع</option>' +
+        '<option value="🟢 سند قبض — تغذية رأس مال">🏦 تغذية رأس مال / صندوق</option>' +
+        '<option value="🟢 سند قبض — تحصيل مديونية">💵 تحصيل مديونية سابقة</option>' +
+        '<option value="🟢 سند قبض — عمولات وعوائد">📈 عمولات وعوائد إضافية</option>' +
+      '</select></label>' +
+      '<label style="flex:1 1 130px">المبلغ المقبوض (' + esc(cur) + ')<input id="rv_am" type="number" min="0" step="any" placeholder="0"></label>' +
+    '</div>' +
+    '<label style="margin-top:8px">البيان / سبب القبض<input id="rv_ti" placeholder="مثال: إيداع نقدي بالصندوق / دفعة من عميل..."></label>' +
+    '<div class="row" style="margin-top:8px">' +
+      '<label>الخزينة / الحساب المستلم<select id="rv_md"><option>نقداً</option><option>تحويل بنكي</option><option>محفظة إلكترونية</option></select></label>' +
+      '<label>التاريخ<input id="rv_dt" type="date" value="' + today() + '"></label>' +
+    '</div>' +
+    '<label style="margin-top:8px">استلمنا من السيد / الجهة (اختياري)<input id="rv_nt" placeholder="اسم الدافع أو الجهة..."></label>' +
+    '<div class="row dact"><button class="p s" id="rv_ok">💾 حفظ سند القبض</button><button class="s" id="rv_x">إلغاء</button></div>';
+  $('rv_x').onclick = () => dlg.close();
+  $('rv_ok').onclick = async () => {
+    const ti = $('rv_ti').value.trim(), am = +$('rv_am').value;
+    if (!(am > 0)) return $('rv_am').focus();
+    if (!ti) return $('rv_ti').focus();
+    $('rv_ok').disabled = true; $('rv_ok').textContent = 'جارٍ الحفظ...';
+    await addErpRecord('exp', {
+      company_id: co,
+      category: $('rv_sub').value,
+      title: ti,
+      amount: am,
+      method: $('rv_md').value,
+      spent_on: $('rv_dt').value || today(),
+      note: $('rv_nt').value.trim() || null
+    });
+    dlg.close();
+    if (typeof toast === 'function') toast('تم إصدار وحفظ سند القبض بنجاح ✓');
+  };
+  dlg.showModal();
+  $('rv_am').focus();
+}
+
+async function sendVoucherPdf(en, cur, btnEl) {
+  if (!en || typeof shareOrSendInvoicePdf !== 'function') return;
+  const co = activeCompanyFilter() || 'متجرك';
+  const prof = getCompanyProfile(co);
+  const isRec = en.dir === 'in';
+  await shareOrSendInvoicePdf({
+    storeName: prof.displayName || co,
+    slogan: prof.slogan || '',
+    storePhone: prof.phone || '',
+    storeAddress: prof.address || '',
+    taxNo: prof.taxNo || '',
+    accent: isRec ? '#15803d' : '#b42318',
+    currency: cur,
+    docTitle: isRec ? 'سند قبض مالي رسمي معتمد' : 'سند صرف مالي رسمي معتمد',
+    orderNo: en.voucherNo,
+    orderDate: en.date,
+    customerName: en.party || (isRec ? 'جهة الإيداع' : 'جهة الصرف'),
+    customerAddress: 'طريقة الدفع: ' + (en.rawMethod || en.method),
+    categoryLabel: isRec ? 'سند قبض' : 'سند صرف',
+    categoryBg: isRec ? '#dcfce7' : '#fee2e2',
+    categoryColor: isRec ? '#15803d' : '#b91c1c',
+    items: [{
+      name: en.title + (en.note ? ' — (' + en.note + ')' : ''),
+      qty: 1,
+      price: en.amount,
+      line_total: en.amount
+    }],
+    subtotal: en.amount,
+    deliveryFee: 0,
+    discount: 0,
+    total: en.amount,
+    paid: en.amount,
+    balance: 0,
+    footer: prof.footer || 'سند مالي إلكتروني معتمد من النظام المحاسبي 🌹'
+  }, '', btnEl);
+}
+
+function exportAccountingJournalCsv(rng, cur) {
+  const L = calcAccountingLedger(rng);
+  const headers = ['رقم السند', 'التاريخ', 'نوع القيد', 'الاتجاه', 'الطرف / الجهة', 'البيان', 'الحساب / الطريقة', 'وارد (قبض)', 'صادر (صرف)', 'العملة', 'ملاحظات'];
+  const rows = L.entries.map(en => [
+    en.voucherNo,
+    en.date,
+    en.typeLabel,
+    en.dir === 'in' ? 'قبض (وارد)' : 'صرف (صادر)',
+    en.party || '',
+    en.title || '',
+    en.rawMethod || en.method,
+    en.dir === 'in' ? en.amount : 0,
+    en.dir === 'out' ? en.amount : 0,
+    cur,
+    en.note || ''
+  ]);
+  const csvContent = '\uFEFF' + [headers, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'دفتر-القيود-المحاسبي-' + today() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (typeof toast === 'function') toast('تم تصدير الدفتر المحاسبي (CSV / Excel) بنجاح ✓');
+}
+
+function accountingOverviewTabHtml(rng, cur) {
+  const L = calcAccountingLedger(rng);
+
+  return '<div class="dsh-kpi-grid">' +
+      '<div class="dsh-kpi ' + (L.netCash >= 0 ? 'ok' : 'late') + '"><div class="dk-lbl">🏦 صافي السيولة المتوفرة (الصندوق والبنك)</div><div class="dk-val">' + money(L.netCash) + ' <small>' + esc(cur) + '</small></div><div class="dk-sub">مقبوضات: ' + money(L.totalIn) + ' · مدفوعات: ' + money(L.totalOut) + '</div></div>' +
+      '<div class="dsh-kpi ok"><div class="dk-lbl">🏆 صافي الربح النهائي الحقيقي</div><div class="dk-val">' + money(L.netProfit) + ' <small>' + esc(cur) + '</small></div><div class="dk-sub">مجمل ربح البضاعة: ' + money(L.grossProfit) + '</div></div>' +
+      '<div class="dsh-kpi soon"><div class="dk-lbl">📥 ذمم مدينة (أموال لنا بالخارج)</div><div class="dk-val">' + money(L.customerReceivables + L.repCustodyDue) + ' <small>' + esc(cur) + '</small></div><div class="dk-sub">عند العملاء: ' + money(L.customerReceivables) + ' · بعهدة المناديب: ' + money(L.repCustodyDue) + '</div></div>' +
+      '<div class="dsh-kpi ' + (L.supplierPayables > 0 ? 'late' : 'ok') + '"><div class="dk-lbl">📤 ذمم دائنة (ديون للتجار علينا)</div><div class="dk-val">' + money(L.supplierPayables) + ' <small>' + esc(cur) + '</small></div><div class="dk-sub">' + (L.supplierPayables > 0 ? 'مستحقة السداد للموردين' : 'جميع الموردين مسدّدون ✓') + '</div></div>' +
+    '</div>' +
+
+    '<div class="card" style="margin-bottom:14px">' +
+      '<div class="bar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
+        '<h2 style="margin:0">⚡ إجراءات محاسبية سريعة (بضغطة زر)</h2>' +
+        '<div class="row s" style="gap:6px;flex-wrap:wrap">' +
+          '<button class="p s" id="acc_q_rv" type="button" style="background:#15803d;border-color:#15803d;color:#fff">➕ سند قبض مالي</button>' +
+          '<button class="p s" id="acc_q_pv" type="button" style="background:var(--late);border-color:var(--late);color:#fff">➖ سند صرف مصروف</button>' +
+          '<button class="s" id="acc_q_rep" type="button">🛵 استلام عهدة مندوب</button>' +
+          '<button class="s" id="acc_q_sup" type="button">🏪 سداد تاجر / مورد</button>' +
+          '<button class="s" id="acc_q_csv" type="button">📥 تصدير الدفتر (Excel/CSV)</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dsh-kpi-grid" style="margin-bottom:0">' +
+        Object.entries(L.boxes).map(([k, b]) =>
+          '<div class="card" style="margin:0;padding:12px 14px;background:var(--col);border:1px solid var(--line)">' +
+            '<div class="bar" style="margin-bottom:6px"><b>' + b.icon + ' ' + esc(b.label) + '</b><span class="chip ' + (b.net >= 0 ? 'ok' : 'late') + '">الرصيد الصافي</span></div>' +
+            '<div class="num" style="font-size:20px;font-weight:800;color:' + (b.net >= 0 ? 'var(--ok)' : 'var(--late)') + ';margin-bottom:6px">' + money(b.net) + ' <small style="font-size:12px">' + esc(cur) + '</small></div>' +
+            '<div class="bar m" style="font-size:12px"><span>➕ وارد: <b>' + money(b.in) + '</b></span><span>➖ صادر: <b>' + money(b.out) + '</b></span></div>' +
+          '</div>'
+        ).join('') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card">' +
+      '<div class="bar" style="margin-bottom:10px">' +
+        '<h2 style="margin:0">📒 أحدث الحركات والقيود المالية (' + Math.min(8, L.entries.length) + ' من ' + L.entries.length + ')</h2>' +
+        '<button class="s" id="acc_go_journal" type="button">عرض الدفتر الكامل والسندات ⬅</button>' +
+      '</div>' +
+      (L.entries.length ? '<div class="twrap"><table class="rtbl"><thead><tr><th>رقم السند</th><th>التاريخ</th><th>النوع</th><th>الطرف / البيان</th><th>الحساب</th><th>المبلغ (' + esc(cur) + ')</th><th>سند PDF</th></tr></thead><tbody>' +
+        L.entries.slice(0, 8).map(en =>
+          '<tr>' +
+            '<td><b dir="ltr">' + esc(en.voucherNo) + '</b></td>' +
+            '<td>' + esc(en.date) + '</td>' +
+            '<td><span class="chip ' + (en.dir === 'in' ? 'ok' : 'late') + '">' + esc(en.typeLabel) + '</span></td>' +
+            '<td><b>' + esc(en.title) + '</b>' + (en.note ? '<div class="m" style="font-size:11.5px">' + esc(en.note) + '</div>' : '') + '</td>' +
+            '<td>' + esc(en.rawMethod || en.method) + '</td>' +
+            '<td class="num" style="font-weight:800;color:' + (en.dir === 'in' ? 'var(--ok)' : 'var(--late)') + '">' + (en.dir === 'in' ? '+' : '-') + money(en.amount) + '</td>' +
+            '<td><button class="s" data-vpdf="' + esc(en.id) + '" style="font-size:11.5px;padding:4px 8px">📄 سند PDF</button></td>' +
+          '</tr>'
+        ).join('') +
+      '</tbody></table></div>' : '<div class="empty">لا توجد حركات مالية مسجّلة في هذه الفترة بعد.</div>') +
+    '</div>';
+}
+
+function accountingJournalTabHtml(rng, cur) {
+  const L = calcAccountingLedger(rng);
+  const jf = S.erpJf || (S.erpJf = { q: '', dir: '', method: '' });
+  const q = (jf.q || '').trim().toLowerCase();
+
+  const filtered = L.entries.filter(en =>
+    (!jf.dir || en.dir === jf.dir) &&
+    (!jf.method || en.method === jf.method) &&
+    (!q || (en.voucherNo + ' ' + en.title + ' ' + en.party + ' ' + en.typeLabel + ' ' + en.note).toLowerCase().includes(q))
+  );
+
+  const sumIn = filtered.filter(e => e.dir === 'in' && !e.infoOnlyInCash).reduce((a, e) => a + e.amount, 0);
+  const sumOut = filtered.filter(e => e.dir === 'out').reduce((a, e) => a + e.amount, 0);
+
+  return '<div class="card">' +
+      '<div class="bar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
+        '<div>' +
+          '<h2 style="margin:0">📒 دفتر القيود اليومية وسندات القبض والصرف (' + filtered.length + ')</h2>' +
+          '<div class="m">سجل محاسبي موحد لكافة المقبوضات والمدفوعات مع إمكانية إرسال أي سند بصيغة PDF مباشرة</div>' +
+        '</div>' +
+        '<div class="row s" style="gap:6px;flex-wrap:wrap">' +
+          '<button class="p s" id="jrn_add_rv" type="button" style="background:#15803d;border-color:#15803d;color:#fff">➕ إصدار سند قبض</button>' +
+          '<button class="p s" id="jrn_add_pv" type="button" style="background:var(--late);border-color:var(--late);color:#fff">➖ إصدار سند صرف</button>' +
+          '<button class="s" id="jrn_csv" type="button">📥 تصدير Excel / CSV</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="tools" style="margin-bottom:12px">' +
+        '<input id="jrn_q" type="search" placeholder="🔎 بحث في السندات: رقم السند، البيان، العميل، المورد…" value="' + esc(jf.q) + '" style="flex:2 1 200px">' +
+        '<select id="jrn_dir"><option value="">كل القيود (قبض وصرف)</option><option value="in"' + (jf.dir === 'in' ? ' selected' : '') + '>🟢 سندات القبض (الوارد)</option><option value="out"' + (jf.dir === 'out' ? ' selected' : '') + '>🔴 سندات الصرف (الصادر)</option></select>' +
+        '<select id="jrn_md"><option value="">كل الصناديق والحسابات</option><option value="نقداً"' + (jf.method === 'نقداً' ? ' selected' : '') + '>💵 الصندوق النقدي (كاش)</option><option value="تحويل بنكي"' + (jf.method === 'تحويل بنكي' ? ' selected' : '') + '>🏦 الحساب البنكي</option><option value="محفظة إلكترونية"' + (jf.method === 'محفظة إلكترونية' ? ' selected' : '') + '>📱 المحافظ الإلكترونية</option></select>' +
+      '</div>' +
+
+      (filtered.length ? '<div class="twrap"><table class="rtbl"><thead><tr><th>رقم السند</th><th>التاريخ</th><th>نوع القيد</th><th>الطرف / الجهة</th><th>البيان والتفاصيل</th><th>الحساب</th><th>وارد (+)</th><th>صادر (-)</th><th>إجراءات</th></tr></thead><tbody>' +
+        filtered.map(en =>
+          '<tr>' +
+            '<td><b dir="ltr">' + esc(en.voucherNo) + '</b></td>' +
+            '<td>' + esc(en.date) + '</td>' +
+            '<td><span class="chip ' + (en.dir === 'in' ? 'ok' : 'late') + '">' + esc(en.typeLabel) + '</span></td>' +
+            '<td><b>' + esc(en.party || '—') + '</b></td>' +
+            '<td>' + esc(en.title) + (en.note ? '<div class="m" style="font-size:11.5px">' + esc(en.note) + '</div>' : '') + '</td>' +
+            '<td>' + esc(en.rawMethod || en.method) + '</td>' +
+            '<td class="num" style="color:var(--ok);font-weight:700">' + (en.dir === 'in' ? money(en.amount) : '—') + '</td>' +
+            '<td class="num" style="color:var(--late);font-weight:700">' + (en.dir === 'out' ? money(en.amount) : '—') + '</td>' +
+            '<td><div class="row s" style="gap:4px;flex-wrap:nowrap">' +
+              '<button class="s" data-vpdf="' + esc(en.id) + '" style="font-size:11.5px;padding:4px 8px" title="إرسال أو مشاركة السند بصيغة PDF">📄 PDF</button>' +
+              (en.canDelete ? '<button class="dng s" data-vdel="' + esc(en.delKind + ':' + en.rawId) + '" style="padding:4px 7px" title="حذف السند">✕</button>' : '') +
+            '</div></td>' +
+          '</tr>'
+        ).join('') +
+        '<tr class="tfoot"><td colspan="6"><b>إجمالي القيود المعروضة (صافي الحركة: ' + money(sumIn - sumOut) + ' ' + esc(cur) + ')</b></td><td class="num" style="color:var(--ok)"><b>+' + money(sumIn) + '</b></td><td class="num" style="color:var(--late)"><b>-' + money(sumOut) + '</b></td><td></td></tr>' +
+      '</tbody></table></div>' : '<div class="empty">لا توجد قيود مطابقة للبحث في هذه الفترة.</div>') +
+    '</div>';
 }
 
 function expensesAndProfitTabHtml(rng, cur) {
@@ -594,6 +992,7 @@ function expensesAndProfitTabHtml(rng, cur) {
           '<div class="bar" style="padding:6px 10px;background:var(--bg);border-radius:8px"><span>➕ صافي مبيعات البضاعة (بعد الخصم)</span><b class="num">' + money(P.totalSubtotal - P.totalDiscount) + ' ' + esc(cur) + '</b></div>' +
           '<div class="bar" style="padding:6px 10px;color:var(--late)"><span>➖ تكلفة البضاعة المباعة (سعر الشراء من التجار)</span><b class="num">-' + money(P.totalCOGS) + ' ' + esc(cur) + '</b></div>' +
           '<div class="bar" style="padding:8px 10px;background:var(--accsoft);border-radius:8px;font-weight:700"><span>🟰 مجمل ربح البضاعة (Gross Profit)</span><b class="num">' + money(P.grossProfit) + ' ' + esc(cur) + '</b></div>' +
+          (P.otherIncome > 0 ? '<div class="bar" style="padding:5px 10px;color:var(--ok)"><span>➕ إيرادات وسندات قبض أخرى</span><b class="num">+' + money(P.otherIncome) + ' ' + esc(cur) + '</b></div>' : '') +
           '<div class="bar" style="padding:5px 10px;color:var(--late)"><span>➖ مصروفات الإعلانات والترويج الممول</span><b class="num">-' + money(P.adsExp) + ' ' + esc(cur) + '</b></div>' +
           '<div class="bar" style="padding:5px 10px;color:var(--late)"><span>➖ الرواتب والأجور والحوافز</span><b class="num">-' + money(P.salariesExp) + ' ' + esc(cur) + '</b></div>' +
           '<div class="bar" style="padding:5px 10px;color:var(--late)"><span>➖ المصروفات التشغيلية الأخرى (إيجارات، تغليف، نقل)</span><b class="num">-' + money(P.otherExp) + ' ' + esc(cur) + '</b></div>' +
@@ -644,7 +1043,7 @@ function expensesAndProfitTabHtml(rng, cur) {
 function expenseDialog(defaultCat) {
   const co = activeCompanyFilter() || 'متجرك';
   const cur = getCompanyProfile(co).currency || BRAND.currency || 'ر.ي';
-  dlg.innerHTML = '<h2>💸 تسجيل مصروف جديد</h2>' +
+  dlg.innerHTML = '<h2>💸 تسجيل مصروف جديد (سند صرف)</h2>' +
     '<div class="row">' +
       '<label style="flex:1 1 160px">بند المصروف<select id="ex_cat">' + EXP_CATS.map(c => '<option' + (c === defaultCat ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' +
       '<label style="flex:1 1 130px">المبلغ (' + esc(cur) + ')<input id="ex_am" type="number" min="0" step="any" placeholder="0"></label>' +
@@ -715,11 +1114,9 @@ function archStatusTabHtml() {
 
 async function migrateLegacyDataToExplicitColumns() {
   let migrated = 0;
-  // 1) ترحيل الشركات إلى جدول companies
   const cos = companiesList();
   await persistOrgLists(cos, departmentsList());
 
-  // 2) ترحيل الأعضاء
   for (const m of (S.rawMembers || [])) {
     const meta = parseMemberMeta(m);
     const { error } = await sb.from('members').update({
@@ -730,7 +1127,6 @@ async function migrateLegacyDataToExplicitColumns() {
     if (!error) migrated++;
   }
 
-  // 3) ترحيل المهام وتنظيف الملاحظات إن كان عمود company_id مفعّلاً
   for (const t of (S.rawTasks || [])) {
     const co = taskCompany(t);
     const cleanN = String(t.notes || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
@@ -739,7 +1135,6 @@ async function migrateLegacyDataToExplicitColumns() {
     if (!error) migrated++;
   }
 
-  // 4) ترحيل الطلبات وتنظيف الملاحظات إن كان عمود company_id مفعّلاً
   for (const o of (S.rawOrders || [])) {
     const co = orderCompany(o);
     const cleanN = String(o.notes || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
@@ -748,7 +1143,6 @@ async function migrateLegacyDataToExplicitColumns() {
     if (!error) migrated++;
   }
 
-  // 5) ترحيل أي سجلات ERP محفوظة مؤقتاً في ord_settings إلى جداول erp_*
   const fb = getCloudErpFallback();
   if (fb.sup.length) {
     const { error } = await sb.from('erp_supplier_payments').upsert(fb.sup);
@@ -768,10 +1162,10 @@ async function migrateLegacyDataToExplicitColumns() {
 }
 
 // ============================================================================
-// الواجهة الرئيسية لتبويب «💼 الحسابات والعهد»
+// الواجهة الرئيسية لحزمة النظام المحاسبي المبسط والأساسي «💼 الحسابات والعهد»
 // ============================================================================
 function erpView() {
-  S.erpTab = S.erpTab || 'suppliers';
+  S.erpTab = S.erpTab || 'overview';
   S.erpPeriod = S.erpPeriod || 'all';
   const curCo = activeCompanyFilter();
   const cur = getCompanyProfile(curCo || 'متجرك').currency || BRAND.currency || 'ر.ي';
@@ -789,22 +1183,26 @@ function erpView() {
   const headerBar = '<div class="card dsh-hero" style="margin-bottom:14px">' +
     '<div class="bar" style="gap:12px">' +
       '<div>' +
-        '<div class="dsh-badge">💼 الإدارة المالية والمحاسبية المتكاملة</div>' +
-        '<h2 style="margin:4px 0 2px;font-size:19px">حسابات الموردين · عهدة المناديب · المصروفات وصافي الربح' + (curCo ? ' — ' + esc(getCompanyProfile(curCo).displayName) : ' — جميع المتاجر') + '</h2>' +
+        '<div class="dsh-badge">💼 حزمة النظام المحاسبي المبسط والأساسي</div>' +
+        '<h2 style="margin:4px 0 2px;font-size:19px">الصندوق والبنك · السندات والقيود · الموردين · عهد المناديب · الأرباح' + (curCo ? ' — ' + esc(getCompanyProfile(curCo).displayName) : ' — جميع المتاجر') + '</h2>' +
         '<div class="m">الفترة المعروضة: <b>' + esc(rng.label) + '</b> · العملة: <b>' + esc(cur) + '</b></div>' +
       '</div>' +
       '<div class="row s" style="gap:6px">' +
         '<select id="erp_per" title="الفترة الزمنية">' + periods.map(([k, l]) => '<option value="' + k + '"' + (S.erpPeriod === k ? ' selected' : '') + '>📅 ' + l + '</option>').join('') + '</select>' +
       '</div>' +
     '</div>' +
-    '<div class="seg" style="margin-top:12px">' +
-      '<button type="button" data-etab="suppliers" class="' + (S.erpTab === 'suppliers' ? 'on' : '') + '">🏪 1. حساب الموردين (التجار)</button>' +
-      '<button type="button" data-etab="reps" class="' + (S.erpTab === 'reps' ? 'on' : '') + '">🛵 2. عهدة المندوب والتحصيل</button>' +
-      '<button type="button" data-etab="expenses" class="' + (S.erpTab === 'expenses' ? 'on' : '') + '">💸 3. المصروفات وصافي الربح</button>' +
+    '<div class="seg" style="margin-top:12px;flex-wrap:wrap">' +
+      '<button type="button" data-etab="overview" class="' + (S.erpTab === 'overview' ? 'on' : '') + '">📊 1. الملخص والصندوق</button>' +
+      '<button type="button" data-etab="journal" class="' + (S.erpTab === 'journal' ? 'on' : '') + '">📒 2. دفتر القيود والسندات</button>' +
+      '<button type="button" data-etab="suppliers" class="' + (S.erpTab === 'suppliers' ? 'on' : '') + '">🏪 3. حساب الموردين</button>' +
+      '<button type="button" data-etab="reps" class="' + (S.erpTab === 'reps' ? 'on' : '') + '">🛵 4. عهدة المناديب</button>' +
+      '<button type="button" data-etab="expenses" class="' + (S.erpTab === 'expenses' ? 'on' : '') + '">💸 5. المصروفات والأرباح</button>' +
     '</div>' +
   '</div>';
 
-  const body = S.erpTab === 'reps' ? repCustodyTabHtml(rng, cur)
+  const body = S.erpTab === 'overview' ? accountingOverviewTabHtml(rng, cur)
+    : S.erpTab === 'journal' ? accountingJournalTabHtml(rng, cur)
+    : S.erpTab === 'reps' ? repCustodyTabHtml(rng, cur)
     : S.erpTab === 'expenses' ? expensesAndProfitTabHtml(rng, cur)
     : suppliersTabHtml(rng, cur);
 
@@ -819,7 +1217,33 @@ function bindErp() {
   if ($('erp_per')) $('erp_per').onchange = e => { S.erpPeriod = e.target.value; render(); };
   document.querySelectorAll('[data-etab]').forEach(b => b.onclick = () => { S.erpTab = b.dataset.etab; render(); });
 
-  // 1) الموردين
+  // الملخص المالي ودفتر القيود والسندات
+  if ($('acc_q_rv')) $('acc_q_rv').onclick = () => receiptVoucherDialog();
+  if ($('acc_q_pv')) $('acc_q_pv').onclick = () => expenseDialog(EXP_CATS[0]);
+  if ($('acc_q_rep')) $('acc_q_rep').onclick = () => repHandoverDialog('', 0);
+  if ($('acc_q_sup')) $('acc_q_sup').onclick = () => supplierPayDialog('', 0, 'payment');
+  if ($('acc_q_csv')) $('acc_q_csv').onclick = () => exportAccountingJournalCsv(rng, cur);
+  if ($('acc_go_journal')) $('acc_go_journal').onclick = () => { S.erpTab = 'journal'; render(); };
+
+  if ($('jrn_add_rv')) $('jrn_add_rv').onclick = () => receiptVoucherDialog();
+  if ($('jrn_add_pv')) $('jrn_add_pv').onclick = () => expenseDialog(EXP_CATS[0]);
+  if ($('jrn_csv')) $('jrn_csv').onclick = () => exportAccountingJournalCsv(rng, cur);
+  if ($('jrn_q')) $('jrn_q').oninput = e => { S.erpJf = S.erpJf || { q: '', dir: '', method: '' }; S.erpJf.q = e.target.value; render(); };
+  if ($('jrn_dir')) $('jrn_dir').onchange = e => { S.erpJf = S.erpJf || { q: '', dir: '', method: '' }; S.erpJf.dir = e.target.value; render(); };
+  if ($('jrn_md')) $('jrn_md').onchange = e => { S.erpJf = S.erpJf || { q: '', dir: '', method: '' }; S.erpJf.method = e.target.value; render(); };
+
+  document.querySelectorAll('[data-vpdf]').forEach(b => b.onclick = () => {
+    const L = calcAccountingLedger(rng);
+    const en = L.entries.find(x => x.id === b.dataset.vpdf);
+    if (en) sendVoucherPdf(en, cur, b);
+  });
+  document.querySelectorAll('[data-vdel]').forEach(b => b.onclick = async () => {
+    if (!confirm('هل تريد حذف هذا السند المالي؟')) return;
+    const [kind, id] = (b.dataset.vdel || ':').split(':');
+    if (kind && id) await deleteErpRecord(kind, id);
+  });
+
+  // 3) الموردين
   if ($('erp_sup_q')) $('erp_sup_q').oninput = e => { S.erpSupQ = e.target.value; render(); };
   if ($('erp_sup_pay')) $('erp_sup_pay').onclick = () => supplierPayDialog('', 0, 'payment');
   if ($('erp_sup_buy')) $('erp_sup_buy').onclick = () => supplierPayDialog('', 0, 'purchase');
@@ -831,7 +1255,7 @@ function bindErp() {
     if (s) waSummaryDialog('🏪 كشف حساب التاجر: ' + s.name, buildSupplierWaStatement(s, cur));
   });
 
-  // 2) عهدة المناديب
+  // 4) عهدة المناديب
   if ($('erp_rep_add')) $('erp_rep_add').onclick = () => repHandoverDialog('', 0);
   document.querySelectorAll('[data-rhand]').forEach(b => b.onclick = () => repHandoverDialog(b.dataset.rhand, +b.dataset.rbal || 0));
   document.querySelectorAll('[data-rstmt]').forEach(b => b.onclick = () => repStatementDialog(b.dataset.rstmt, rng, cur));
@@ -841,7 +1265,7 @@ function bindErp() {
     if (r) waSummaryDialog('🛵 كشف عهدة المندوب: ' + r.name, buildRepCustodyWaMsg(r, cur), r.phone);
   });
 
-  // 3) المصروفات وصافي الربح
+  // 5) المصروفات وصافي الربح
   if ($('erp_exp_add')) $('erp_exp_add').onclick = () => expenseDialog(EXP_CATS[0]);
   document.querySelectorAll('[data-qexp]').forEach(b => b.onclick = () => expenseDialog(b.dataset.qexp));
   document.querySelectorAll('[data-del-exp]').forEach(b => b.onclick = async () => {
@@ -869,7 +1293,7 @@ function bindErp() {
     waSummaryDialog('📊 تقرير صافي الربح والمصروفات', txt);
   };
 
-  // 4) العزل المعماري
+  // 6) العزل المعماري
   if ($('arch_copy_sql')) $('arch_copy_sql').onclick = async () => {
     try {
       const r = await fetch('/sql/014_clean_architecture_and_erp.sql');

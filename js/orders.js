@@ -1,8 +1,35 @@
-// ===== إدارة الطلبات (للفريق): لوحة حالات + طلب ببنوده ودفعاته + فاتورة + واتساب =====
+// ===== إدارة الطلبات (للفريق): لوحة حالات + طلب ببنوده ودفعاته + تصنيف الطلبات + فاتورة PDF مباشرة + واتساب =====
 const OST = { new: 'جديد', preparing: 'قيد التجهيز', delivered: 'تم التوصيل', cancelled: 'ملغي', returned: 'مرتجع' };
 const OCOLS = [['new', 'جديد'], ['preparing', 'قيد التجهيز'], ['delivered', 'تم التوصيل'], ['closed', 'ملغي / مرتجع']];
 const OCH = ['واتساب', 'تيك توك', 'سناب شات', 'انستغرام', 'فيسبوك', 'زيارة المتجر', 'أخرى'];
 const OPAYM = ['نقداً', 'تحويل بنكي', 'محفظة إلكترونية', 'أخرى'];
+const OCATS = {
+  normal:    { label: 'عادي',              badge: '📦 عادي',         cls: '',     bg: '#f1f5f9', fg: '#475569', rank: 5 },
+  urgent:    { label: 'مستعجل جداً',       badge: '🚨 مستعجل جداً',  cls: 'late', bg: '#fef2f2', fg: '#b91c1c', rank: 0 },
+  vip:       { label: 'عميل VIP',          badge: '👑 عميل VIP',     cls: 'soon', bg: '#fef3c7', fg: '#b45309', rank: 1 },
+  scheduled: { label: 'توصيل بوقت محدد',   badge: '⏰ بوقت محدد',    cls: 'all',  bg: '#eff6ff', fg: '#1d4ed8', rank: 2 },
+  fragile:   { label: 'قابل للكسر',        badge: '⚠️ قابل للكسر',   cls: 'soon', bg: '#fff7ed', fg: '#c2410c', rank: 3 },
+  gift:      { label: 'هدية / تغليف خاص', badge: '🎁 هدية',         cls: 'ok',   bg: '#f0fdf4', fg: '#15803d', rank: 4 }
+};
+function stripOrderMetaNotes(s) {
+  return String(s || '')
+    .replace(/\[شركة:\s*[^\]]+\]\n?/g, '')
+    .replace(/\[تصنيف:\s*[^\]]+\]\n?/g, '')
+    .trim();
+}
+function orderCatOf(o) {
+  if (!o) return 'normal';
+  if (o.order_category && OCATS[o.order_category]) return o.order_category;
+  const m = String(o.notes || '').match(/\[تصنيف:\s*([^\]]+)\]/);
+  if (m) {
+    const k = m[1].trim();
+    if (OCATS[k]) return k;
+  }
+  return 'normal';
+}
+function orderCatMeta(o) {
+  return OCATS[orderCatOf(o)] || OCATS.normal;
+}
 const money = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const oOf = id => (S.orders || []).find(o => o.id === id);
 const oItems = id => (S.oitems || []).filter(i => i.order_id === id).sort((a, b) => a.pos - b.pos);
@@ -17,17 +44,22 @@ function waPhone(p) {      // رقم يمني محلي ← صيغة دولية �
 }
 function orderMsg(o, imgMap) {
   const cur = bcurr(o), stName = bn(o), map = imgMap || {};
+  const catKey = orderCatOf(o), catM = orderCatMeta(o);
   const L = oItems(o.id).map(i => {
     const u = i.image_path ? (map[i.image_path] || '') : '';
     return '▫️ *' + i.name + '* × ' + (+i.qty) +
       (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') +
       (u ? '\n    📷 صورة المنتج: ' + u : '');
   }).join('\n') || '—';
-  const cleanNotes = String(o.notes || '').replace(/\[شركة:\s*[^\]]+\]/g, '').trim();
+  const cleanNotes = stripOrderMetaNotes(o.notes);
   const hasImgs = oItems(o.id).some(i => i.image_path);
-  return ['مرحباً كابتن *' + (o.rep_email ? repName(o.rep_email) : '...') + '* 🛵', '📦 معك طلب جديد من *' + stName + '* (#' + o.order_no + ')', '',
+  return ['مرحباً كابتن *' + (o.rep_email ? repName(o.rep_email) : '...') + '* 🛵',
+    '📦 معك طلب جديد من *' + stName + '* (#' + o.order_no + ')' + (catKey !== 'normal' ? ' — *[' + catM.badge + ']*' : ''),
+    '',
+    catKey !== 'normal' ? '⚡ *تصنيف الطلب:* ' + catM.badge : '',
     '🧑‍💼 مسجل الطلب: ' + creatorName(o.created_by), '🙍 العميل: ' + o.customer_name, '📞 الهاتف: ' + (o.phone || '—'), '📍 العنوان: ' + (o.address || '—'),
     '💵 المطلوب تحصيله: *' + money(o.balance) + ' ' + cur + '*', '', '----------------', '📋 *قائمة التجهيز:*', L, '----------------']
+    .filter(x => x !== '')
     .concat(cleanNotes ? ['⚠️ *ملاحظات هامة:* ' + cleanNotes] : [])
     .concat(hasImgs ? ['🖼️ *ملاحظة:* صور المنتجات مرفقة لك أيضاً في حساب المندوب بالمنصة للتأكد عند الاستلام والتسليم.'] : [])
     .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
@@ -38,9 +70,51 @@ const bn = o => bProf(o).displayName || (S.ordSet && S.ordSet.store_name) || BRA
 const bphone = o => bProf(o).phone || (S.ordSet && S.ordSet.store_phone) || BRAND.phone;
 const baddr = o => bProf(o).address || (S.ordSet && S.ordSet.store_address) || BRAND.address;
 const bcurr = o => bProf(o).currency || BRAND.currency || 'ر.ي';
+function buildOrderPdfData(o) {
+  const its = oItems(o.id), p = bProf(o), cur = bcurr(o), catM = orderCatMeta(o);
+  return {
+    storeName: bn(o),
+    slogan: p.slogan || '',
+    storePhone: bphone(o) || '',
+    storeAddress: baddr(o) || '',
+    taxNo: p.taxNo || '',
+    accent: p.accent || '#c9a24e',
+    currency: cur,
+    footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
+    orderNo: o.order_no,
+    orderDate: o.order_date,
+    customerName: o.customer_name,
+    customerPhone: o.phone || '',
+    customerAddress: o.address || '',
+    repName: o.rep_email ? repName(o.rep_email) : '',
+    categoryLabel: catM.badge,
+    categoryBg: catM.bg,
+    categoryColor: catM.fg,
+    items: its.map(i => ({ name: i.name, qty: +i.qty || 1, price: +i.price || 0, line_total: +i.line_total || ((+i.qty || 1) * (+i.price || 0)) })),
+    subtotal: +o.subtotal || 0,
+    deliveryFee: +o.delivery_fee || 0,
+    discount: +o.discount || 0,
+    total: +o.total || 0,
+    paid: +o.paid || 0,
+    balance: +o.balance || 0
+  };
+}
+async function sendOrderInvoicePdf(o, btnEl) {
+  if (!o || typeof shareOrSendInvoicePdf !== 'function') return;
+  await shareOrSendInvoicePdf(buildOrderPdfData(o), o.phone, btnEl);
+}
 function invoiceText(o) {
-  const its = oItems(o.id), p = bProf(o), cur = bcurr(o);
-  return ['🧾 *فاتورة مبيعات #' + o.order_no + '* — *' + bn(o) + '*'].concat(p.slogan ? ['_' + p.slogan + '_'] : []).concat(['📅 التاريخ: ' + o.order_date, '👤 العميل: ' + o.customer_name + (o.phone ? ' (' + o.phone + ')' : ''), o.address ? '📍 العنوان: ' + o.address : '', '', '📦 *الأصناف:*'].filter(x => x !== ''))
+  const its = oItems(o.id), p = bProf(o), cur = bcurr(o), catKey = orderCatOf(o), catM = orderCatMeta(o);
+  return ['🧾 *فاتورة مبيعات #' + o.order_no + '* — *' + bn(o) + '*']
+    .concat(p.slogan ? ['_' + p.slogan + '_'] : [])
+    .concat([
+      '📅 التاريخ: ' + o.order_date,
+      catKey !== 'normal' ? '⚡ التصنيف: ' + catM.badge : '',
+      '👤 العميل: ' + o.customer_name + (o.phone ? ' (' + o.phone + ')' : ''),
+      o.address ? '📍 العنوان: ' + o.address : '',
+      '',
+      '📦 *الأصناف:*'
+    ].filter(x => x !== ''))
     .concat(its.map((i, idx) => (idx + 1) + '. *' + i.name + '* × ' + (+i.qty) + ' ← ' + money(i.line_total) + ' ' + cur)).concat(['────────────────'])
     .concat(['المجموع الفرعي: ' + money(o.subtotal) + ' ' + cur]).concat(+o.delivery_fee ? ['رسوم التوصيل: ' + money(o.delivery_fee) + ' ' + cur] : []).concat(+o.discount ? ['الخصم: -' + money(o.discount) + ' ' + cur] : [])
     .concat(['💰 *الإجمالي النهائي: ' + money(o.total) + ' ' + cur + '*', '✅ المدفوع: ' + money(o.paid) + ' ' + cur, '⏳ *المتبقي: ' + money(o.balance) + ' ' + cur + '*'])
@@ -54,13 +128,17 @@ const repPhone = e => ((S.reps || []).find(r => same(r.email, e)) || {}).phone |
 const sameDay = o => o.order_date === today();
 function oKpis() {
   const O = S.orders || [], live = O.filter(o => o.status !== 'cancelled' && o.status !== 'returned'), m = today().slice(0, 7);
-  return { today: O.filter(o => sameDay(o) && o.status !== 'cancelled').length, wait: O.filter(o => o.status === 'new').length, prep: O.filter(o => o.status === 'preparing').length,
+  const urg = O.filter(o => (o.status === 'new' || o.status === 'preparing') && orderCatOf(o) === 'urgent').length;
+  return { today: O.filter(o => sameDay(o) && o.status !== 'cancelled').length, wait: O.filter(o => o.status === 'new').length, prep: O.filter(o => o.status === 'preparing').length, urg,
     sales: live.filter(o => String(o.order_date).slice(0, 7) === m).reduce((a, o) => a + +o.total, 0), due: O.filter(o => o.status === 'delivered').reduce((a, o) => a + Math.max(0, +o.balance), 0) };
 }
 function ordersFiltered() {
-  const f = S.of || (S.of = { q: '', rep: '', all: false }), q = f.q.trim().toLowerCase();
-  return (S.orders || []).filter(o => (!f.rep || (f.rep === '_none' ? !o.rep_email : same(o.rep_email, f.rep))) &&
-    (!q || ('#' + o.order_no + ' ' + o.customer_name + ' ' + (o.phone || '') + ' ' + (o.address || '')).toLowerCase().includes(q)));
+  const f = S.of || (S.of = { q: '', rep: '', cat: '', all: false }), q = (f.q || '').trim().toLowerCase();
+  return (S.orders || []).filter(o =>
+    (!f.rep || (f.rep === '_none' ? !o.rep_email : same(o.rep_email, f.rep))) &&
+    (!f.cat || orderCatOf(o) === f.cat) &&
+    (!q || ('#' + o.order_no + ' ' + o.customer_name + ' ' + (o.phone || '') + ' ' + (o.address || '') + ' ' + orderCatMeta(o).label).toLowerCase().includes(q))
+  );
 }
 function ocard(o) {
   const its = oItems(o.id), names = its.slice(0, 2).map(i => esc(i.name) + (+i.qty > 1 ? ' ×' + (+i.qty) : '')).join('، ') + (its.length > 2 ? ' +' + (its.length - 2) : '');
@@ -68,9 +146,22 @@ function ocard(o) {
   const bal = +o.balance, closed = o.status === 'cancelled' || o.status === 'returned', cur = bcurr(o);
   const showCoBadge = typeof isSuperAdmin === 'function' && isSuperAdmin() && !activeCompanyFilter();
   const oCo = orderCompany(o);
-  const A = { new: [['assign', '🛵 إسناد وتجهيز', 'p'], ['inv', '🧾']], preparing: [['wa', '📲 للمندوب'], ['eye', '👁'], ['deliver', '✅ تم التوصيل'], ['inv', '🧾'], ['cancel', '❌']],
-    delivered: (bal > 0 ? [['pay', '💰 دفعة']] : []).concat([['inv', '🧾 فاتورة']]), cancelled: [['reopen', '↩ إعادة فتح']], returned: [['reopen', '↩ إعادة فتح']] }[o.status] || [];
-  return '<div class="oc ' + o.status + '" data-oid="' + o.id + '"><div class="bar"><b>#' + o.order_no + '</b><span class="m">' + esc(o.order_date) + '</span></div>' +
+  const catKey = orderCatOf(o), catM = orderCatMeta(o);
+  const A = {
+    new: [['assign', '🛵 إسناد وتجهيز', 'p'], ['pdf', '📄 PDF للعميل', ''], ['inv', '🧾']],
+    preparing: [['wa', '📲 للمندوب'], ['pdf', '📄 PDF للعميل', ''], ['eye', '👁'], ['deliver', '✅ تم التوصيل'], ['inv', '🧾'], ['cancel', '❌']],
+    delivered: (bal > 0 ? [['pay', '💰 دفعة']] : []).concat([['pdf', '📄 إرسال PDF', 'p'], ['inv', '🧾 فاتورة']]),
+    cancelled: [['reopen', '↩ إعادة فتح']],
+    returned: [['reopen', '↩ إعادة فتح']]
+  }[o.status] || [];
+  const urgStyle = (!closed && catKey === 'urgent') ? ' style="border-inline-start:4px solid var(--late);box-shadow:0 4px 14px rgba(185,28,28,.1)"' : (!closed && catKey === 'vip') ? ' style="border-inline-start:4px solid var(--gold)"' : '';
+  return '<div class="oc ' + o.status + '" data-oid="' + o.id + '"' + urgStyle + '>' +
+    '<div class="bar">' +
+      '<div style="display:flex;align-items:center;gap:6px"><b>#' + o.order_no + '</b>' +
+      (catKey !== 'normal' ? '<span class="chip ' + catM.cls + '" style="font-weight:700">' + esc(catM.badge) + '</span>' : '') +
+      '</div>' +
+      '<span class="m">' + esc(o.order_date) + '</span>' +
+    '</div>' +
     '<div class="oc-n">' + esc(o.customer_name) + '</div>' +
     (o.phone ? '<div class="m" dir="ltr" style="text-align:start">' + esc(o.phone) + '</div>' : '') +
     (o.address ? '<div class="oc-a">📍 ' + esc(o.address) + '</div>' : '') +
@@ -86,8 +177,14 @@ function ocard(o) {
     (A.length ? '<div class="acts">' + A.map(a => '<button class="' + (a[2] || '') + '" data-oa="' + a[0] + '" data-id="' + o.id + '">' + a[1] + '</button>').join('') + '</div>' : '') + '</div>';
 }
 function oBoardHtml() {
-  const f = S.of, rows = ordersFiltered(), searching = !!(f.q.trim() || f.rep);
-  const col = k => rows.filter(o => k === 'closed' ? (o.status === 'cancelled' || o.status === 'returned') : o.status === k);
+  const f = S.of, rows = ordersFiltered(), searching = !!((f.q || '').trim() || f.rep || f.cat);
+  const col = k => {
+    const list = rows.filter(o => k === 'closed' ? (o.status === 'cancelled' || o.status === 'returned') : o.status === k);
+    if (k === 'new' || k === 'preparing') {
+      return list.slice().sort((a, b) => (orderCatMeta(a).rank - orderCatMeta(b).rank) || ((b.order_no || 0) - (a.order_no || 0)));
+    }
+    return list;
+  };
   return '<div class="ctabs">' + OCOLS.map(([k, l]) => '<button data-oc="' + k + '" class="' + (S.ocol === k ? 'on' : '') + '">' + l + ' (' + col(k).length + ')</button>').join('') + '</div>' +
     '<div class="board ob">' + OCOLS.map(([k, l]) => {
       let items = col(k), more = 0; if ((k === 'delivered' || k === 'closed') && !searching && !f.all && items.length > 20) { more = items.length - 20; items = items.slice(0, 20); }
@@ -163,17 +260,20 @@ function ordVizStripHtml() {
 }
 function ordersView() {
   if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات SQL في Supabase ثم اضغط تحديث.</p></div>';
-  S.of = S.of || { q: '', rep: '', all: false }; S.ocol = S.ocol || 'new';
+  S.of = S.of || { q: '', rep: '', cat: '', all: false }; S.ocol = S.ocol || 'new';
   const cur = bcurr();
   const K = oKpis(), kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
-  return '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + kc(money(K.sales), 'مبيعات الشهر (' + esc(cur) + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
-    '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب…" value="' + esc(S.of.q) + '" style="flex:2 1 220px">' +
+  const catOpts = '<option value="">⚡ كل التصنيفات</option>' + Object.entries(OCATS).map(([k, v]) => '<option value="' + k + '"' + (S.of.cat === k ? ' selected' : '') + '>' + v.badge + '</option>').join('');
+  return '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + (K.urg ? kc('🚨 ' + K.urg, 'طلبات مستعجلة', 'late') : '') + kc(money(K.sales), 'مبيعات الشهر (' + esc(cur) + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
+    '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب، تصنيف…" value="' + esc(S.of.q) + '" style="flex:2 1 200px">' +
+    '<select id="o_fcat" title="تصفية حسب تصنيف الطلب">' + catOpts + '</select>' +
     '<select id="o_fr"><option value="">كل المندوبين</option><option value="_none"' + (S.of.rep === '_none' ? ' selected' : '') + '>بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(S.of.rep, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select>' +
     '<button class="p" id="o_new">＋ طلب جديد</button></div><div id="o_board">' + oBoardHtml() + '</div><button class="fab" id="o_fab" aria-label="طلب جديد">＋</button>';
 }
 function bindOrders() {
   if (S.ordErr) return;
   $('o_q').oninput = e => { S.of.q = e.target.value; drawOBoard(); };
+  if ($('o_fcat')) $('o_fcat').onchange = e => { S.of.cat = e.target.value; drawOBoard(); };
   $('o_fr').onchange = e => { S.of.rep = e.target.value; drawOBoard(); };
   $('o_new').onclick = $('o_fab').onclick = () => orderDialog(null);
   bindOBoard();
@@ -183,7 +283,7 @@ function bindOBoard() {
   document.querySelectorAll('[data-oc]').forEach(b => b.onclick = () => { S.ocol = b.dataset.oc; drawOBoard(); });
   document.querySelectorAll('[data-omore]').forEach(b => b.onclick = () => { S.of.all = true; drawOBoard(); });
   document.querySelectorAll('.oc').forEach(el => el.onclick = e => { if (e.target.closest('[data-oa]')) return; orderDialog(oOf(el.dataset.oid)); });
-  document.querySelectorAll('[data-oa]').forEach(b => b.onclick = e => { e.stopPropagation(); oAction(b.dataset.oa, b.dataset.id); });
+  document.querySelectorAll('[data-oa]').forEach(b => b.onclick = e => { e.stopPropagation(); oAction(b.dataset.oa, b.dataset.id, b); });
 }
 
 /* ---------- تحديث وإشعار ---------- */
@@ -194,13 +294,14 @@ async function oUpdate(id, patch) {
   if ('status' in patch || 'rep_email' in patch) apiPost('/api/order-push', JSON.stringify({ order_id: id })).catch(() => {});
   await load(); return true;
 }
-async function oAction(a, id) {
+async function oAction(a, id, btnEl) {
   const o = oOf(id); if (!o) return;
   if (a === 'wa') {
     const paths = oItems(o.id).map(i => i.image_path).filter(Boolean);
     const map = paths.length ? await imgSign(paths) : {};
     window.open('https://wa.me/' + (repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '') + '?text=' + encodeURIComponent(orderMsg(o, map)), '_blank');
   }
+  else if (a === 'pdf') await sendOrderInvoicePdf(o, btnEl);
   else if (a === 'eye') previewDialog(o);
   else if (a === 'assign') assignDialog(o);
   else if (a === 'deliver') deliverDialog(o);
@@ -386,8 +487,17 @@ function openInvoice(o) {   // بديل: صفحة فاتورة في نافذة �
   w.document.open(); w.document.write(invoiceDoc(o, true)); w.document.close();
 }
 function invoiceDialog(o) {
-  dlg.innerHTML = invoiceInner(o) + '<div class="row dact no-print"><button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button><button class="s" id="iv_o">↗ فتح في نافذة</button><button class="s" id="iv_cp">📋 نسخ النص</button>' + (o.phone ? '<button class="s" id="iv_w">📲 إرسال للعميل واتساب</button>' : '') + '<button class="s" id="iv_x">إغلاق</button></div>';
+  dlg.innerHTML = invoiceInner(o) +
+    '<div class="row dact no-print" style="flex-wrap:wrap;gap:6px">' +
+      '<button class="p s" id="iv_pdf_wa" style="background:#15803d;border-color:#15803d;color:#fff">📄 إرسال فاتورة PDF للعميل مباشرة</button>' +
+      '<button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' +
+      '<button class="s" id="iv_o">↗ فتح في نافذة</button>' +
+      (o.phone ? '<button class="s" id="iv_w">💬 إرسال نص واتساب</button>' : '') +
+      '<button class="s" id="iv_cp">📋 نسخ النص</button>' +
+      '<button class="s" id="iv_x">إغلاق</button>' +
+    '</div>';
   $('iv_x').onclick = () => dlg.close();
+  $('iv_pdf_wa').onclick = () => sendOrderInvoicePdf(o, $('iv_pdf_wa'));
   $('iv_p').onclick = () => printInvoice(o);
   $('iv_o').onclick = () => openInvoice(o);
   $('iv_cp').onclick = async () => { try { await navigator.clipboard.writeText(invoiceText(o)); $('iv_cp').textContent = 'تم النسخ ✓'; if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓'); } catch (e) { alert('تعذّر النسخ'); } };
@@ -406,19 +516,30 @@ function orderDialog(o) {
   const cos = typeof companiesList === 'function' ? companiesList() : ['متجرك'];
   const initCo = edit ? orderCompany(o) : (activeCompanyFilter() || 'متجرك');
   const cur = getCompanyProfile(initCo).currency || BRAND.currency || 'ر.ي';
+  let selCat = edit ? orderCatOf(o) : 'normal';
   const blank = () => ({ id: crypto.randomUUID(), name: '', supplier: '', qty: 1, price: '', cost: '', img: '', blob: null, url: '', rmImg: false });
   let items = edit ? oItems(o.id).map(i => ({ id: i.id, name: i.name, supplier: i.supplier || '', qty: +i.qty, price: +i.price, cost: cc ? (costOf(i.id) || '') : '', img: i.image_path || '', blob: null, url: '', rmImg: false })) : [blank()];
   const origIds = items.map(i => i.id), origImgs = items.map(i => i.img).filter(Boolean);
   let urls = {};
   const names = [...new Set((S.orders || []).map(r => r.customer_name))].slice(0, 80), pnames = [...new Set((S.oitems || []).map(i => i.name))].slice(0, 120), sups = [...new Set((S.oitems || []).map(i => i.supplier).filter(Boolean))].slice(0, 80);
   const lastOf = n => { const L = (S.oitems || []).filter(i => i.name === n); return L.length ? L[L.length - 1] : null; };
-  const cleanNotesVal = String(x.notes || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
+  const cleanNotesVal = stripOrderMetaNotes(x.notes);
   const coSelectHtml = isSuperAdmin() ? (
     '<label>🏢 المتجر / الشركة<select id="o_co">' + cos.map(c => '<option value="' + esc(c) + '"' + (same(initCo, c) ? ' selected' : '') + '>🏢 ' + esc(getCompanyProfile(c).displayName || c) + '</option>').join('') + '</select></label>'
   ) : '<input type="hidden" id="o_co" value="' + esc(initCo) + '">';
 
+  const catBtnsHtml = '<div style="margin:6px 0 10px;padding:10px 12px;background:var(--col);border:1px solid var(--line);border-radius:12px">' +
+    '<div class="bar" style="margin-bottom:6px"><b style="font-size:13px">⚡ تصنيف الطلب (مستعجل / أولوية التجهيز):</b><span class="m" style="font-size:11.5px">يظهر للمندوب وفي الفاتورة ويتصدر القائمة</span></div>' +
+    '<div class="row s" id="o_cat_btns" style="gap:6px;flex-wrap:wrap">' +
+      Object.entries(OCATS).map(([k, v]) =>
+        '<button type="button" class="s' + (selCat === k ? ' p' : '') + '" data-ocat-pick="' + k + '" style="font-size:12.5px;padding:6px 11px;border-radius:8px;' + (selCat === k && k === 'urgent' ? 'background:var(--late);border-color:var(--late);color:#fff' : '') + '">' + v.badge + '</button>'
+      ).join('') +
+    '</div>' +
+  '</div>';
+
   dlg.innerHTML = '<h2>' + (edit ? 'طلب #' + o.order_no : '🛒 طلب جديد') + '</h2><div id="o_info" class="m"></div>' +
     (isSuperAdmin() ? '<div class="row" style="margin-bottom:8px">' + coSelectHtml + '</div>' : coSelectHtml) +
+    catBtnsHtml +
     '<div class="row"><label>اسم العميل<input id="o_nm" list="o_names" value="' + esc(x.customer_name || '') + '"></label><label>رقم الهاتف<input id="o_ph" dir="ltr" inputmode="tel" value="' + esc(x.phone || '') + '"></label></div>' +
     '<datalist id="o_names">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="o_pn">' + pnames.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="o_sup">' + sups.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>' +
     '<label style="margin-top:8px">العنوان<input id="o_ad" value="' + esc(x.address || '') + '"></label>' +
@@ -430,7 +551,23 @@ function orderDialog(o) {
     '<label id="o_rsw" style="margin-top:8px;display:none">سبب الإلغاء (إجباري)<input id="o_rs" value="' + esc(x.cancel_reason || '') + '"></label>' +
     '<label style="margin-top:8px">ملاحظات (تصل للمندوب)<textarea id="o_nt" rows="2">' + esc(cleanNotesVal) + '</textarea></label>' +
     (edit ? '<div id="o_pays" class="obox"></div><div id="o_ev" class="obox m"></div>' : '') +
-    '<div class="row dact"><button class="p" id="o_sv">حفظ</button>' + (edit ? '<button class="s" id="o_iv">🧾 فاتورة</button>' : '') + (edit && isAdmin() ? '<button class="dng s" id="o_dl">حذف</button>' : '') + '<button class="s" id="o_cx">إلغاء</button></div>';
+    '<div class="row dact" style="flex-wrap:wrap"><button class="p" id="o_sv">حفظ</button>' + (edit ? '<button class="s" id="o_pdf_btn" style="background:#15803d;color:#fff;border-color:#15803d">📄 إرسال PDF للعميل</button><button class="s" id="o_iv">🧾 فاتورة</button>' : '') + (edit && isAdmin() ? '<button class="dng s" id="o_dl">حذف</button>' : '') + '<button class="s" id="o_cx">إلغاء</button></div>';
+
+  dlg.querySelectorAll('[data-ocat-pick]').forEach(b => {
+    b.onclick = () => {
+      selCat = b.dataset.ocatPick;
+      dlg._dirty = true;
+      dlg.querySelectorAll('[data-ocat-pick]').forEach(btn => {
+        const k = btn.dataset.ocatPick;
+        const active = k === selCat;
+        btn.classList.toggle('p', active);
+        btn.style.background = (active && k === 'urgent') ? 'var(--late)' : '';
+        btn.style.borderColor = (active && k === 'urgent') ? 'var(--late)' : '';
+        btn.style.color = (active && k === 'urgent') ? '#fff' : '';
+      });
+    };
+  });
+
   const calc = () => {
     const selCo = ($('o_co') && $('o_co').value) || initCo;
     const cCurr = getCompanyProfile(selCo).currency || cur;
@@ -493,7 +630,10 @@ function orderDialog(o) {
     });
   }
   $('o_cx').onclick = () => dlg.close();
-  if (edit) $('o_iv').onclick = () => invoiceDialog(oOf(o.id) || o);
+  if (edit) {
+    $('o_iv').onclick = () => invoiceDialog(oOf(o.id) || o);
+    if ($('o_pdf_btn')) $('o_pdf_btn').onclick = () => sendOrderInvoicePdf(oOf(o.id) || o, $('o_pdf_btn'));
+  }
   if ($('o_dl')) $('o_dl').onclick = async () => { if (confirm('حذف الطلب #' + o.order_no + ' نهائياً مع أصنافه ودفعاته وصوره؟')) { dlg.close(); await imgRemove(oItems(o.id).map(i => i.image_path)); await sb.from('ord_orders').delete().eq('id', o.id); load(); } };
   $('o_sv').onclick = async () => {
     const name = $('o_nm').value.trim(); if (!name) return $('o_nm').focus();
@@ -502,10 +642,12 @@ function orderDialog(o) {
     if (st === 'cancelled' && rs.length < 3) { $('o_rsw').style.display = ''; return $('o_rs').focus(); }
     if (st === 'preparing' && !rep) return alert('اختر المندوب قبل تحويل الطلب إلى «قيد التجهيز»');
     const chosenCo = ($('o_co') && $('o_co').value) || initCo || 'متجرك';
-    const cleanNotes = $('o_nt').value.trim().replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
-    const fallbackNotes = (cleanNotes ? cleanNotes + '\n' : '') + '[شركة: ' + chosenCo + ']';
+    const cleanNotes = stripOrderMetaNotes($('o_nt').value);
+    const catTag = selCat && selCat !== 'normal' ? '[تصنيف: ' + selCat + ']' : '';
+    const notesWithCat = [cleanNotes, catTag].filter(Boolean).join('\n');
+    const fallbackNotes = [notesWithCat, '[شركة: ' + chosenCo + ']'].filter(Boolean).join('\n');
     const useExplicitCol = S.hasExplicitOrderCo !== false;
-    const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: (useExplicitCol ? cleanNotes : fallbackNotes) || null, cancel_reason: st === 'cancelled' ? rs : null };
+    const row = { customer_name: name, phone: $('o_ph').value.trim() || null, address: $('o_ad').value.trim() || null, channel: $('o_ch').value || null, order_date: $('o_dt').value || today(), delivery_fee: +$('o_fee').value || 0, discount: +$('o_dc').value || 0, status: st, rep_email: rep, notes: (useExplicitCol ? notesWithCat : fallbackNotes) || null, cancel_reason: st === 'cancelled' ? rs : null };
     if (useExplicitCol) row.company_id = chosenCo;
     $('o_sv').disabled = true; $('o_sv').textContent = 'جارٍ الحفظ…';
     const id = edit ? o.id : crypto.randomUUID();

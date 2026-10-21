@@ -13,8 +13,8 @@
 8. ارفع `js/version.js` مع كل إصدار (يظهر شريط «نسخة جديدة» للمستخدمين).
 
 ## ترتيب تحميل JS (index.html)
-`boot, version, /api/config, config, brand, core, sync, helpers, priority, groups, tasks, orders, rep, reports, ordadmin, task-extras, recurring, proposals, settings, ui, app, checklist, activity, dashboard, tools, realtime, inbox, alerts, main`
-- **core**: اتصال Supabase المصغّر (`Q`, `sb`, `sb.rpc`, الدخول، `fetchAll` للصفحات). **app**: `init()`, `load()`, `render()` وتوزيع الشاشات. **ui**: القائمة السفلية، الترويسة، المظهر، إخفاء الشاشات. **tasks/groups/priority/checklist/task-extras/recurring**: المهام. **orders/reports/ordadmin**: الطلبات (الفريق). **rep**: واجهة المندوب. **settings**: الإعدادات. **realtime/inbox/alerts/sync**: التحديث اللحظي والتنبيهات والعمل دون اتصال.
+`boot, version, /api/config, config, brand, core, sync, helpers, priority, groups, tasks, orders, rep, reports, erp, ordadmin, task-extras, recurring, proposals, settings, ui, app, checklist, activity, dashboard, tools, realtime, inbox, alerts, main`
+- **core**: اتصال Supabase المصغّر (`Q`, `sb`, `sb.rpc`, الدخول، `fetchAll` للصفحات). **app**: `init()`, `load()`, `render()` وتوزيع الشاشات. **ui**: القائمة السفلية، الترويسة، المظهر، إخفاء الشاشات. **tasks/groups/priority/checklist/task-extras/recurring**: المهام والفلترة المتقدمة. **orders/reports/ordadmin**: الطلبات، تصنيف الطلبات، وإرسال فواتير PDF مباشرة. **erp**: حزمة النظام المحاسبي المبسط (سندات، صندوق، موردون، عهد، مصروفات وأرباح). **rep**: واجهة المندوب. **settings**: الإعدادات المقسمة لتبويبات فرعية. **realtime/inbox/alerts/sync**: التحديث اللحظي والتنبيهات والعمل دون اتصال.
 - الحالة كلها في الكائن العام `S` (`S.me, S.members, S.reps, S.tasks, S.orders, S.oitems, S.opay, S.ocost, S.ordSet, S.notes ...`). `load()` يجلب كل شيء ثم `render()`.
 
 ## الأدوار

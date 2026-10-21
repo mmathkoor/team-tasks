@@ -22,9 +22,13 @@ async function repLoad() {
 }
 
 const repImgUrl = p => (p && (S.rimg || {})[p]) || '';
-const rOpen = () => (S.rorders || []).filter(o => o.status === 'preparing');
+const rOpen = () => (S.rorders || []).filter(o => o.status === 'preparing').sort((a, b) => {
+  const ra = typeof orderCatMeta === 'function' ? orderCatMeta(a).rank : 5;
+  const rb = typeof orderCatMeta === 'function' ? orderCatMeta(b).rank : 5;
+  return (ra - rb) || ((b.order_no || 0) - (a.order_no || 0));
+});
 const rHistory = () => (S.rorders || []).filter(o => o.status !== 'preparing');
-const repCleanNotes = o => String((o && o.notes) || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
+const repCleanNotes = o => typeof stripOrderMetaNotes === 'function' ? stripOrderMetaNotes((o && o.notes) || '') : String((o && o.notes) || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').replace(/\[تصنيف:\s*[^\]]+\]\n?/g, '').trim();
 
 function repCompanyProfile(o) {
   const coId = (o && o.company_id) || (S.me && parseMemberMeta(S.me).company) || 'متجرك';
@@ -61,16 +65,51 @@ function repMsg(o) {
   .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
 
-// نص الفاتورة المهيأ للعميل والرسائل والطابعات
-function receiptPlainText(o) {
+// استخلاص وحساب مبالغ الفاتورة بدقة وضمان عدم ظهور الأسعار 0
+function normalizeInvoiceData(o) {
   const cp = repCompanyProfile(o);
-  const items = o.items || [];
-  const sub = o.subtotal != null ? +o.subtotal : items.reduce((s, i) => s + ((+i.price || 0) * (+i.qty || 1)), 0);
+  let items = Array.isArray(o.items) ? o.items.map(it => ({ ...it })) : [];
+  let sub = o.subtotal != null ? +o.subtotal : 0;
   const dFee = +(o.delivery_fee || 0);
   const disc = +(o.discount || 0);
-  const tot = o.total != null ? +o.total : (sub + dFee - disc);
-  const bal = o.balance != null ? +o.balance : (+o.collect || tot);
-  const paid = o.paid != null ? +o.paid : (tot - bal);
+  let tot = o.total != null ? +o.total : (sub + dFee - disc);
+  let bal = o.balance != null ? +o.balance : (+o.collect || tot);
+
+  // إذا لم يكن الإجمالي مسجلاً أو كان 0 وكان هناك مبلغ مطلوب تحصيله (collect / balance)
+  const knownPayable = +o.collect || +o.balance || 0;
+  if (tot <= 0 && knownPayable > 0) {
+    tot = knownPayable;
+    sub = Math.max(0, tot - dFee + disc);
+    bal = knownPayable;
+  }
+
+  // فحص ما إذا كانت الأصناف ينقصها السعر الفردي
+  const itemsSum = items.reduce((s, i) => s + ((+i.price || 0) * (+i.qty || 1)), 0);
+  if (itemsSum === 0 && sub > 0 && items.length > 0) {
+    if (items.length === 1) {
+      const q = +items[0].qty > 0 ? +items[0].qty : 1;
+      items[0].price = sub / q;
+      items[0].line_total = sub;
+    } else {
+      const share = sub / items.length;
+      items.forEach(it => {
+        const q = +it.qty > 0 ? +it.qty : 1;
+        it.price = +(share / q).toFixed(2);
+        it.line_total = +share.toFixed(2);
+      });
+    }
+  } else if (sub <= 0 && itemsSum > 0) {
+    sub = itemsSum;
+    if (tot <= 0) tot = sub + dFee - disc;
+  }
+
+  const paid = o.paid != null ? +o.paid : Math.max(0, tot - bal);
+  return { cp, items, sub, dFee, disc, tot, bal, paid };
+}
+
+// نص الفاتورة المهيأ للعميل والرسائل والطابعات
+function receiptPlainText(o) {
+  const { cp, items, sub, dFee, disc, tot, bal, paid } = normalizeInvoiceData(o);
 
   const lines = [
     '🧾 *فاتورة مبيعات* — *' + cp.name + '*',
@@ -107,14 +146,7 @@ function receiptPlainText(o) {
 
 // وثيقة الإيصال الحراري 80mm / 58mm الجاهزة للطباعة بالبلوتوث
 function thermalReceiptHtml(o) {
-  const cp = repCompanyProfile(o);
-  const items = o.items || [];
-  const sub = o.subtotal != null ? +o.subtotal : items.reduce((s, i) => s + ((+i.price || 0) * (+i.qty || 1)), 0);
-  const dFee = +(o.delivery_fee || 0);
-  const disc = +(o.discount || 0);
-  const tot = o.total != null ? +o.total : (sub + dFee - disc);
-  const bal = o.balance != null ? +o.balance : (+o.collect || tot);
-  const paid = o.paid != null ? +o.paid : (tot - bal);
+  const { cp, items, sub, dFee, disc, tot, bal, paid } = normalizeInvoiceData(o);
 
   return '<div class="thermal-paper" id="thermal_print_target">' +
     '<div class="t-center">' +
@@ -197,55 +229,116 @@ function printThermalReceipt(o) {
   doc.close();
 }
 
-function repInvoiceDialog(o) {
-  if (!o) return;
-  const rawText = receiptPlainText(o);
-  const cp = repCompanyProfile(o);
-
-  dlg.innerHTML = '<div class="bar" style="margin-bottom:12px">' +
-    '<h2 style="margin:0">🧾 فاتورة وإيصال العميل #' + o.order_no + '</h2>' +
-    '<span class="chip ok">🏢 ' + esc(cp.name) + '</span>' +
-  '</div>' +
-  '<div style="max-height:60vh;overflow-y:auto;margin-bottom:12px;padding:4px">' +
-    thermalReceiptHtml(o) +
-  '</div>' +
-  '<div class="row dact" style="gap:6px;flex-wrap:wrap">' +
-    '<button class="p s" id="riv_th" type="button" style="background:#0b1426;color:#f6e3a8">🖨 طباعة إيصال حراري (بلوتوث)</button>' +
-    '<button class="s" id="riv_a4" type="button">📄 طباعة A4 / PDF</button>' +
-    (o.phone ? '<button class="s" id="riv_wa" type="button" style="background:#15803d;color:#fff;border-color:#15803d">📲 إرسال للعميل واتساب</button>' : '') +
-    '<button class="s" id="riv_bt" type="button" title="إرسال لتطبيق طابعة البلوتوث RawBT">📱 تطبيق البلوتوث (RawBT)</button>' +
-    '<button class="s" id="riv_cp" type="button">📋 نسخ النص</button>' +
-    '<button class="s" id="riv_x" type="button">إغلاق</button>' +
-  '</div>';
-
-  $('riv_x').onclick = () => dlg.close();
-  $('riv_th').onclick = () => printThermalReceipt(o);
-  $('riv_a4').onclick = () => {
-    if (typeof printInvoice === 'function') printInvoice(o);
-    else printThermalReceipt(o);
-  };
-  if ($('riv_wa')) {
-    $('riv_wa').onclick = () => {
-      const ph = typeof waPhone === 'function' ? waPhone(o.phone) : o.phone;
-      window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(rawText), '_blank');
-    };
-  }
-  $('riv_bt').onclick = () => {
-    // تشغيل تطبيق RawBT المباشر على أندرويد لطابعات البلوتوث
-    window.location.href = 'rawbt:' + encodeURIComponent(rawText);
-    setTimeout(() => {
-      if (typeof toast === 'function') toast('تم إرسال الإيصال لتطبيق طابعة البلوتوث ✓');
-    }, 500);
-  };
-  $('riv_cp').onclick = async () => {
+async function sendRepInvoicePdf(o, btnEl) {
+  if (!o || typeof shareOrSendInvoicePdf !== 'function') return;
+  const needsFetch = !o.subtotal || !(o.items && o.items.some(i => +i.price > 0));
+  if (needsFetch && o.id) {
     try {
-      await navigator.clipboard.writeText(rawText);
-      $('riv_cp').textContent = 'تم النسخ ✓';
-      if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓');
-    } catch (e) { alert('تعذّر النسخ'); }
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'get_order_invoice', order_id: o.id }));
+      const j = await rr.json().catch(() => ({}));
+      if (rr.ok && j && j.order) Object.assign(o, j.order);
+    } catch (e) {}
+  }
+  const { cp, items, sub, dFee, disc, tot, paid, bal } = normalizeInvoiceData(o);
+  const catM = typeof orderCatMeta === 'function' ? orderCatMeta(o) : { badge: 'عادي', bg: '#f1f5f9', fg: '#475569' };
+  await shareOrSendInvoicePdf({
+    storeName: cp.name,
+    storePhone: cp.phone || '',
+    storeAddress: cp.address || '',
+    currency: cp.currency,
+    footer: cp.footer,
+    orderNo: o.order_no,
+    orderDate: o.order_date,
+    customerName: o.customer_name,
+    customerPhone: o.phone || '',
+    customerAddress: o.address || '',
+    repName: S.me ? S.me.name : '',
+    categoryLabel: catM.badge,
+    categoryBg: catM.bg,
+    categoryColor: catM.fg,
+    items: items.map(it => ({ name: it.name, qty: +it.qty || 1, price: +it.price || 0, line_total: +it.line_total || ((+it.qty || 1) * (+it.price || 0)) })),
+    subtotal: sub,
+    deliveryFee: dFee,
+    discount: disc,
+    total: tot,
+    paid: paid,
+    balance: bal
+  }, o.phone, btnEl);
+}
+
+async function repInvoiceDialog(o) {
+  if (!o) return;
+
+  const renderContent = () => {
+    const rawText = receiptPlainText(o);
+    const cp = repCompanyProfile(o);
+
+    dlg.innerHTML = '<div class="bar" style="margin-bottom:12px">' +
+      '<h2 style="margin:0">🧾 فاتورة وإيصال العميل #' + o.order_no + '</h2>' +
+      '<span class="chip ok">🏢 ' + esc(cp.name) + '</span>' +
+    '</div>' +
+    '<div id="riv_body" style="max-height:60vh;overflow-y:auto;margin-bottom:12px;padding:4px">' +
+      thermalReceiptHtml(o) +
+    '</div>' +
+    '<div class="row dact" style="gap:6px;flex-wrap:wrap">' +
+      '<button class="p s" id="riv_pdf" type="button" style="background:#15803d;color:#fff;border-color:#15803d">📄 إرسال فاتورة PDF للعميل مباشرة</button>' +
+      '<button class="p s" id="riv_th" type="button" style="background:#0b1426;color:#f6e3a8">🖨 طباعة إيصال حراري (بلوتوث)</button>' +
+      '<button class="s" id="riv_a4" type="button">📄 طباعة A4 / حفظ PDF</button>' +
+      (o.phone ? '<button class="s" id="riv_wa" type="button">💬 إرسال نص واتساب</button>' : '') +
+      '<button class="s" id="riv_bt" type="button" title="إرسال لتطبيق طابعة البلوتوث RawBT">📱 تطبيق البلوتوث (RawBT)</button>' +
+      '<button class="s" id="riv_cp" type="button">📋 نسخ النص</button>' +
+      '<button class="s" id="riv_x" type="button">إغلاق</button>' +
+    '</div>';
+
+    if ($('riv_x')) $('riv_x').onclick = () => dlg.close();
+    if ($('riv_pdf')) $('riv_pdf').onclick = () => sendRepInvoicePdf(o, $('riv_pdf'));
+    if ($('riv_th')) $('riv_th').onclick = () => printThermalReceipt(o);
+    if ($('riv_a4')) $('riv_a4').onclick = () => {
+      if (typeof printInvoice === 'function') printInvoice(o);
+      else printThermalReceipt(o);
+    };
+    if ($('riv_wa')) {
+      $('riv_wa').onclick = () => {
+        const ph = typeof waPhone === 'function' ? waPhone(o.phone) : o.phone;
+        window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(rawText), '_blank');
+      };
+    }
+    if ($('riv_bt')) {
+      $('riv_bt').onclick = () => {
+        window.location.href = 'rawbt:' + encodeURIComponent(rawText);
+        setTimeout(() => {
+          if (typeof toast === 'function') toast('تم إرسال الإيصال لتطبيق طابعة البلوتوث ✓');
+        }, 500);
+      };
+    }
+    if ($('riv_cp')) {
+      $('riv_cp').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(rawText);
+          $('riv_cp').textContent = 'تم النسخ ✓';
+          if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓');
+        } catch (e) { alert('تعذّر النسخ'); }
+      };
+    }
   };
 
+  renderContent();
   dlg.showModal();
+
+  // جلب الأسعار الدقيقة وتفاصيل الأصناف من الخادم إن لم تكن متوفرة
+  const needsFetch = !o.subtotal || !(o.items && o.items.some(i => +i.price > 0));
+  if (needsFetch && o.id) {
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'get_order_invoice', order_id: o.id }));
+      const j = await rr.json().catch(() => ({}));
+      if (rr.ok && j && j.order) {
+        Object.assign(o, j.order);
+        if (dlg.open && document.getElementById('riv_body')) {
+          renderContent();
+        }
+      }
+    } catch (e) {}
+  }
 }
 
 function repCard(o) {
@@ -255,11 +348,15 @@ function repCard(o) {
   const imgItems = its.filter(i => repImgUrl(i.image || i.image_path));
   const cp = repCompanyProfile(o);
   const collAmount = o.collect != null ? +o.collect : (+o.balance || 0);
+  const catKey = typeof orderCatOf === 'function' ? orderCatOf(o) : 'normal';
+  const catM = typeof orderCatMeta === 'function' ? orderCatMeta(o) : { badge: '📦 عادي', cls: '' };
+  const urgStyle = catKey === 'urgent' ? ' style="border-inline-start:4px solid var(--late);box-shadow:0 4px 14px rgba(185,28,28,.12)"' : catKey === 'vip' ? ' style="border-inline-start:4px solid var(--gold)"' : '';
 
-  return '<div class="card rcard" data-roid="' + o.id + '">' +
+  return '<div class="card rcard" data-roid="' + o.id + '"' + urgStyle + '>' +
     '<div class="bar">' +
-      '<div style="display:flex;align-items:center;gap:6px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
         '<b class="rno">#' + o.order_no + '</b>' +
+        (catKey !== 'normal' ? '<span class="chip ' + catM.cls + '" style="font-weight:700">' + esc(catM.badge) + '</span>' : '') +
         '<span class="chip" style="font-size:11px">🏢 ' + esc(cp.name) + '</span>' +
       '</div>' +
       '<span class="m">' + esc(o.order_date || '') + '</span>' +
@@ -285,9 +382,10 @@ function repCard(o) {
     (collAmount > 0 ? '<div class="rcol" style="background:var(--goldsoft);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;margin:10px 0;font-size:16px;display:flex;justify-content:space-between;align-items:center"><span>💵 المطلوب تحصيله نقداً:</span><b style="font-size:18px;color:var(--ink)">' + money(collAmount) + ' ' + cp.currency + '</b></div>' : '<div class="m" style="margin:8px 0;color:var(--ok)">✅ مدفوع بالكامل مسبقاً (لا تحصيل نقدي)</div>') +
     '<div class="m" style="margin:6px 0;font-size:12px">مسجل الطلب: ' + esc(o.created_by_name || '—') + '</div>' +
     '<div class="acts ract" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">' +
-      '<button class="p" data-rd="' + o.id + '" style="flex:2 1 120px">✅ تم التوصيل</button>' +
-      '<button class="s" data-rinv="' + o.id + '" style="flex:2 1 120px;font-weight:700" title="طباعة فاتورة أو إيصال حراري للعميل">🧾 فاتورة للعميل</button>' +
-      '<button class="dng s" data-rc="' + o.id + '" style="flex:1 1 80px">❌ إلغاء</button>' +
+      '<button class="p" data-rd="' + o.id + '" style="flex:2 1 110px">✅ تم التوصيل</button>' +
+      '<button class="s" data-rpdf="' + o.id + '" style="flex:2 1 110px;font-weight:700;background:#15803d;color:#fff;border-color:#15803d" title="إرسال الفاتورة بصيغة PDF مباشرة للعميل">📄 إرسال PDF</button>' +
+      '<button class="s" data-rinv="' + o.id + '" style="flex:1 1 90px;font-weight:700" title="طباعة فاتورة أو إيصال حراري للعميل">🧾 إيصال</button>' +
+      '<button class="dng s" data-rc="' + o.id + '" style="flex:1 1 70px">❌ إلغاء</button>' +
       '<button class="s" data-re="' + o.id + '" aria-label="معاينة الرسالة" style="flex:0 0 42px">👁</button>' +
     '</div></div>';
 }
@@ -456,6 +554,10 @@ function repRender() {
   // أحداث الطلبات
   document.querySelectorAll('[data-rd]').forEach(b => b.onclick = () => repDeliver(b.dataset.rd));
   document.querySelectorAll('[data-rc]').forEach(b => b.onclick = () => repCancel(b.dataset.rc));
+  document.querySelectorAll('[data-rpdf]').forEach(b => b.onclick = () => {
+    const o = (S.rorders || []).find(x => x.id === b.dataset.rpdf);
+    if (o) sendRepInvoicePdf(o, b);
+  });
   document.querySelectorAll('[data-rinv]').forEach(b => b.onclick = () => {
     const o = (S.rorders || []).find(x => x.id === b.dataset.rinv);
     if (o) repInvoiceDialog(o);

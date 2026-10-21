@@ -393,49 +393,213 @@ function card(t) {
   '</div>';
 }
 
-function boardView() {
-  const deps = typeof departmentsList === 'function' ? departmentsList() : [];
-  let all = S.tasks.filter(t => (!S.meeting || t.meeting_id === S.meeting) && (!S.dept || same(memberDept(t.assignee_email), S.dept)) && (S.filter === 'all' || mine(t)));
-  if (S.kpi && KPI_TEST[S.kpi]) all = all.filter(KPI_TEST[S.kpi]);
-  
+function ensureTaskFilterState() {
+  if (!S.tf) {
+    S.tf = { q: '', emp: '', prio: '', due: '', type: '', from: '', to: '', sort: 'default', open: false };
+  }
+  return S.tf;
+}
+
+function activeTaskFiltersCount() {
+  const tf = ensureTaskFilterState();
+  return [tf.q.trim(), tf.emp, tf.prio, tf.due, tf.type, tf.from, tf.to, S.meeting, S.dept, S.kpi].filter(Boolean).length;
+}
+
+function filterTasksAdvanced() {
+  const tf = ensureTaskFilterState();
+  const td = today();
+  const q = tf.q.trim().toLowerCase();
+
+  let list = (S.tasks || []).filter(t => {
+    if (S.meeting && t.meeting_id !== S.meeting) return false;
+    if (S.dept && !same(memberDept(t.assignee_email), S.dept)) return false;
+    if (S.filter === 'mine' && !mine(t)) return false;
+    if (S.kpi && KPI_TEST[S.kpi] && !KPI_TEST[S.kpi](t)) return false;
+
+    // فلتر الموظف المحدد
+    if (tf.emp) {
+      if (tf.emp === '_all_team' && !t.for_all && !t.group_id) return false;
+      else if (tf.emp === '_unassigned' && (t.for_all || t.assignee_email)) return false;
+      else if (tf.emp !== '_all_team' && tf.emp !== '_unassigned' && !same(t.assignee_email, tf.emp)) return false;
+    }
+
+    // فلتر الأولوية
+    if (tf.prio && prioOf(t) !== tf.prio) return false;
+
+    // فلتر حالة الموعد والاستحقاق
+    const st = eff(t);
+    if (tf.due) {
+      if (tf.due === 'late' && !(st !== 'done' && t.due_on && t.due_on < td)) return false;
+      if (tf.due === 'today' && !(st !== 'done' && t.due_on === td)) return false;
+      if (tf.due === 'tomorrow' && !(st !== 'done' && t.due_on === addDays(td, 1))) return false;
+      if (tf.due === 'week' && !(st !== 'done' && t.due_on && t.due_on >= td && t.due_on <= addDays(td, 7))) return false;
+      if (tf.due === 'has_due' && !t.due_on) return false;
+      if (tf.due === 'no_due' && t.due_on) return false;
+    }
+
+    // فلتر نوع وبنية المهمة
+    if (tf.type) {
+      const ck = (S.itemStats || {})[t.id];
+      const hasCk = !!(ck && ck[1] > 0);
+      const hasFlow = Array.isArray(t.flow) && t.flow.length > 1;
+      const hasHandoff = String(t.notes || '').includes('[WF_HANDOFF]');
+      if (tf.type === 'single' && (t.for_all || t.group_id)) return false;
+      if (tf.type === 'group' && !(t.for_all || t.group_id)) return false;
+      if (tf.type === 'flow' && !hasFlow && !hasHandoff) return false;
+      if (tf.type === 'checklist' && !hasCk) return false;
+    }
+
+    // فلتر النطاق الزمني (من - إلى)
+    const refDate = t.due_on || String(t.created_at || '').slice(0, 10);
+    if (tf.from && (!refDate || refDate < tf.from)) return false;
+    if (tf.to && (!refDate || refDate > tf.to)) return false;
+
+    // البحث النصي الشامل
+    if (q) {
+      const mt = (S.meetings || []).find(m => m.id === t.meeting_id);
+      const hay = [
+        t.title || '',
+        t.notes || '',
+        t.done_note || '',
+        t.assignee_email ? nm(t.assignee_email) : '',
+        mt ? mt.title : ''
+      ].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  // الترتيب الذكي
+  const sortMode = tf.sort || 'default';
+  const cmpFn = (a, b) => {
+    if (sortMode === 'due_asc') {
+      const da = a.due_on || '9999-99-99', db = b.due_on || '9999-99-99';
+      if (da !== db) return da < db ? -1 : 1;
+    } else if (sortMode === 'newest') {
+      const ca = a.created_at || '', cb = b.created_at || '';
+      if (ca !== cb) return ca > cb ? -1 : 1;
+    } else if (sortMode === 'progress_desc') {
+      const pa = +a.progress || 0, pb = +b.progress || 0;
+      if (pa !== pb) return pb - pa;
+    } else if (sortMode === 'emp_asc') {
+      const na = a.assignee_email ? nm(a.assignee_email) : 'ي', nb = b.assignee_email ? nm(b.assignee_email) : 'ي';
+      const c = na.localeCompare(nb, 'ar');
+      if (c !== 0) return c;
+    }
+    return taskCmp(a, b);
+  };
+
+  return { list, cmpFn };
+}
+
+function taskBoardColsHtml() {
+  const { list: all, cmpFn } = filterTasksAdvanced();
+  const cTabs = Object.keys(ST).map(k => '<button data-c="' + k + '" class="' + (S.col === k ? 'on' : '') + '">' + ST[k] + ' (' + all.filter(t => eff(t) === k).length + ')</button>').join('');
   const cols = Object.keys(ST).map(k => {
-    const items = all.filter(t => eff(t) === k).sort(taskCmp);
+    const items = all.filter(t => eff(t) === k).sort(cmpFn);
     return '<div class="col ' + (S.col === k ? 'on' : '') + '" data-st="' + k + '">' +
       '<div class="ch"><span>' + ST[k] + '</span><i>' + items.length + '</i></div>' +
-      (items.length ? items.map(card).join('') : '<div class="empty">لا يوجد مهام</div>') +
+      (items.length ? items.map(card).join('') : '<div class="empty">لا توجد مهام مطابقة</div>') +
     '</div>';
   }).join('');
-  
-  let mtOpts = '<option value="">كل المشاريع/الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
-  let depOpts = '<option value="">كل الإدارات والأقسام</option>' + deps.map(d => '<option value="' + esc(d) + '" ' + (same(S.dept, d) ? 'selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
+  return '<div class="ctabs">' + cTabs + '</div><div class="board">' + cols + '</div>';
+}
+
+function boardView() {
+  const tf = ensureTaskFilterState();
+  const deps = typeof departmentsList === 'function' ? departmentsList() : [];
+  const { list: all } = filterTasksAdvanced();
+  const activeCnt = activeTaskFiltersCount();
+
+  let mtOpts = '<option value="">📁 كل المشاريع/الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
+  let depOpts = '<option value="">🏛️ كل الإدارات والأقسام</option>' + deps.map(d => '<option value="' + esc(d) + '" ' + (same(S.dept, d) ? 'selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
+  let empOpts = '<option value="">👤 كل الموظفين</option>' +
+    '<option value="_all_team"' + (tf.emp === '_all_team' ? ' selected' : '') + '>👥 مهام جماعية (الفريق)</option>' +
+    '<option value="_unassigned"' + (tf.emp === '_unassigned' ? ' selected' : '') + '>⏳ غير مسندة</option>' +
+    (S.members || []).map(m => '<option value="' + esc(m.email) + '"' + (same(tf.emp, m.email) ? ' selected' : '') + '>👤 ' + esc(m.name) + '</option>').join('');
+
+  let prioOpts = '<option value="">⚡ كل الأولويات</option>' +
+    '<option value="urgent"' + (tf.prio === 'urgent' ? ' selected' : '') + '>🔴 عاجل ومهم</option>' +
+    '<option value="important"' + (tf.prio === 'important' ? ' selected' : '') + '>🟠 مهم غير عاجل</option>' +
+    '<option value="quick"' + (tf.prio === 'quick' ? ' selected' : '') + '>🔵 عاجل غير مهم</option>' +
+    '<option value="normal"' + (tf.prio === 'normal' ? ' selected' : '') + '>⚪ عادي</option>';
+
+  let dueOpts = '<option value="">📅 كل المواعيد</option>' +
+    '<option value="late"' + (tf.due === 'late' ? ' selected' : '') + '>⚠️ متأخرة عن الموعد</option>' +
+    '<option value="today"' + (tf.due === 'today' ? ' selected' : '') + '>🔥 مستحقة اليوم</option>' +
+    '<option value="tomorrow"' + (tf.due === 'tomorrow' ? ' selected' : '') + '>⏱️ مستحقة غداً</option>' +
+    '<option value="week"' + (tf.due === 'week' ? ' selected' : '') + '>📆 خلال 7 أيام</option>' +
+    '<option value="has_due"' + (tf.due === 'has_due' ? ' selected' : '') + '>📅 لها تاريخ استحقاق</option>' +
+    '<option value="no_due"' + (tf.due === 'no_due' ? ' selected' : '') + '>⏳ بدون تاريخ استحقاق</option>';
+
+  let typeOpts = '<option value="">🔗 كل أنواع المهام</option>' +
+    '<option value="single"' + (tf.type === 'single' ? ' selected' : '') + '>👤 مهام فردية</option>' +
+    '<option value="group"' + (tf.type === 'group' ? ' selected' : '') + '>👥 مهام جماعية / متعددة</option>' +
+    '<option value="flow"' + (tf.type === 'flow' ? ' selected' : '') + '>🔄 مرتبطة بمسار عمل / إحالة</option>' +
+    '<option value="checklist"' + (tf.type === 'checklist' ? ' selected' : '') + '>☑️ تحتوي بنود تحقق فرعية</option>';
+
+  let sortOpts = '<option value="default"' + (tf.sort === 'default' ? ' selected' : '') + '>🔃 الترتيب: الأولوية والموعد</option>' +
+    '<option value="due_asc"' + (tf.sort === 'due_asc' ? ' selected' : '') + '>📅 الأقرب استحقاقاً أولاً</option>' +
+    '<option value="newest"' + (tf.sort === 'newest' ? ' selected' : '') + '>🆕 الأحدث إنشاءً أولاً</option>' +
+    '<option value="progress_desc"' + (tf.sort === 'progress_desc' ? ' selected' : '') + '>📈 الأعلى نسبة إنجاز</option>' +
+    '<option value="emp_asc"' + (tf.sort === 'emp_asc' ? ' selected' : '') + '>🔤 حسب اسم الموظف</option>';
+
   let adminBtn = '<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>';
   let waBatchBtn = '<button class="s" id="wa_batch_btn" type="button" style="background:rgba(18,140,126,.12);color:#128c7e;border-color:rgba(18,140,126,.35);font-weight:700" title="إرسال رسائل تذكير للموظفين بالمهام المتأخرة والمفتوحة دفعة واحدة">📲 تذكير واتساب للموظفين</button>';
-  let cTabs = Object.keys(ST).map(k => '<button data-c="' + k + '" class="' + (S.col === k ? 'on' : '') + '">' + ST[k] + ' (' + all.filter(t => eff(t) === k).length + ')</button>').join('');
+  let advToggleBtn = '<button class="s' + (tf.open || activeCnt ? ' p' : '') + '" id="tf_tog" type="button">🎛️ فلترة متقدمة' + (activeCnt ? ' (' + activeCnt + ')' : '') + '</button>';
+
+  const quickChips = [
+    ['', '', '📋 الكل (' + S.tasks.length + ')'],
+    ['due', 'late', '⚠️ المتأخرة'],
+    ['due', 'today', '🔥 اليوم'],
+    ['due', 'tomorrow', '⏱️ غداً'],
+    ['due', 'week', '📆 هذا الأسبوع'],
+    ['prio', 'urgent', '🔴 عاجل ومهم'],
+    ['type', 'group', '👥 جماعية']
+  ].map(([field, val, label]) => {
+    const isAct = (!field && !tf.due && !tf.prio && !tf.type) || (field && tf[field] === val);
+    return '<button type="button" class="s' + (isAct ? ' p' : '') + '" data-tf-qchip="' + field + ':' + val + '" style="font-size:12px;padding:4px 10px;border-radius:8px">' + label + '</button>';
+  }).join('');
+
+  const advPanelHtml = (tf.open || activeCnt > 0) ? (
+    '<div class="card" id="tf_panel" style="padding:12px 14px;margin:0 0 12px;border:1px solid var(--acc);background:var(--card)">' +
+      '<div class="bar" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">' +
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:13.5px">🎛️ خيارات الفلترة المتقدمة والترتيب</b><span class="chip all" id="tf_count_badge">المطابق: ' + all.length + ' من ' + S.tasks.length + '</span></div>' +
+        (activeCnt ? '<button type="button" class="s dng" id="tf_reset" style="font-size:12px;padding:4px 10px">↺ مسح كل الفلاتر (' + activeCnt + ')</button>' : '') +
+      '</div>' +
+      '<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+        '<select id="tf_emp" style="flex:1 1 160px">' + empOpts + '</select>' +
+        '<select id="tf_prio" style="flex:1 1 150px">' + prioOpts + '</select>' +
+        '<select id="tf_due" style="flex:1 1 160px">' + dueOpts + '</select>' +
+        '<select id="tf_type" style="flex:1 1 160px">' + typeOpts + '</select>' +
+      '</div>' +
+      '<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">' +
+        '<select id="fm" style="flex:1 1 160px">' + mtOpts + '</select>' +
+        (deps.length ? '<select id="fdep" style="flex:1 1 160px">' + depOpts + '</select>' : '') +
+        '<div class="row s" style="flex:1 1 240px;gap:4px;align-items:center"><span class="m" style="font-size:12px;white-space:nowrap">📅 من:</span><input type="date" id="tf_from" value="' + esc(tf.from) + '" style="padding:6px 8px"><span class="m" style="font-size:12px;white-space:nowrap">إلى:</span><input type="date" id="tf_to" value="' + esc(tf.to) + '" style="padding:6px 8px"></div>' +
+        '<select id="tf_sort" style="flex:1 1 170px">' + sortOpts + '</select>' +
+      '</div>' +
+    '</div>'
+  ) : '';
 
   return kpiHtml() +
-  '<div class="tools">' +
+  '<div class="tools" style="margin-bottom:8px">' +
     '<div class="seg"><button data-f="mine" class="' + (S.filter === 'mine' ? 'on' : '') + '">مهامي فقط</button><button data-f="all" class="' + (S.filter === 'all' ? 'on' : '') + '">كل الفريق</button></div>' +
-    '<select id="fm" style="border-radius:6px">' + mtOpts + '</select>' +
-    (deps.length ? '<select id="fdep" style="border-radius:6px">' + depOpts + '</select>' : '') +
+    '<input id="tf_q" type="search" placeholder="🔎 بحث فوري: عنوان المهمة، موظف، ملاحظات، مشروع…" value="' + esc(tf.q) + '" style="flex:2 1 200px">' +
+    advToggleBtn +
+    (!tf.open && !activeCnt ? '<select id="fm" style="border-radius:6px">' + mtOpts + '</select>' + (deps.length ? '<select id="fdep" style="border-radius:6px">' + depOpts + '</select>' : '') : '') +
     '<span class="sp"></span>' +
     waBatchBtn + adminBtn + '<button class="p s" id="nt">➕ إضافة مهمة</button>' +
   '</div>' +
-  '<div class="ctabs">' + cTabs + '</div>' +
-  '<div class="board">' + cols + '</div>';
+  '<div class="row s" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">' + quickChips + '</div>' +
+  advPanelHtml +
+  '<div id="t_board_wrap">' + taskBoardColsHtml() + '</div>';
 }
 
-function bindBoard() {
-  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
-  document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { S.kpi = S.kpi === b.dataset.kpi ? '' : b.dataset.kpi; S.filter = 'mine'; render(); });
-  if ($('kpi_x')) $('kpi_x').onclick = () => { S.kpi = ''; render(); };
+function bindTaskColsEvents() {
   document.querySelectorAll('[data-ci]').forEach(c => c.onchange = () => ckToggle(c.dataset.ci, c.checked));
   document.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.col = b.dataset.c; render(); });
-  $('fm').onchange = e => { S.meeting = e.target.value; render(); };
-  if ($('fdep')) $('fdep').onchange = e => { S.dept = e.target.value; render(); };
-  $('nt').onclick = () => taskDialog(null);
-  if ($('wa_batch_btn')) $('wa_batch_btn').onclick = () => waRemindDialog('', 'late');
-  if ($('nmt')) $('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
-  
   document.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); moveTask(b.dataset.mv, b.dataset.to); });
   document.querySelectorAll('[data-hf]').forEach(b => { b.onclick = e => { e.stopPropagation(); handoffDialog(b.dataset.hf); }; });
   document.querySelectorAll('[data-wa-tk]').forEach(b => {
@@ -445,7 +609,6 @@ function bindBoard() {
       if (tk) waRemindDialog(tk.assignee_email || '', 'single', tk.id);
     };
   });
-
   document.querySelectorAll('.tk').forEach(el => {
     el.onclick = e => { if (e.target.closest('.ckrows') || e.target.closest('[data-wa-tk]')) return; taskDialog(S.tasks.find(t => t.id === el.dataset.id)); };
     el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag'); };
@@ -456,6 +619,50 @@ function bindBoard() {
     c.ondragleave = () => c.classList.remove('over');
     c.ondrop = e => { e.preventDefault(); c.classList.remove('over'); const id = e.dataTransfer.getData('text/plain'); if (id) moveTask(id, c.dataset.st); };
   });
+}
+
+function bindBoard() {
+  const tf = ensureTaskFilterState();
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+  document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { S.kpi = S.kpi === b.dataset.kpi ? '' : b.dataset.kpi; S.filter = 'mine'; render(); });
+  if ($('kpi_x')) $('kpi_x').onclick = () => { S.kpi = ''; render(); };
+  if ($('tf_tog')) $('tf_tog').onclick = () => { tf.open = !tf.open; render(); };
+  if ($('tf_q')) {
+    $('tf_q').oninput = e => {
+      tf.q = e.target.value;
+      if ($('t_board_wrap')) {
+        $('t_board_wrap').innerHTML = taskBoardColsHtml();
+        bindTaskColsEvents();
+        if ($('tf_count_badge')) $('tf_count_badge').textContent = 'المطابق: ' + filterTasksAdvanced().list.length + ' من ' + S.tasks.length;
+      }
+    };
+  }
+  document.querySelectorAll('[data-tf-qchip]').forEach(b => {
+    b.onclick = () => {
+      const [field, val] = (b.dataset.tfQchip || ':').split(':');
+      if (!field) { tf.due = ''; tf.prio = ''; tf.type = ''; }
+      else { tf[field] = tf[field] === val ? '' : val; if (field === 'type' && val === 'group') S.filter = 'all'; }
+      render();
+    };
+  });
+  if ($('tf_emp')) $('tf_emp').onchange = e => { tf.emp = e.target.value; if (tf.emp) S.filter = 'all'; render(); };
+  if ($('tf_prio')) $('tf_prio').onchange = e => { tf.prio = e.target.value; render(); };
+  if ($('tf_due')) $('tf_due').onchange = e => { tf.due = e.target.value; render(); };
+  if ($('tf_type')) $('tf_type').onchange = e => { tf.type = e.target.value; render(); };
+  if ($('tf_from')) $('tf_from').onchange = e => { tf.from = e.target.value; render(); };
+  if ($('tf_to')) $('tf_to').onchange = e => { tf.to = e.target.value; render(); };
+  if ($('tf_sort')) $('tf_sort').onchange = e => { tf.sort = e.target.value; render(); };
+  if ($('tf_reset')) $('tf_reset').onclick = () => {
+    S.tf = { q: '', emp: '', prio: '', due: '', type: '', from: '', to: '', sort: 'default', open: true };
+    S.meeting = ''; S.dept = ''; S.kpi = '';
+    render();
+  };
+  if ($('fm')) $('fm').onchange = e => { S.meeting = e.target.value; render(); };
+  if ($('fdep')) $('fdep').onchange = e => { S.dept = e.target.value; render(); };
+  $('nt').onclick = () => taskDialog(null);
+  if ($('wa_batch_btn')) $('wa_batch_btn').onclick = () => waRemindDialog('', 'late');
+  if ($('nmt')) $('nmt').onclick = () => { const t = prompt('اسم القسم/الاجتماع الجديد'); if (t && t.trim()) run(sb.from('meetings').insert({ title: t.trim() })); };
+  bindTaskColsEvents();
 }
 
 function handoffDialog(tId) {
