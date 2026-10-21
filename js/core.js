@@ -189,14 +189,14 @@ function memberPerms(mOrEmail) {
   const m = typeof mOrEmail === 'string'
     ? (S.allMembers || S.members || S.rawMembers || []).find(x => same(x.email, mOrEmail))
     : mOrEmail;
-  if (!m) return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false, settingsTabs: [] };
-  if (m.role === 'admin') return { screens: ['board', 'orders', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true, settingsTabs: ['staff', 'reps', 'stores', 'orders_cfg', 'notify', 'recur', 'tools', 'account'] };
+  if (!m) return { screens: ['board', 'orders', 'pipe', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false, settingsTabs: [] };
+  if (m.role === 'admin') return { screens: ['board', 'orders', 'pipe', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true, settingsTabs: ['staff', 'reps', 'stores', 'orders_cfg', 'notify', 'recur', 'tools', 'account'] };
   if (m.role === 'rep') return { screens: ['rep'], ordersScope: 'own', canCost: false, settingsTabs: ['account'] };
 
   const meta = parseMemberMeta(m);
   const p = meta.perms || {};
   const setTabs = Array.isArray(p.settingsTabs) ? p.settingsTabs : [];
-  const screens = Array.isArray(p.screens) && p.screens.length ? p.screens.slice() : ['board', 'orders', 'dash', 'props', 'log'];
+  const screens = Array.isArray(p.screens) && p.screens.length ? p.screens.slice() : ['board', 'orders', 'pipe', 'dash', 'props', 'log'];
   if (!screens.includes('set')) screens.push('set');
 
   return {
@@ -467,7 +467,7 @@ function applyCompanyScope() {
   }
   S.allMembers = S.rawMembers.filter(m => {
     const mc = parseMemberMeta(m).company;
-    return same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email);
+    return same(mc, co) || (m.role === 'rep' && mc === '__all') || (m.role === 'admin' && !mc) || same(m.email, S.me && S.me.email);
   });
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');

@@ -193,8 +193,8 @@ const logout = async () => { await sb.auth.signOut(); localStorage.clear(); loca
 
 function render() {
   if (S.me && S.me.role === 'rep') return repRender();
+  if (typeof viewHidden === 'function' && viewHidden(S.view)) S.view = firstView();
   if (typeof canMemberAccessScreen === 'function' && !canMemberAccessScreen(S.view)) S.view = firstView();
-  if (S.view === 'set' && !isAdmin() && !(typeof canMemberAccessScreen === 'function' && canMemberAccessScreen('set'))) S.view = firstView();
   try { document.title = appName(); updateBadge(); saveCache(); } catch (e) {}
   if (!S.me) return;
   const props = S.props || [];
@@ -204,12 +204,12 @@ function render() {
   const enter = S._rv !== S.view; S._rv = S.view;
   $app.innerHTML = headerHtml() + navHtml(S.view, badge) +
   '<div class="view' + (enter ? ' enter' : '') + '">' +
-  (S.view === 'orders' ? ordersView() : S.view === 'erp' ? erpView() : S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : S.view === 'log' ? logView() : S.view === 'dash' ? dashView() : settingsView()) +
+  (S.view === 'orders' ? ordersView() : S.view === 'pipe' ? pipeView() : S.view === 'erp' ? erpView() : S.view === 'board' ? boardView() : S.view === 'props' ? propsView() : S.view === 'log' ? logView() : S.view === 'dash' ? dashView() : settingsView()) +
   '</div>' + (S.view === 'board' ? '<button class="fab" id="fab" aria-label="مهمة جديدة">＋</button>' : '');
   
   if (S.view === 'set') $app.insertAdjacentHTML('beforeend', '<p class="m" style="text-align:center;margin-top:20px">النسخة ' + VERSION + '</p>');
   bindHeader();
   if ($('fab')) $('fab').onclick = () => taskDialog(null);
   document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { if (b.dataset.nv === 'more') return moreDialog(); S.view = b.dataset.nv; render(); });
-  if (S.view === 'orders') bindOrders(); else if (S.view === 'erp') bindErp(); else if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();
+  if (S.view === 'orders') bindOrders(); else if (S.view === 'pipe') bindPipe(); else if (S.view === 'erp') bindErp(); else if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();
 }

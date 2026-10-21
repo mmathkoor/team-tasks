@@ -3,6 +3,7 @@ const svgIc = p => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" 
 const NAV_ITEMS = [
   { id: 'board', short: 'المهام', long: 'المهام والمشاريع', ic: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>' },
   { id: 'orders', short: 'الطلبات', long: 'إدارة الطلبات', ic: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2.5l2.2 11h10.6l2-8H6.5"/>' },
+  { id: 'pipe', short: 'النشر', long: 'خط نشر المنتجات', ic: '<path d="M4 4h6v6H4z"/><path d="M14 14h6v6h-6z"/><path d="M10 7h4a3 3 0 0 1 3 3v4"/><path d="M15.5 12.5L17 14l1.5-1.5"/>' },
   { id: 'erp', short: 'الحسابات', long: 'الحسابات والعهد', ic: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>' },
   { id: 'dash', short: 'الأرقام', long: 'لوحة الأرقام', ic: '<path d="M5 20v-7M12 20V5M19 20v-10"/><path d="M3 20h18"/>' },
   { id: 'more', short: 'المزيد', long: 'المزيد', ic: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>' }
@@ -12,7 +13,7 @@ const MORE_ITEMS = [
   { id: 'log', long: 'سجل النشاط', ic: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
   { id: 'set', long: 'الإعدادات', ic: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>' }
 ];
- // إخفاء/إظهار الشاشات (إعداد المدير + صلاحيات الموظف الدقيقة). الإعدادات لا تظهر إلا للأدمن.
+ // إخفاء/إظهار الشاشات (إعداد المدير + صلاحيات الموظف الدقيقة). الإعدادات تظهر للجميع؛ التبويبات الحساسة فيها للأدمن أو بحسب صلاحيات الموظف.
 const viewHidden = id => id !== 'set' && !!(S.ordSet && (S.ordSet.hidden_views || []).includes(id));
 const visNav = () => NAV_ITEMS.filter(n => {
   if (n.id === 'more') return visMore().length > 0;
@@ -50,8 +51,9 @@ function navHtml(view, propsBadge) {
 function moreDialog() {
   const op = (S.props || []).filter(p => !isClosed(p)).length;
   dlg.innerHTML = '<h2>المزيد</h2><div class="more">' + visMore().map(m => '<button class="more-i" data-go="' + m.id + '">' + svgIc(m.ic) + '<span>' + m.long + '</span>' + (m.id === 'props' && op ? '<i class="n">' + op + '</i>' : '') + '</button>').join('') + '</div>' +
-    '<p class="m" style="text-align:center;margin:14px 0 0">النسخة ' + VERSION + '</p>';
+    '<button class="dng s" id="more_out" style="width:100%;margin-top:12px">تسجيل الخروج</button>' + '<p class="m" style="text-align:center;margin:14px 0 0">النسخة ' + VERSION + '</p>';
   dlg.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { S.view = b.dataset.go; dlg.close(); render(); });
+  if ($('more_out')) $('more_out').onclick = () => { dlg.close(); logout(); };
   dlg.showModal();
 }
 const THEME_I = { auto: '◐', light: '☀', dark: '☾' }, THEME_L = { auto: 'تلقائي', light: 'فاتح', dark: 'داكن' };
@@ -155,6 +157,7 @@ function bindHeader() {
   if ($('ver_badge_btn')) $('ver_badge_btn').onclick = () => { if (typeof forceAppUpdate === 'function') forceAppUpdate(); else location.reload(true); };
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
+  if ($('hdr_out')) $('hdr_out').onclick = () => { if (confirm('تسجيل الخروج؟')) logout(); };
   if ($('co_sw_btn')) $('co_sw_btn').onclick = toggleCoPopover;
   if ($('co_sw')) $('co_sw').onchange = e => { S.activeCompany = e.target.value; applyCompanyScope(); render(); };
   updateBell();
@@ -200,6 +203,7 @@ function headerHtml() {
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +
+      '<button id="hdr_out" class="s iconbtn" aria-label="تسجيل الخروج" title="تسجيل الخروج">' + svgIc('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>') + '</button>' +
     '</div>' +
     (swHtml ? '<div class="top-co-bar">' + swHtml + '</div>' : '') +
   '</div>';

@@ -178,6 +178,7 @@ function memberPermsDialog(email) {
   const screens = [
     ['board', '📋 المهام والمشاريع', 'لوحة المهام ومتابعة سير العمل اليومي'],
     ['orders', '🛒 إدارة الطلبات', 'تسجيل الطلبات، إسناد للمناديب، طباعة الفواتير'],
+    ['pipe', '📣 خط نشر المنتجات', 'استلام المنتجات من المورد، التصميم والمحتوى، النشر على المنصات'],
     ['erp', '💼 الحسابات والعهد', 'حسابات الموردين، عهدة المناديب، والمصروفات'],
     ['dash', '📊 لوحة الأرقام والتقارير', 'مؤشرات الأداء ورسوم وتحليلات المبيعات والإنجاز'],
     ['props', '🗳️ القرارات والتصويت', 'تقديم المقترحات ومشاركة الفريق في التصويت'],
@@ -835,96 +836,6 @@ function bindSettings() {
     else if (typeof toast === 'function') toast('تم حفظ بيانات العضو ✓');
     load();
   });
-  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
-
-  document.querySelectorAll('[data-mpw]').forEach(b => b.onclick = async () => {
-    const em = b.dataset.mpw;
-    const all = (S.rawMembers || S.allMembers || S.members || []);
-    const m = all.find(x => same(x.email, em));
-    const gen = typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8);
-    const w = prompt('تعيين كلمة مرور جديدة للموظف ' + (m ? m.name : '') + ':\n(اتركها فارغة للتوليد التلقائي: ' + gen + ')', gen);
-    if (w === null) return;
-    const pw = w.trim() || gen;
-    if (pw.length < 6) return alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
-    b.disabled = true;
-    try {
-      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'member_password', email: em, password: pw }));
-      const j = await rr.json().catch(() => ({}));
-      b.disabled = false;
-      if (!rr.ok) return alert(j.error || 'تعذّر تعيين كلمة المرور');
-      memberCredsDialog({
-        name: (m && m.name) || j.name || 'الموظف',
-        email: em,
-        phone: (m && m.phone) || j.phone || '',
-        password: pw,
-        company: (m && parseMemberMeta(m).company) || j.company || 'متجرك',
-        role: (m && m.role) || 'member',
-        department: (m && parseMemberMeta(m).department) || ''
-      });
-    } catch (e) {
-      b.disabled = false;
-      alert('تعذّر الاتصال بخادم الحسابات');
-    }
-  });
-
-  if ($('npw_g')) {
-    $('npw_g').onclick = () => {
-      const g = typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8);
-      if ($('npw')) $('npw').value = g;
-    };
-  }
-
-  if ($('addm')) $('addm').onclick = async () => {
-    const n = $('nn') ? $('nn').value.trim() : '';
-    const ph = $('nph') ? $('nph').value.trim() : '';
-    const e = $('ne') ? $('ne').value.trim() : '';
-    const pw = $('npw') ? $('npw').value.trim() : '';
-    const co = $('nco') ? $('nco').value : activeCompanyFilter();
-    const dep = $('ndep') ? $('ndep').value : '';
-    const title = $('ntitle') && $('ntitle').value.trim() ? $('ntitle').value.trim() : null;
-    const role = $('nr') ? $('nr').value : 'member';
-
-    if (n.length < 2) return alert('الرجاء كتابة اسم الموظف.');
-    if (!ph && !e) return alert('الرجاء إدخال رقم الجوال للدخول (أو البريد الإلكتروني).');
-
-    $('addm').disabled = true;
-    $('addm').textContent = 'جارٍ إنشاء الحساب...';
-
-    try {
-      const rr = await apiPost('/api/rep-admin', JSON.stringify({
-        action: 'create_member',
-        name: n,
-        phone: ph,
-        email: e,
-        password: pw,
-        company: co || 'متجرك',
-        department: dep || '',
-        title: title || '',
-        role: role
-      }));
-      const j = await rr.json().catch(() => ({}));
-      $('addm').disabled = false;
-      $('addm').textContent = '➕ إنشاء حساب الموظف';
-
-      if (!rr.ok) return alert(j.error || ('تعذّر إنشاء الحساب (' + rr.status + ')'));
-
-      // تفريغ الحقول بعد النجاح
-      if ($('nn')) $('nn').value = '';
-      if ($('nph')) $('nph').value = '';
-      if ($('ne')) $('ne').value = '';
-      if ($('npw')) $('npw').value = '';
-      if ($('ntitle')) $('ntitle').value = '';
-
-      await load();
-      memberCredsDialog(j);
-    } catch (e) {
-      $('addm').disabled = false;
-      $('addm').textContent = '➕ إنشاء حساب الموظف';
-      alert('تعذّر الاتصال بخادم الحسابات');
-    }
-  };
-}
-
 function memberCredsDialog(res) {
   if (!res) return;
   const storeTitle = res.company && res.company !== '__all' ? (getCompanyProfile(res.company).displayName || res.company) : (typeof bn === 'function' ? bn() : BRAND.name);
@@ -980,4 +891,94 @@ function memberCredsDialog(res) {
     };
   }
   dlg.showModal();
+}
+
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { if (confirm('إزالة العضو نهائياً؟')) run(sb.from('members').delete().eq('email', b.dataset.rm)); });
+
+  document.querySelectorAll('[data-mpw]').forEach(b => b.onclick = async () => {
+    const em = b.dataset.mpw;
+    const all = (S.rawMembers || S.allMembers || S.members || []);
+    const m = all.find(x => same(x.email, em));
+    const gen = typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8);
+    const w = prompt('تعيين كلمة مرور جديدة للموظف ' + (m ? m.name : '') + ':\n(اتركها فارغة للتوليد التلقائي: ' + gen + ')', gen);
+    if (w === null) return;
+    const pw = w.trim() || gen;
+    if (pw.length < 6) return alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    b.disabled = true;
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'member_password', email: em, password: pw }));
+      const j = await rr.json().catch(() => ({}));
+      b.disabled = false;
+      if (!rr.ok) return alert(j.error || 'تعذّر تعيين كلمة المرور');
+      memberCredsDialog({
+        name: (m && m.name) || j.name || 'الموظف',
+        email: em,
+        phone: (m && m.phone) || j.phone || '',
+        password: pw,
+        company: (m && parseMemberMeta(m).company) || j.company || 'متجرك',
+        role: (m && m.role) || 'member',
+        department: (m && parseMemberMeta(m).department) || ''
+      });
+    } catch (e) {
+      b.disabled = false;
+      alert('تعذّر الاتصال بخادم الحسابات');
+    }
+  });
+
+  if ($('npw_g')) {
+    $('npw_g').onclick = () => {
+      const g = typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8);
+      $('npw').value = g;
+    };
+  }
+
+  if ($('addm')) $('addm').onclick = async () => {
+    const n = $('nn').value.trim();
+    const ph = $('nph') ? $('nph').value.trim() : '';
+    const e = $('ne') ? $('ne').value.trim() : '';
+    const pw = $('npw') ? $('npw').value.trim() : '';
+    const co = $('nco') ? $('nco').value : activeCompanyFilter();
+    const dep = $('ndep') ? $('ndep').value : '';
+    const title = $('ntitle') && $('ntitle').value.trim() ? $('ntitle').value.trim() : null;
+    const role = $('nr') ? $('nr').value : 'member';
+
+    if (n.length < 2) return alert('الرجاء كتابة اسم الموظف.');
+    if (!ph && !e) return alert('الرجاء إدخال رقم الجوال للدخول (أو البريد الإلكتروني).');
+
+    $('addm').disabled = true;
+    $('addm').textContent = 'جارٍ إنشاء الحساب...';
+
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({
+        action: 'create_member',
+        name: n,
+        phone: ph,
+        email: e,
+        password: pw,
+        company: co || 'متجرك',
+        department: dep || '',
+        title: title || '',
+        role: role
+      }));
+      const j = await rr.json().catch(() => ({}));
+      $('addm').disabled = false;
+      $('addm').textContent = '➕ إنشاء حساب الموظف';
+
+      if (!rr.ok) return alert(j.error || ('تعذّر إنشاء الحساب (' + rr.status + ')'));
+
+      // تفريغ الحقول بعد النجاح
+      $('nn').value = '';
+      if ($('nph')) $('nph').value = '';
+      if ($('ne')) $('ne').value = '';
+      if ($('npw')) $('npw').value = '';
+      if ($('ntitle')) $('ntitle').value = '';
+
+      await load();
+      memberCredsDialog(j);
+    } catch (e) {
+      $('addm').disabled = false;
+      $('addm').textContent = '➕ إنشاء حساب الموظف';
+      alert('تعذّر الاتصال بخادم الحسابات');
+    }
+  };
 }
