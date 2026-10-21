@@ -393,6 +393,13 @@ function card(t) {
   '</div>';
 }
 
+function addDays(dateStr, days) {
+  const d = new Date((dateStr || today()) + 'T00:00:00Z');
+  if (isNaN(d.getTime())) return today();
+  d.setUTCDate(d.getUTCDate() + (+days || 0));
+  return d.toISOString().slice(0, 10);
+}
+
 function ensureTaskFilterState() {
   if (!S.tf) {
     S.tf = { q: '', emp: '', prio: '', due: '', type: '', from: '', to: '', sort: 'default', open: false };
