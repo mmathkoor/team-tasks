@@ -16,6 +16,12 @@ async function tok() {
 
 function getOfflineTableRef(table) {
   if (table === 'ord_settings') return S.ordSet ? [S.ordSet] : [];
+  if (typeof PL !== 'undefined' && PL) {
+    if (table === 'pl_products') return PL.rows || [];
+    if (table === 'pl_posts') return PL.posts || [];
+    if (table === 'pl_images') return PL.imgs || [];
+    if (table === 'pl_presence') return PL.pres || [];
+  }
   const map = {
     members: 'rawMembers',
     meetings: 'rawMeetings',
@@ -53,6 +59,27 @@ function applyOptimisticLocal(table, method, params, body) {
   try {
     if (table === 'ord_settings' && (method === 'PATCH' || method === 'POST') && body) {
       S.ordSet = Object.assign({}, S.ordSet || { id: true }, body);
+      if (typeof saveCache === 'function') saveCache();
+      return;
+    }
+    if (typeof PL !== 'undefined' && PL && /^pl_(products|posts|images|presence)$/.test(table)) {
+      const plKey = table === 'pl_products' ? 'rows' : table === 'pl_posts' ? 'posts' : table === 'pl_images' ? 'imgs' : 'pres';
+      const eqs = parseSearchParamsEq(params);
+      const matchRow = r => eqs.length > 0 && eqs.every(([col, val]) => String(r[col] ?? '').toLowerCase() === String(val ?? '').toLowerCase());
+      if (!Array.isArray(PL[plKey])) PL[plKey] = [];
+      if (method === 'POST' && body) {
+        const rows = (Array.isArray(body) ? body : [body]).filter(Boolean);
+        rows.forEach(nr => {
+          const idx = PL[plKey].findIndex(x => (nr.id && x.id === nr.id) || (table === 'pl_presence' && same(x.email, nr.email)));
+          if (idx >= 0) PL[plKey][idx] = Object.assign({}, PL[plKey][idx], nr);
+          else PL[plKey].unshift(nr);
+        });
+      } else if (method === 'PATCH' && body) {
+        PL[plKey] = PL[plKey].map(r => matchRow(r) ? Object.assign({}, r, body) : r);
+      } else if (method === 'DELETE') {
+        PL[plKey] = PL[plKey].filter(r => !matchRow(r));
+      }
+      if (typeof plSaveCache === 'function') plSaveCache();
       if (typeof saveCache === 'function') saveCache();
       return;
     }
@@ -324,6 +351,7 @@ function canMemberAccessScreen(screenId, m) {
   if (member.role === 'admin') return true;
   const p = memberPerms(member);
   if (screenId === 'set') return true;
+  if (screenId === 'pub' || screenId === 'pipe') return p.screens.includes('pub') || p.screens.includes('pipe');
   return p.screens.includes(screenId);
 }
 

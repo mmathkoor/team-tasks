@@ -264,13 +264,19 @@ function ordVizStripHtml() {
 }
 function ordersView() {
   if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات SQL في Supabase ثم اضغط تحديث.</p></div>';
-  S.of = S.of || { q: '', rep: '', cat: '', ch: '', pay: '', from: '', to: '', all: false }; S.ocol = S.ocol || 'new';
+  S.of = S.of || { q: '', rep: '', cat: '', ch: '', pay: '', from: '', to: '', all: false }; S.ocol = S.ocol || 'new'; S.otab = S.otab || 'board';
+  const subTabs = '<div class="seg" style="margin-bottom:12px"><button type="button" data-otab="board" class="' + (S.otab === 'board' ? 'on' : '') + '">📦 لوحة الطلبات</button><button type="button" data-otab="reports" class="' + (S.otab === 'reports' ? 'on' : '') + '">📊 تقارير وكشوفات الطلبات</button></div>';
+  if (S.otab === 'reports' && typeof reportsView === 'function') {
+    return subTabs + reportsView();
+  }
   const cur = bcurr();
   const K = oKpis(), kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
   const catOpts = '<option value="">⚡ كل التصنيفات</option>' + Object.entries(OCATS).map(([k, v]) => '<option value="' + k + '"' + (S.of.cat === k ? ' selected' : '') + '>' + v.badge + '</option>').join('');
-  const channels = [...new Set([...OCHAN, ...(S.orders || []).map(o => o.channel).filter(Boolean)])];
+  const channels = [...new Set([...OCH, ...(S.orders || []).map(o => o.channel).filter(Boolean)])];
   const chOpts = '<option value="">📡 كل القنوات</option>' + channels.map(c => '<option value="' + esc(c) + '"' + (S.of.ch === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-  return '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + (K.urg ? kc('🚨 ' + K.urg, 'طلبات مستعجلة', 'late') : '') + kc(money(K.sales), 'مبيعات الشهر (' + esc(cur) + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
+  return subTabs +
+    '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + (K.urg ? kc('🚨 ' + K.urg, 'طلبات مستعجلة', 'late') : '') + kc(money(K.sales), 'مبيعات الشهر (' + esc(cur) + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
+    ordVizStripHtml() +
     '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب، تصنيف…" value="' + esc(S.of.q) + '" style="flex:2 1 200px">' +
     '<select id="o_fcat" title="تصفية حسب تصنيف الطلب">' + catOpts + '</select>' +
     '<select id="o_fr"><option value="">كل المندوبين</option><option value="_none"' + (S.of.rep === '_none' ? ' selected' : '') + '>بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(S.of.rep, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select>' +
@@ -293,6 +299,11 @@ function ordersView() {
 }
 function bindOrders() {
   if (S.ordErr) return;
+  document.querySelectorAll('[data-otab]').forEach(b => b.onclick = () => { S.otab = b.dataset.otab; render(); });
+  if (S.otab === 'reports' && typeof bindReports === 'function') return bindReports();
+  if ($('ov_tog')) $('ov_tog').onclick = () => { S.hideOrdViz = !S.hideOrdViz; render(); };
+  if ($('ov_go_dash')) $('ov_go_dash').onclick = () => { S.view = 'dash'; render(); };
+  document.querySelectorAll('[data-oc-jump]').forEach(b => b.onclick = () => { S.ocol = b.dataset.ocJump; drawOBoard(); });
   $('o_q').oninput = e => { S.of.q = e.target.value; drawOBoard(); };
   if ($('o_fcat')) $('o_fcat').onchange = e => { S.of.cat = e.target.value; drawOBoard(); };
   $('o_fr').onchange = e => { S.of.rep = e.target.value; drawOBoard(); };
