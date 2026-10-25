@@ -1,5 +1,5 @@
-// Build version: 5.1.3 (timestamp: 2026-10-21)
-const SW_BUILD_VERSION = '5.1.3';
+// Build version: 5.2.1 (timestamp: 2026-10-25)
+const SW_BUILD_VERSION = '5.2.1';
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
