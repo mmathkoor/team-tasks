@@ -14,6 +14,93 @@ async function tok() {
   } catch (e) { return s?.access_token || KEY; }
 }
 
+function getOfflineTableRef(table) {
+  if (table === 'ord_settings') return S.ordSet ? [S.ordSet] : [];
+  const map = {
+    members: 'rawMembers',
+    meetings: 'rawMeetings',
+    tasks: 'rawTasks',
+    task_done: 'done',
+    task_items: 'items',
+    proposals: 'rawProps',
+    votes: 'votes',
+    notifications: 'notes',
+    ord_orders: 'rawOrders',
+    ord_items: 'rawOitems',
+    ord_payments: 'rawOpay',
+    companies: 'companiesRows',
+    erp_supplier_payments: 'dbSupPay',
+    erp_rep_handovers: 'dbRepHand',
+    erp_expenses: 'dbExpenses'
+  };
+  const k = map[table];
+  if (k && Array.isArray(S[k])) return S[k];
+  if (Array.isArray(S[table])) return S[table];
+  return [];
+}
+
+function parseSearchParamsEq(params) {
+  const filters = [];
+  if (!params || !params.entries) return filters;
+  for (const [k, v] of params.entries()) {
+    if (String(v).startsWith('eq.')) filters.push([k, String(v).slice(3)]);
+    else if (String(v).startsWith('ilike.')) filters.push([k, String(v).slice(6)]);
+  }
+  return filters;
+}
+
+function applyOptimisticLocal(table, method, params, body) {
+  try {
+    if (table === 'ord_settings' && (method === 'PATCH' || method === 'POST') && body) {
+      S.ordSet = Object.assign({}, S.ordSet || { id: true }, body);
+      if (typeof saveCache === 'function') saveCache();
+      return;
+    }
+    const map = {
+      members: ['rawMembers', 'allMembers', 'members'],
+      meetings: ['rawMeetings', 'meetings'],
+      tasks: ['rawTasks', 'tasks'],
+      task_done: ['done'],
+      task_items: ['items'],
+      proposals: ['rawProps', 'props'],
+      votes: ['votes'],
+      ord_orders: ['rawOrders', 'orders'],
+      ord_items: ['rawOitems', 'oitems'],
+      ord_payments: ['rawOpay', 'opay'],
+      erp_supplier_payments: ['dbSupPay', 'rawSupPay', 'supPay'],
+      erp_rep_handovers: ['dbRepHand', 'rawRepHand', 'repHand'],
+      erp_expenses: ['dbExpenses', 'rawExpenses', 'expenses']
+    };
+    const keys = map[table];
+    if (!keys) return;
+    const eqs = parseSearchParamsEq(params);
+    const matchRow = r => eqs.length > 0 && eqs.every(([col, val]) => String(r[col] ?? '').toLowerCase() === String(val ?? '').toLowerCase());
+
+    if (method === 'POST' && body) {
+      const rows = (Array.isArray(body) ? body : [body]).filter(Boolean).map(r => Object.assign({ created_at: new Date().toISOString() }, r, r.id ? {} : { id: crypto.randomUUID() }));
+      keys.forEach(k => {
+        if (!Array.isArray(S[k])) S[k] = [];
+        rows.forEach(nr => {
+          const idx = S[k].findIndex(x => (nr.id && x.id === nr.id) || (table === 'task_done' && x.task_id === nr.task_id && same(x.email, nr.email)) || (table === 'votes' && x.proposal_id === nr.proposal_id && same(x.email, nr.email)));
+          if (idx >= 0) S[k][idx] = Object.assign({}, S[k][idx], nr);
+          else S[k].unshift(nr);
+        });
+      });
+    } else if (method === 'PATCH' && body) {
+      keys.forEach(k => {
+        if (!Array.isArray(S[k])) return;
+        S[k] = S[k].map(r => matchRow(r) ? Object.assign({}, r, body) : r);
+      });
+    } else if (method === 'DELETE') {
+      keys.forEach(k => {
+        if (!Array.isArray(S[k])) return;
+        S[k] = S[k].filter(r => !matchRow(r));
+      });
+    }
+    if (typeof saveCache === 'function') saveCache();
+  } catch (e) {}
+}
+
 class Q {
   constructor(t) { this.t = t; this.m = 'GET'; this.p = new URLSearchParams(); this.b = null; this.pf = ''; }
   select(c) { this.p.set('select', c || '*'); return this; }
@@ -29,17 +116,37 @@ class Q {
   in(c, arr) { this.p.append(c, 'in.(' + arr.join(',') + ')'); return this; }
   lt(c, v) { this.p.append(c, 'lt.' + v); return this; }
   ilike(c, v) { this.p.append(c, 'ilike.' + v); return this; }
+  single() { this.p.set('limit', 1); return this; }
   then(res, rej) { return this.run().then(res, rej); }
   async run() {
+    const mut = this.m !== 'GET';
+    if (!navigator.onLine) {
+      if (!mut) {
+        const rows = getOfflineTableRef(this.t).slice();
+        const eqs = parseSearchParamsEq(this.p);
+        const filtered = eqs.length ? rows.filter(r => eqs.every(([col, val]) => String(r[col] ?? '').toLowerCase() === String(val ?? '').toLowerCase())) : rows;
+        return { data: filtered, error: null, offline: true };
+      }
+      applyOptimisticLocal(this.t, this.m, this.p, this.b);
+      await enqueue({ path: '/rest/v1/' + this.t + '?' + this.p, m: this.m, pf: (this.pf ? this.pf + ',' : '') + 'return=minimal', b: this.b ? JSON.stringify(this.b) : null });
+      return { data: null, error: null, queued: true };
+    }
     try {
-      const mut = this.m !== 'GET', h = { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' };
+      const h = { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' };
       const pf = [this.pf, mut ? 'return=minimal' : ''].filter(Boolean).join(','); if (pf) h.Prefer = pf;
       const r = await fetch(API + '/rest/v1/' + this.t + '?' + this.p, { method: this.m, headers: h, body: this.b ? JSON.stringify(this.b) : undefined });
       if (!r.ok) { const e = await r.json().catch(() => ({})); return { data: null, error: { message: e.message || r.statusText } }; }
       return { data: mut ? null : await r.json(), error: null };
     } catch (e) {
-      if (this.m !== 'GET') { await enqueue({ path: '/rest/v1/' + this.t + '?' + this.p, m: this.m, pf: (this.pf ? this.pf + ',' : '') + 'return=minimal', b: this.b ? JSON.stringify(this.b) : null }); return { data: null, error: null, queued: true }; }
-      return { data: null, error: { message: 'تعذّر الاتصال بقاعدة البيانات. (تأكد من الإنترنت)' } };
+      if (mut) {
+        applyOptimisticLocal(this.t, this.m, this.p, this.b);
+        await enqueue({ path: '/rest/v1/' + this.t + '?' + this.p, m: this.m, pf: (this.pf ? this.pf + ',' : '') + 'return=minimal', b: this.b ? JSON.stringify(this.b) : null });
+        return { data: null, error: null, queued: true };
+      }
+      const rows = getOfflineTableRef(this.t).slice();
+      const eqs = parseSearchParamsEq(this.p);
+      const filtered = eqs.length ? rows.filter(r => eqs.every(([col, val]) => String(r[col] ?? '').toLowerCase() === String(val ?? '').toLowerCase())) : rows;
+      return { data: filtered, error: null, offline: true };
     }
   }
 }
@@ -189,14 +296,18 @@ function memberPerms(mOrEmail) {
   const m = typeof mOrEmail === 'string'
     ? (S.allMembers || S.members || S.rawMembers || []).find(x => same(x.email, mOrEmail))
     : mOrEmail;
-  if (!m) return { screens: ['board', 'orders', 'pipe', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false, settingsTabs: [] };
-  if (m.role === 'admin') return { screens: ['board', 'orders', 'pipe', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true, settingsTabs: ['staff', 'reps', 'stores', 'orders_cfg', 'notify', 'recur', 'tools', 'account'] };
+  if (!m) return { screens: ['board', 'pub', 'kb', 'orders', 'erp', 'dash', 'props', 'log'], ordersScope: 'all', canCost: false, settingsTabs: [] };
+  if (m.role === 'admin') return { screens: ['board', 'pub', 'kb', 'orders', 'erp', 'dash', 'props', 'log', 'set'], ordersScope: 'all', canCost: true, settingsTabs: ['staff', 'reps', 'stores', 'orders_cfg', 'notify', 'recur', 'tools', 'account'] };
   if (m.role === 'rep') return { screens: ['rep'], ordersScope: 'own', canCost: false, settingsTabs: ['account'] };
 
   const meta = parseMemberMeta(m);
   const p = meta.perms || {};
   const setTabs = Array.isArray(p.settingsTabs) ? p.settingsTabs : [];
-  const screens = Array.isArray(p.screens) && p.screens.length ? p.screens.slice() : ['board', 'orders', 'pipe', 'dash', 'props', 'log'];
+  const screens = Array.isArray(p.screens) && p.screens.length ? p.screens.slice() : ['board', 'pub', 'kb', 'orders', 'dash', 'props', 'log'];
+  if (!p._v52) {
+    if (!screens.includes('pub')) screens.push('pub');
+    if (!screens.includes('kb')) screens.push('kb');
+  }
   if (!screens.includes('set')) screens.push('set');
 
   return {
@@ -467,7 +578,7 @@ function applyCompanyScope() {
   }
   S.allMembers = S.rawMembers.filter(m => {
     const mc = parseMemberMeta(m).company;
-    return same(mc, co) || (m.role === 'rep' && mc === '__all') || (m.role === 'admin' && !mc) || same(m.email, S.me && S.me.email);
+    return same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email);
   });
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');
