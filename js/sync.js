@@ -27,14 +27,43 @@ async function flushNow() {
   try { return navigator.locks ? await navigator.locks.request('flush-q', go) : await go(); } catch (e) {}
 }
 const netEl = document.createElement('div');
-netEl.style.cssText = 'position:fixed;bottom:12px;inset-inline:12px;margin:auto;max-width:440px;z-index:50;background:#b7791f;color:#fff;border-radius:10px;padding:8px 14px;text-align:center;font-size:14px;display:none';
+netEl.style.cssText = 'position:fixed;bottom:12px;inset-inline:12px;margin:auto;max-width:460px;z-index:50;background:linear-gradient(135deg,#b45309,#92400e);color:#fff;border-radius:12px;padding:10px 16px;text-align:center;font-size:13.5px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none';
 document.body.appendChild(netEl);
 async function updateNet() {
   const n = ((await idbGet('q')) || []).length, off = !navigator.onLine;
+  S.offlineQueueCount = n;
   netEl.style.display = off || n ? 'block' : 'none';
-  netEl.textContent = (off ? 'غير متصل — تعمل على النسخة المحفوظة' : 'جارٍ المزامنة...') + (n ? ' · ' + n + ' تغيير بانتظار المزامنة' : '');
+  netEl.innerHTML = (off ? '📡 <b>وضع أوفلاين نشط:</b> يمكنك التصفح والإضافة والتعديل بحرية' : '🔄 جارٍ مزامنة التعديلات مع السحابة...') + (n ? ' · <u>' + n + ' عملية بانتظار المزامنة</u>' : '');
+  const pill = document.getElementById('net_status_pill');
+  if (pill) {
+    if (off) {
+      pill.className = 'net-pill off';
+      pill.innerHTML = '📡 <span>أوفلاين' + (n ? ' (' + n + ')' : '') + '</span>';
+      pill.title = 'النظام يعمل حالياً بدون إنترنت (أوفلاين). جميع تعديلاتك محفوظة محلياً وستُزامَن تلقائياً فور عودة الشبكة.';
+    } else if (n > 0) {
+      pill.className = 'net-pill sync';
+      pill.innerHTML = '🔄 <span>مزامنة (' + n + ')</span>';
+      pill.title = 'اضغط لمزامنة العمليات المحفوظة أثناء عدم الاتصال';
+    } else {
+      pill.className = 'net-pill on';
+      pill.innerHTML = '<i class="np-dot"></i> <span>متصل</span>';
+      pill.title = 'متصل بالإنترنت — المزامنة السحابية الفورية نشطة';
+    }
+  }
 }
-window.addEventListener('online', () => { updateNet(); flushNow(); setTimeout(updateNet, 3000); });
-window.addEventListener('offline', updateNet);
+window.addEventListener('online', () => {
+  updateNet();
+  if (typeof handleResponderNetChange === 'function') handleResponderNetChange(true);
+  if (typeof toast === 'function') toast('🟢 عاد الاتصال بالإنترنت — تتم المزامنة التلقائية الآن');
+  flushNow();
+  setTimeout(updateNet, 3000);
+});
+window.addEventListener('offline', () => {
+  updateNet();
+  if (typeof handleResponderNetChange === 'function') handleResponderNetChange(false);
+  if (typeof toast === 'function') toast('📡 انقطع الاتصال بالإنترنت — النظام يعمل الآن في وضع الأوفلاين', false);
+  if (typeof S !== 'undefined' && S.view === 'pub' && typeof render === 'function') render();
+});
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data === 'synced') { updateNet(); load(); } });
 updateNet();
+
