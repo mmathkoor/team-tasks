@@ -133,10 +133,14 @@ function oKpis() {
     sales: live.filter(o => String(o.order_date).slice(0, 7) === m).reduce((a, o) => a + +o.total, 0), due: O.filter(o => o.status === 'delivered').reduce((a, o) => a + Math.max(0, +o.balance), 0) };
 }
 function ordersFiltered() {
-  const f = S.of || (S.of = { q: '', rep: '', cat: '', all: false }), q = (f.q || '').trim().toLowerCase();
+  const f = S.of || (S.of = { q: '', rep: '', cat: '', ch: '', pay: '', from: '', to: '', all: false }), q = (f.q || '').trim().toLowerCase();
   return (S.orders || []).filter(o =>
     (!f.rep || (f.rep === '_none' ? !o.rep_email : same(o.rep_email, f.rep))) &&
     (!f.cat || orderCatOf(o) === f.cat) &&
+    (!f.ch || o.channel === f.ch) &&
+    (!f.pay || (f.pay === 'unpaid' ? +o.balance > 0 : f.pay === 'paid' ? +o.balance <= 0 : true)) &&
+    (!f.from || String(o.order_date || '') >= f.from) &&
+    (!f.to || String(o.order_date || '') <= f.to) &&
     (!q || ('#' + o.order_no + ' ' + o.customer_name + ' ' + (o.phone || '') + ' ' + (o.address || '') + ' ' + orderCatMeta(o).label).toLowerCase().includes(q))
   );
 }
@@ -177,7 +181,7 @@ function ocard(o) {
     (A.length ? '<div class="acts">' + A.map(a => '<button class="' + (a[2] || '') + '" data-oa="' + a[0] + '" data-id="' + o.id + '">' + a[1] + '</button>').join('') + '</div>' : '') + '</div>';
 }
 function oBoardHtml() {
-  const f = S.of, rows = ordersFiltered(), searching = !!((f.q || '').trim() || f.rep || f.cat);
+  const f = S.of, rows = ordersFiltered(), searching = !!((f.q || '').trim() || f.rep || f.cat || f.ch || f.pay || f.from || f.to);
   const col = k => {
     const list = rows.filter(o => k === 'closed' ? (o.status === 'cancelled' || o.status === 'returned') : o.status === k);
     if (k === 'new' || k === 'preparing') {
@@ -260,21 +264,47 @@ function ordVizStripHtml() {
 }
 function ordersView() {
   if (S.ordErr) return '<div class="card"><b>الطلبات غير مفعّلة بعد.</b><p class="m">شغّل ملفات SQL في Supabase ثم اضغط تحديث.</p></div>';
-  S.of = S.of || { q: '', rep: '', cat: '', all: false }; S.ocol = S.ocol || 'new';
+  S.of = S.of || { q: '', rep: '', cat: '', ch: '', pay: '', from: '', to: '', all: false }; S.ocol = S.ocol || 'new';
   const cur = bcurr();
   const K = oKpis(), kc = (v, l, c) => '<div class="stat ' + (c || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
   const catOpts = '<option value="">⚡ كل التصنيفات</option>' + Object.entries(OCATS).map(([k, v]) => '<option value="' + k + '"' + (S.of.cat === k ? ' selected' : '') + '>' + v.badge + '</option>').join('');
+  const channels = [...new Set([...OCHAN, ...(S.orders || []).map(o => o.channel).filter(Boolean)])];
+  const chOpts = '<option value="">📡 كل القنوات</option>' + channels.map(c => '<option value="' + esc(c) + '"' + (S.of.ch === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
   return '<div class="stats kpis">' + kc(K.today, 'طلبات اليوم') + kc(K.wait, 'بانتظار الإسناد', K.wait ? 'soon' : '') + kc(K.prep, 'قيد التوصيل') + (K.urg ? kc('🚨 ' + K.urg, 'طلبات مستعجلة', 'late') : '') + kc(money(K.sales), 'مبيعات الشهر (' + esc(cur) + ')', 'ok') + kc(money(K.due), 'ديون العملاء', K.due ? 'late' : '') + '</div>' +
     '<div class="tools"><input id="o_q" type="search" placeholder="🔎 بحث: اسم، هاتف، رقم طلب، تصنيف…" value="' + esc(S.of.q) + '" style="flex:2 1 200px">' +
     '<select id="o_fcat" title="تصفية حسب تصنيف الطلب">' + catOpts + '</select>' +
     '<select id="o_fr"><option value="">كل المندوبين</option><option value="_none"' + (S.of.rep === '_none' ? ' selected' : '') + '>بدون مندوب</option>' + (S.reps || []).map(r => '<option value="' + esc(r.email) + '"' + (same(S.of.rep, r.email) ? ' selected' : '') + '>🛵 ' + esc(r.name) + '</option>').join('') + '</select>' +
-    '<button class="p" id="o_new">＋ طلب جديد</button></div><div id="o_board">' + oBoardHtml() + '</div><button class="fab" id="o_fab" aria-label="طلب جديد">＋</button>';
+    '<button class="s" id="o_adv_btn" title="فلاتر متقدمة للطلبات">🎛️ فلاتر متقدمة</button>' +
+    '<button class="p" id="o_new">＋ طلب جديد</button></div>' +
+    '<div id="o_adv_box" class="adv-filter-bar' + (S.showOrdAdv ? '' : ' hide') + '" style="margin-bottom:12px">' +
+      '<div class="adv-filter-grid">' +
+        '<select id="o_fch">' + chOpts + '</select>' +
+        '<select id="o_fpay">' +
+          '<option value="">💳 كل حالات السداد</option>' +
+          '<option value="unpaid"' + (S.of.pay === 'unpaid' ? ' selected' : '') + '>⏳ متبقي عليه رصيد</option>' +
+          '<option value="paid"' + (S.of.pay === 'paid' ? ' selected' : '') + '>✅ مسدّد بالكامل</option>' +
+        '</select>' +
+        '<input type="date" id="o_ffrom" value="' + esc(S.of.from || '') + '" title="من تاريخ">' +
+        '<input type="date" id="o_fto" value="' + esc(S.of.to || '') + '" title="إلى تاريخ">' +
+        '<button class="s" id="o_freset">↺ مسح الفلاتر</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="o_board">' + oBoardHtml() + '</div><button class="fab" id="o_fab" aria-label="طلب جديد">＋</button>';
 }
 function bindOrders() {
   if (S.ordErr) return;
   $('o_q').oninput = e => { S.of.q = e.target.value; drawOBoard(); };
   if ($('o_fcat')) $('o_fcat').onchange = e => { S.of.cat = e.target.value; drawOBoard(); };
   $('o_fr').onchange = e => { S.of.rep = e.target.value; drawOBoard(); };
+  if ($('o_adv_btn')) $('o_adv_btn').onclick = () => { S.showOrdAdv = !S.showOrdAdv; $('o_adv_box')?.classList.toggle('hide', !S.showOrdAdv); };
+  if ($('o_fch')) $('o_fch').onchange = e => { S.of.ch = e.target.value; drawOBoard(); };
+  if ($('o_fpay')) $('o_fpay').onchange = e => { S.of.pay = e.target.value; drawOBoard(); };
+  if ($('o_ffrom')) $('o_ffrom').onchange = e => { S.of.from = e.target.value; drawOBoard(); };
+  if ($('o_fto')) $('o_fto').onchange = e => { S.of.to = e.target.value; drawOBoard(); };
+  if ($('o_freset')) $('o_freset').onclick = () => {
+    S.of = { q: '', rep: '', cat: '', ch: '', pay: '', from: '', to: '', all: false };
+    render();
+  };
   $('o_new').onclick = $('o_fab').onclick = () => orderDialog(null);
   bindOBoard();
 }
