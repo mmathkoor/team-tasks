@@ -1,7 +1,7 @@
 // ===== التحديث اللحظي (Supabase Realtime عبر WebSocket بدون مكتبات) =====
 const RT = { ws: null, ref: 0, hb: null, tk: null, retry: 0, timer: null, rc: null, dirty: false };
 const RT_BASE = ['tasks', 'task_done', 'proposals', 'votes', 'meetings', 'members', 'notifications'];
-const RT_ORD = ['ord_orders', 'ord_items', 'ord_payments'];
+const RT_ORD = ['ord_orders', 'ord_items', 'ord_payments', 'ord_settings'];
 const rtTables = () => (S.me && S.me.role === 'rep') ? ['notifications'] : RT.safe ? RT_BASE.slice(0, 6) : RT_BASE.concat(RT_ORD);
 function rtStart() {
   if (RT.ws || !S.me || !AUTH.s || !navigator.onLine) return;
