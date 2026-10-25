@@ -1,223 +1,72 @@
-// ===== القائمة الفرعية للمهمة (checklist) مع تحديد الفترة الزمنية وحساب التأخير لكل بند فرعي =====
-function parseSubtaskMeta(rawItemOrText) {
-  const rawText = typeof rawItemOrText === 'string' ? rawItemOrText : String((rawItemOrText && rawItemOrText.text) || '');
-  const isDone = typeof rawItemOrText === 'object' && rawItemOrText ? !!rawItemOrText.done : false;
-  let cleanText = rawText;
-  let from = '', due = '', days = 0;
+// ===== المهام الجماعية (نسخة لكل عضو) + ملاحظة الإنجاز + بنود القائمة على البطاقة + مؤشراتي =====
+const groupOf = t => t.group_id ? S.tasks.filter(x => x.group_id === t.group_id) : [];
+function groupChip(t) {
+  if (!t.group_id) return '';
+  const g = groupOf(t), dn = g.filter(x => x.status === 'done').length;
+  const tip = g.map(x => (x.status === 'done' ? '✓ ' : '○ ') + nm(x.assignee_email)).join('\n');
+  return '<span class="chip all" title="' + esc(tip) + '">👥 المجموعة ' + dn + '/' + g.length + '</span>';
+}
+const doneNoteLine = t => t.status === 'done' && t.done_note ? '<div class="dnote">📝 ' + esc(t.done_note) + '</div>' : '';
 
-  const m = rawText.match(/\s*⟦sub:(\{.*?\})⟧\s*$/);
-  if (m) {
-    cleanText = rawText.slice(0, m.index).trim();
-    try {
-      const j = JSON.parse(m[1]);
-      from = j.from || '';
-      due = j.due || '';
-      days = +j.days || 0;
-    } catch (e) {}
-  }
-
-  if (!days && from && due && due >= from) {
-    days = Math.max(1, Math.round((new Date(due) - new Date(from)) / 864e5));
-  }
-  const td = today();
-  const isLate = !isDone && !!due && due < td;
-  const lateDays = isLate ? Math.max(1, Math.round((new Date(td) - new Date(due)) / 864e5)) : 0;
-  const remDays = (!isDone && !isLate && due) ? daysTo(due) : null;
-
-  let badgeHtml = '';
-  if (from || due || days) {
-    const periodTxt = (from && due) ? (from.slice(5) + ' ⬅ ' + due.slice(5)) : (due ? ('حتى ' + due.slice(5)) : ('من ' + from.slice(5)));
-    const daysTxt = days ? (' (' + (days === 1 ? 'يوم' : days === 2 ? 'يومان' : days + ' أيام') + ')') : '';
-    if (isDone) {
-      badgeHtml = '<span class="chip ok" style="font-size:11px;padding:1px 6px">📅 ' + esc(periodTxt + daysTxt) + ' ✓</span>';
-    } else if (isLate) {
-      badgeHtml = '<span class="chip late" style="font-size:11px;padding:1px 6px">🚨 متأخرة ' + lateDays + (lateDays === 1 ? ' يوم' : ' أيام') + ' (' + esc(periodTxt) + ')</span>';
-    } else if (remDays === 0) {
-      badgeHtml = '<span class="chip soon" style="font-size:11px;padding:1px 6px">🔥 اليوم (' + esc(periodTxt + daysTxt) + ')</span>';
-    } else if (remDays === 1) {
-      badgeHtml = '<span class="chip soon" style="font-size:11px;padding:1px 6px">⏱️ غداً (' + esc(periodTxt + daysTxt) + ')</span>';
-    } else {
-      badgeHtml = '<span class="chip" style="font-size:11px;padding:1px 6px">📅 ' + esc(periodTxt + daysTxt) + '</span>';
-    }
-  }
-
-  return { cleanText, from, due, days, isLate, lateDays, remDays, badgeHtml };
+// عند إنجاز مهمة جماعية: ماذا أنجزت؟
+function askDone(t, cb) {
+  dlg.innerHTML = '<h2>🎉 إنجاز المهمة</h2><div style="margin-bottom:12px;font-weight:700">' + esc(t.title) + '</div>' +
+    '<label>ماذا أنجزت؟ (اختياري — يظهر في تقارير الفريق)<textarea id="dn_t" rows="3" placeholder="اكتب باختصار ما تم إنجازه...">' + esc(t.done_note || '') + '</textarea></label>' +
+    '<div class="row dact"><button class="s" id="dn_x">إلغاء</button><button class="p s" id="dn_ok">تأكيد الإنجاز ✓</button></div>';
+  $('dn_x').onclick = () => dlg.close();
+  $('dn_ok').onclick = () => { const v = $('dn_t').value.trim(); dlg.close(); cb(v || null); };
+  dlg.showModal(); $('dn_t').focus();
 }
 
-function encodeSubtaskMeta(cleanText, from, due, days) {
-  const base = String(cleanText || '').replace(/\s*⟦sub:\{.*?\}⟧\s*$/g, '').trim();
-  const f = String(from || '').trim(), d = String(due || '').trim();
-  let dy = +days || 0;
-  if (!dy && f && d && d >= f) dy = Math.max(1, Math.round((new Date(d) - new Date(f)) / 864e5));
-  if (!f && !d && !dy) return base;
-  return base + ' ⟦sub:' + JSON.stringify({ from: f, due: d, days: dy || undefined }) + '⟧';
+// بنود القائمة الفرعية تظهر على البطاقة مع فترتها الزمنية وحالة التأخير ويُشطب البند بضغطة بدون فتح المهمة
+const itemsOf = id => (S.items || []).filter(x => x.task_id === id);
+function ckRows(t) {
+  if (t.for_all || eff(t) === 'done') return '';
+  const L = itemsOf(t.id); if (!L.length) return '';
+  return '<div class="ckrows">' + L.slice(0, 5).map(x => {
+    const m = typeof parseSubtaskMeta === 'function' ? parseSubtaskMeta(x) : { cleanText: x.text, badgeHtml: '' };
+    return '<label class="ckrow" style="justify-content:space-between;flex-wrap:wrap">' +
+      '<span style="display:flex;align-items:center;gap:8px;min-width:0"><input type="checkbox" data-ci="' + x.id + '"' + (x.done ? ' checked' : '') + '><span' + (x.done ? ' class="dn"' : '') + '>' + esc(m.cleanText) + '</span></span>' +
+      (m.badgeHtml || '') +
+    '</label>';
+  }).join('') +
+    (L.length > 5 ? '<div class="m" style="padding:2px 4px">+' + (L.length - 5) + ' بنود أخرى…</div>' : '') + '</div>';
+}
+async function ckToggle(id, done) {
+  const it = (S.items || []).find(x => x.id === id); if (!it) return;
+  const t = S.tasks.find(x => x.id === it.task_id); it.done = done;
+  const L = itemsOf(it.task_id), dn = L.filter(x => x.done).length, pg = L.length ? Math.round(100 * dn / L.length) : 0;
+  S.itemStats = S.itemStats || {}; S.itemStats[it.task_id] = [dn, L.length];
+  const bump = !!(done && t && t.status === 'todo');
+  if (t) { t.progress = pg; if (bump) t.status = 'doing'; }
+  render();
+  const r = await sb.from('task_items').update({ done, done_by: done ? S.me.email : null, done_at: done ? new Date().toISOString() : null }).eq('id', id);
+  if (r.error) { it.done = !done; alert('خطأ: ' + r.error.message); return load(); }
+  await sb.from('tasks').update(bump ? { progress: pg, status: 'doing' } : { progress: pg }).eq('id', it.task_id);
+  if (done && L.length && dn === L.length && t && t.status !== 'done' && confirm('اكتملت كل البنود ✅\nهل تريد إنجاز المهمة الآن؟')) moveTask(t.id, 'done');
 }
 
-function hasLateSubtasks(tid) {
-  const L = (S.items || []).filter(x => x.task_id === tid && !x.done);
-  return L.some(x => parseSubtaskMeta(x).isLate);
-}
-
-async function ckLoad(tid) {
-  const { data, error } = await sb.from('task_items').select('*').eq('task_id', tid).order('pos', { ascending: true }).order('created_at', { ascending: true });
-  if (error || !data) {
-    return (S.items || []).filter(x => x.task_id === tid);
-  }
-  return data;
-}
-
-const ckChip = t => {
-  const s = (S.itemStats || {})[t.id];
-  if (!s) return '';
-  const lateSub = eff(t) !== 'done' && hasLateSubtasks(t.id);
-  return '<span class="chip ' + (s[0] === s[1] ? 'ok' : lateSub ? 'late' : '') + '">☑ ' + s[0] + '/' + s[1] + (lateSub ? ' · ⚠️ فرعية متأخرة' : '') + '</span>';
+// ---- مؤشراتي (الصفحة الرئيسية) ----
+const doneAtOf = t => t.for_all ? ((S.done.find(d => d.task_id === t.id && same(d.email, S.me.email)) || {}).done_at || null) : (t.completed_at || null);
+const inDays = (iso, n) => iso && Date.now() - new Date(iso) <= n * 864e5;
+const KPI_TEST = {
+  open: t => eff(t) !== 'done',
+  late: t => eff(t) !== 'done' && t.due_on && t.due_on < today(),
+  soon: t => eff(t) !== 'done' && t.due_on && t.due_on >= today() && daysTo(t.due_on) <= 1,
+  week: t => eff(t) === 'done' && inDays(doneAtOf(t), 7)
 };
-
-const CK_HTML =
-  '<div class="bar" style="margin-bottom:6px"><b>☑ قائمة المهام الفرعية (مع تحديد الفترة الزمنية لكل بند)</b> <span class="m" id="ck_pg"></span></div>' +
-  '<div id="ck_list" style="margin:6px 0"></div>' +
-  '<div style="background:var(--col);padding:10px;border-radius:10px;border:1px solid var(--line)">' +
-    '<div class="row" style="gap:6px;margin-bottom:6px">' +
-      '<input id="ck_in" placeholder="عنوان المهمة الفرعية / البند..." style="flex:2 1 180px">' +
-      '<button class="p s" type="button" id="ck_add" style="white-space:nowrap">＋ إضافة بند فرعي</button>' +
-    '</div>' +
-    '<div class="row s" style="gap:6px;flex-wrap:wrap;align-items:center">' +
-      '<span class="m" style="font-size:11.5px">⏱️ الفترة الزمنية للبند (اختياري):</span>' +
-      '<label style="font-size:11.5px;display:flex;align-items:center;gap:4px;margin:0">من:<input type="date" id="ck_from" style="padding:4px 6px;font-size:12px;width:auto"></label>' +
-      '<label style="font-size:11.5px;display:flex;align-items:center;gap:4px;margin:0">المدة (أيام):<input type="number" id="ck_days" min="1" max="365" placeholder="أيام" style="padding:4px 6px;font-size:12px;width:68px"></label>' +
-      '<label style="font-size:11.5px;display:flex;align-items:center;gap:4px;margin:0">إلى (الاستحقاق):<input type="date" id="ck_due" style="padding:4px 6px;font-size:12px;width:auto"></label>' +
-    '</div>' +
-  '</div>';
-
-function ckInit(t) {
-  $('ck_box').innerHTML = CK_HTML;
-  let items = [], draft = [], dirty = false;
-
-  const syncDatesFromDays = () => {
-    const dy = +($('ck_days').value || 0);
-    if (dy > 0) {
-      const f = $('ck_from').value || today();
-      if (!$('ck_from').value) $('ck_from').value = f;
-      const d = new Date(f + 'T00:00:00Z');
-      if (!isNaN(d.getTime())) {
-        d.setUTCDate(d.getUTCDate() + dy);
-        $('ck_due').value = d.toISOString().slice(0, 10);
-      }
-    }
-  };
-  if ($('ck_days')) $('ck_days').oninput = syncDatesFromDays;
-  if ($('ck_from')) $('ck_from').onchange = () => { if (+($('ck_days').value || 0) > 0) syncDatesFromDays(); };
-
-  const draw = () => {
-    const L = t ? items : draft.map((x, i) => ({ id: 'd' + i, text: x, done: false }));
-    const dn = L.filter(x => x.done).length;
-    $('ck_pg').textContent = L.length ? '(' + dn + '/' + L.length + ' — ' + Math.round(100 * dn / L.length) + '%)' : '';
-    $('ck_list').innerHTML = L.map(x => {
-      const meta = parseSubtaskMeta(x);
-      return '<div class="bar" style="padding:6px 8px;margin-bottom:4px;background:var(--col);border-radius:8px;gap:6px;flex-wrap:wrap">' +
-        '<div style="display:flex;gap:8px;align-items:center;flex:1;min-width:180px">' +
-          (t ? '<input type="checkbox" data-ck="' + x.id + '" ' + (x.done ? 'checked' : '') + ' style="width:18px;height:18px;flex:none;margin:0">' : '<span>•</span>') +
-          '<span style="' + (x.done ? 'text-decoration:line-through;color:var(--mute)' : 'font-weight:600') + '">' + esc(meta.cleanText) + '</span>' +
-        '</div>' +
-        '<div class="row s" style="gap:4px;align-items:center">' +
-          meta.badgeHtml +
-          '<button class="s" type="button" data-cedit="' + x.id + '" title="تحديد أو تعديل الفترة الزمنية للبند الفرعي" style="padding:2px 7px;font-size:11.5px">📅 الفترة</button>' +
-          '<button class="s dng" type="button" data-cd="' + x.id + '" style="padding:2px 7px;font-size:11.5px">✕</button>' +
-        '</div>' +
-      '</div>';
-    }).join('') || '<div class="m" style="padding:4px 0">لا توجد مهام فرعية بعد.</div>';
-    if (t && L.length && $('f_pg')) {
-      $('f_pg').value = Math.round(100 * dn / L.length);
-      $('pg_v').textContent = $('f_pg').value + '%';
-      $('f_pg').parentElement.parentElement.style.display = 'none';
-    }
-  };
-
-  $('ck_list').onchange = async e => {
-    const id = e.target.dataset.ck; if (!id) return;
-    const it = items.find(x => x.id === id), done = e.target.checked;
-    if (!it) return;
-    it.done = done; draw();
-    const r = await sb.from('task_items').update({ done, done_by: done ? S.me.email : null, done_at: done ? new Date().toISOString() : null }).eq('id', id);
-    if (r.error) { it.done = !done; draw(); return alert('خطأ: ' + r.error.message); }
-    dirty = true;
-    if (done && $('f_st') && $('f_st').value === 'todo') $('f_st').value = 'doing';
-    if (done && items.every(x => x.done) && t.status !== 'done' && confirm('اكتملت كل البنود ✅\nهل تريد إنجاز المهمة الآن؟')) { dlg.close(); moveTask(t.id, 'done'); }
-  };
-
-  $('ck_list').onclick = async e => {
-    const editBtn = e.target.closest('[data-cedit]');
-    if (editBtn) {
-      const id = editBtn.dataset.cedit;
-      const targetObj = t ? items.find(x => x.id === id) : { text: draft[+id.slice(1)] };
-      if (!targetObj) return;
-      const m = parseSubtaskMeta(targetObj);
-      const newFrom = prompt('تاريخ بداية المهمة الفرعية (YYYY-MM-DD):', m.from || today());
-      if (newFrom === null) return;
-      const newDue = prompt('تاريخ استحقاق/نهاية المهمة الفرعية (YYYY-MM-DD):', m.due || newFrom || today());
-      if (newDue === null) return;
-      const newText = encodeSubtaskMeta(m.cleanText, newFrom.trim(), newDue.trim(), 0);
-      if (t) {
-        const r = await sb.from('task_items').update({ text: newText }).eq('id', id);
-        if (r.error) return alert('خطأ: ' + r.error.message);
-        targetObj.text = newText;
-        const gItem = (S.items || []).find(x => x.id === id);
-        if (gItem) gItem.text = newText;
-        dirty = true;
-      } else {
-        draft[+id.slice(1)] = newText;
-      }
-      draw();
-      return;
-    }
-    const delBtn = e.target.closest('[data-cd]');
-    if (!delBtn) return;
-    const id = delBtn.dataset.cd;
-    if (t) {
-      const r = await sb.from('task_items').delete().eq('id', id);
-      if (r.error) return alert('خطأ: ' + r.error.message);
-      items = items.filter(x => x.id !== id);
-      dirty = true;
-    } else {
-      draft.splice(+id.slice(1), 1);
-    }
-    draw();
-  };
-
-  const add = async () => {
-    const rawTitle = $('ck_in').value.trim();
-    if (!rawTitle) return $('ck_in').focus();
-    const fromVal = $('ck_from') ? $('ck_from').value : '';
-    const dueVal = $('ck_due') ? $('ck_due').value : '';
-    const daysVal = $('ck_days') ? +$('ck_days').value || 0 : 0;
-    const text = encodeSubtaskMeta(rawTitle, fromVal, dueVal, daysVal);
-    $('ck_in').value = '';
-    if ($('ck_days')) $('ck_days').value = '';
-    if (!t) { draft.push(text); return draw(); }
-    const it = { id: crypto.randomUUID(), task_id: t.id, text, done: false, pos: items.length };
-    const r = await sb.from('task_items').insert(it);
-    if (r.error) return alert('خطأ: ' + r.error.message);
-    items.push(it);
-    S.items = S.items || [];
-    if (!S.items.some(x => x.id === it.id)) S.items.push(it);
-    dirty = true;
-    draw();
-  };
-
-  $('ck_add').onclick = add;
-  $('ck_in').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
-  if (t) {
-    ckLoad(t.id).then(d => { items = d || []; draw(); });
-    dlg.addEventListener('close', () => { if (dirty) load(); }, { once: true });
-  }
-  draw();
-  return {
-    flush: async tid => {
-      if (draft.length) {
-        const rows = draft.map((text, i) => ({ id: crypto.randomUUID(), task_id: tid, text, done: false, pos: i }));
-        await sb.from('task_items').insert(rows);
-      }
-    }
-  };
+const KPI_LABEL = { open: 'المفتوحة', late: 'المتأخرة', soon: 'اليوم/غداً', week: 'المنجزة هذا الأسبوع' };
+function myKpis() {
+  const M = S.tasks.filter(mine), c = k => M.filter(KPI_TEST[k]).length;
+  const rec = M.filter(t => eff(t) === 'done' && t.due_on && doneAtOf(t) && inDays(doneAtOf(t), 30));
+  const ok = rec.filter(t => ymd(new Date(doneAtOf(t))) <= t.due_on).length;
+  return { open: c('open'), late: c('late'), soon: c('soon'), week: c('week'), ontime: rec.length ? Math.round(100 * ok / rec.length) : null, onN: rec.length };
 }
-
+function kpiHtml() {
+  const K = myKpis(), tot = K.week + K.open, pg = tot ? Math.round(100 * K.week / tot) : 0;
+  const card = (k, v, l, cls) => '<button class="stat btn ' + (cls || '') + (S.kpi === k ? ' on' : '') + '" data-kpi="' + k + '"><b>' + v + '</b><span>' + l + '</span></button>';
+  return '<div class="stats kpis">' + card('open', K.open, 'مفتوحة') + card('late', K.late, 'متأخرة', 'late') + card('soon', K.soon, 'اليوم / غداً', 'soon') + card('week', K.week, 'أنجزتها هذا الأسبوع', 'ok') +
+    '<div class="stat"><b>' + (K.ontime == null ? '—' : K.ontime + '%') + '</b><span>التزامي بالمواعيد</span></div></div>' +
+    '<div class="wk"><div class="bar"><span>🎯 إنجازك هذا الأسبوع</span><b>' + K.week + ' من ' + tot + ' (' + pg + '%)</b></div><div class="wkb"><i style="width:' + pg + '%"></i></div></div>' +
+    (S.kpi ? '<div class="kpi-tag">عرض: <b>' + KPI_LABEL[S.kpi] + '</b> <button class="s" id="kpi_x">✕ إلغاء</button></div>' : '');
+}
