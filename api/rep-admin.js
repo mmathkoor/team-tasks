@@ -110,9 +110,35 @@ async function ensureSetPassword(email, password) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
   const me = await member(req);
-  if (!me || me.role !== 'admin') return res.status(403).json({ error: 'للمدير فقط' });
+  if (!me) return res.status(401).json({ error: 'غير مسجّل الدخول' });
+
   try {
-    const { action, name, phone, password, email, company, department, title, role, permissions } = req.body || {};
+    const { action, name, phone, password, email, company, department, title, role, permissions, order_id } = req.body || {};
+
+    // استرجاع تفاصيل الفاتورة كاملة مع أسعار البيع لمندوب الطلب أو أعضاء الفريق
+    if (action === 'get_order_invoice') {
+      if (!order_id) return res.status(400).json({ error: 'order_id مطلوب' });
+      const { data: ord, error: ordErr } = await supabase.from('ord_orders').select('*').eq('id', order_id).maybeSingle();
+      if (ordErr || !ord) return res.status(404).json({ error: 'الطلب غير موجود' });
+      // إذا كان المستخدم مندوباً، نتحقق أن الطلب مسند إليه
+      if (me.role === 'rep' && String(ord.rep_email || '').toLowerCase() !== String(me.email || '').toLowerCase()) {
+        return res.status(403).json({ error: 'غير مصرّح لك بعرض هذا الطلب' });
+      }
+      const { data: items } = await supabase.from('ord_items')
+        .select('id,pos,name,qty,price,line_total,image_path,supplier')
+        .eq('order_id', order_id)
+        .order('pos');
+      return res.json({
+        ok: true,
+        order: {
+          ...ord,
+          items: items || []
+        }
+      });
+    }
+
+    // بقية العمليات الإدارية للمدير فقط
+    if (me.role !== 'admin') return res.status(403).json({ error: 'للمدير فقط' });
     
     // إنشاء عضو / موظف جديد (مع دعم الدخول برقم الجوال فقط بدون إيميل)
     if (action === 'create_member') {

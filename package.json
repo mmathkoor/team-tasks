@@ -1,6 +1,6 @@
 {
   "name": "team-tasks-backend",
-  "version": "5.1.0",
+  "version": "5.1.3",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
