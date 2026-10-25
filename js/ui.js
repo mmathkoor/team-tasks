@@ -2,6 +2,8 @@
 const svgIc = p => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
 const NAV_ITEMS = [
   { id: 'board', short: 'المهام', long: 'المهام والمشاريع', ic: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>' },
+  { id: 'pub', short: 'النشر', long: 'النشر والمحتوى', ic: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>' },
+  { id: 'kb', short: 'المعرفة', long: 'مكتبة المعرفة', ic: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h6"/>' },
   { id: 'orders', short: 'الطلبات', long: 'إدارة الطلبات', ic: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2.5l2.2 11h10.6l2-8H6.5"/>' },
   { id: 'erp', short: 'الحسابات', long: 'الحسابات والعهد', ic: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>' },
   { id: 'dash', short: 'الأرقام', long: 'لوحة الأرقام', ic: '<path d="M5 20v-7M12 20V5M19 20v-10"/><path d="M3 20h18"/>' },
