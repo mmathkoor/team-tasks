@@ -593,18 +593,7 @@ drop policy if exists "v5 evt read" on ord_events;
 create policy "v5 evt read" on ord_events for select using (is_member());
 
 -- ===== 6) واجهة المندوب: دالتان فقط، بلا أسعار وبلا فتح الطلب كاملاً =====
-create or replace function rep_orders() returns table (
-  id uuid, order_no bigint, order_date date, customer_name text, phone text, address text, notes text,
-  status text, cancel_reason text, created_by_name text, delivered_at timestamptz, collect numeric, items jsonb)
-language sql stable security definer set search_path = public as $$
-  select o.id, o.order_no, o.order_date, o.customer_name, o.phone, o.address, o.notes, o.status, o.cancel_reason,
-         (select m.name from members m where lower(m.email) = lower(o.created_by)), o.delivered_at, o.balance,
-         coalesce((select jsonb_agg(jsonb_build_object('name', i.name, 'qty', i.qty) order by i.pos) from ord_items i where i.order_id = o.id), '[]'::jsonb)
-  from ord_orders o
-  where lower(o.rep_email) = lower(auth.jwt() ->> 'email')
-    and (o.status = 'preparing' or (o.status in ('delivered', 'cancelled') and coalesce(o.delivered_at, o.updated_at) > now() - interval '2 days'))
-  order by (o.status = 'preparing') desc, o.order_no desc;
-$$;
+-- (تم دمج وترقية rep_orders لاحقاً في قسم ترقية واجهة المندوب والفواتير لتعود بجميع الأسعار)
 
 create or replace function rep_set_status(p_order uuid, p_status text, p_reason text default null) returns void
 language plpgsql security definer set search_path = public as $$
@@ -666,20 +655,7 @@ alter table ord_item_costs enable row level security;
 drop policy if exists "v6 cost all" on ord_item_costs;
 create policy "v6 cost all" on ord_item_costs for all using (ord_cost_ok()) with check (ord_cost_ok());
 
--- ===== واجهة المندوب: تضيف اسم التاجر لكل صنف (بدون أي سعر) =====
-create or replace function rep_orders() returns table (
-  id uuid, order_no bigint, order_date date, customer_name text, phone text, address text, notes text,
-  status text, cancel_reason text, created_by_name text, delivered_at timestamptz, collect numeric, items jsonb)
-language sql stable security definer set search_path = public as $$
-  select o.id, o.order_no, o.order_date, o.customer_name, o.phone, o.address, o.notes, o.status, o.cancel_reason,
-         (select m.name from members m where lower(m.email) = lower(o.created_by)), o.delivered_at, o.balance,
-         coalesce((select jsonb_agg(jsonb_build_object('name', i.name, 'qty', i.qty, 'supplier', i.supplier) order by i.pos) from ord_items i where i.order_id = o.id), '[]'::jsonb)
-  from ord_orders o
-  where lower(o.rep_email) = lower(auth.jwt() ->> 'email')
-    and (o.status = 'preparing' or (o.status in ('delivered', 'cancelled') and coalesce(o.delivered_at, o.updated_at) > now() - interval '2 days'))
-  order by (o.status = 'preparing') desc, o.order_no desc;
-$$;
-
+-- (دالة rep_orders المحدثة بكافة تفاصيل الفاتورة معرّفة في الأسفل)
 
 -- >>>>>>>>>> sql/010_order_images.sql <<<<<<<<<<
 -- 010: صورة توضيحية لكل صنف (يراها المندوب) + تُحذف تلقائياً بعد التسليم لتوفير المساحة
@@ -704,20 +680,6 @@ create policy "v7 img staff" on storage.objects for all to authenticated
   using (bucket_id = 'order-images' and is_member()) with check (bucket_id = 'order-images' and is_member());
 create policy "v7 img rep read" on storage.objects for select to authenticated
   using (bucket_id = 'order-images' and ord_img_rep_ok(name));
-
--- المندوب يستلم مسار الصورة مع كل صنف
-create or replace function rep_orders() returns table (
-  id uuid, order_no bigint, order_date date, customer_name text, phone text, address text, notes text,
-  status text, cancel_reason text, created_by_name text, delivered_at timestamptz, collect numeric, items jsonb)
-language sql stable security definer set search_path = public as $$
-  select o.id, o.order_no, o.order_date, o.customer_name, o.phone, o.address, o.notes, o.status, o.cancel_reason,
-         (select m.name from members m where lower(m.email) = lower(o.created_by)), o.delivered_at, o.balance,
-         coalesce((select jsonb_agg(jsonb_build_object('name', i.name, 'qty', i.qty, 'supplier', i.supplier, 'image', i.image_path) order by i.pos) from ord_items i where i.order_id = o.id), '[]'::jsonb)
-  from ord_orders o
-  where lower(o.rep_email) = lower(auth.jwt() ->> 'email')
-    and (o.status = 'preparing' or (o.status in ('delivered', 'cancelled') and coalesce(o.delivered_at, o.updated_at) > now() - interval '2 days'))
-  order by (o.status = 'preparing') desc, o.order_no desc;
-$$;
 
 
 -- >>>>>>>>>> sql/011_titles_views.sql <<<<<<<<<<
