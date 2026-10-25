@@ -31,21 +31,79 @@ function bindHistory(t) {
   });
 }
 function logView() {
-  return '<div class="card"><h2>🕘 سجل النشاط</h2><div class="row" style="margin-bottom:10px"><select id="lg_who"><option value="">كل الأعضاء</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('') + '</select></div>' +
+  const actTypes = [
+    ['', '⚡ كل أنواع الحركات'],
+    ['created', '🆕 إنشاء مهمة'],
+    ['status', '🔄 تغيير حالة'],
+    ['flow_step', '🔗 انتقال مرحلة بالمسار'],
+    ['checklist', '☑ إنجاز مهمة فرعية'],
+    ['comment', '💬 تعليق جديد'],
+    ['reassigned', '👤 إحالة مهمة'],
+    ['due', '📅 تعديل موعد'],
+    ['file', '📎 مرفقات'],
+    ['deleted', '🗑️ حذف']
+  ];
+  return '<div class="card"><h2>🕘 سجل النشاط والحركات</h2>' +
+    '<div class="adv-filter-bar" style="margin-bottom:12px">' +
+      '<div class="adv-filter-grid">' +
+        '<input id="lg_q" type="search" placeholder="🔍 بحث في اسم المهمة أو التفاصيل...">' +
+        '<select id="lg_who"><option value="">👤 كل الأعضاء</option>' + S.members.map(m => '<option value="' + esc(m.email) + '">' + esc(m.name) + '</option>').join('') + '</select>' +
+        '<select id="lg_act">' + actTypes.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>' +
+        '<input type="date" id="lg_from" title="من تاريخ">' +
+        '<input type="date" id="lg_to" title="إلى تاريخ">' +
+        '<button class="s" id="lg_reset">↺ مسح</button>' +
+      '</div>' +
+    '</div>' +
     '<div id="lg_list" class="m">جارٍ التحميل...</div><div class="row" style="margin-top:10px"><button id="lg_more" class="s" style="display:none">عرض المزيد</button></div></div>';
 }
 function bindLog() {
   let rows = [];
+  const renderRows = () => {
+    const q = ($('lg_q')?.value || '').trim().toLowerCase();
+    const act = $('lg_act')?.value || '';
+    const from = $('lg_from')?.value || '';
+    const to = $('lg_to')?.value || '';
+    const filtered = rows.filter(a => {
+      if (act && a.action !== act) return false;
+      const day = String(a.at || '').slice(0, 10);
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      if (q) {
+        const txt = (actWho(a.actor_email) + ' ' + actText(a) + ' ' + (a.task_title || '')).toLowerCase();
+        if (!txt.includes(q)) return false;
+      }
+      return true;
+    });
+    $('lg_list').innerHTML = filtered.length ? filtered.map(a => actRow(a, true)).join('') : '<div class="empty">لا يوجد نشاط مطابق للفلتر المحدد.</div>';
+    document.querySelectorAll('[data-at]').forEach(l => l.onclick = e => { e.preventDefault(); const t = S.tasks.find(x => x.id === l.dataset.at); if (t) taskDialog(t); });
+  };
   const go = async more => {
-    let q = sb.from('activity').select('*').order('at', { ascending: false }).limit(50);
+    let q = sb.from('activity').select('*').order('at', { ascending: false }).limit(80);
     if ($('lg_who').value) q = q.ilike('actor_email', $('lg_who').value);
     if (more && rows.length) q = q.lt('at', rows[rows.length - 1].at);
     const { data, error } = await q;
-    if (error) { $('lg_list').textContent = 'تعذّر التحميل (شغّل ملف 004 أولاً)'; return; }
-    rows = more ? rows.concat(data) : data;
-    $('lg_list').innerHTML = rows.length ? rows.map(a => actRow(a, true)).join('') : 'لا يوجد نشاط مسجّل بعد.';
-    $('lg_more').style.display = data.length === 50 ? '' : 'none';
-    document.querySelectorAll('[data-at]').forEach(l => l.onclick = e => { e.preventDefault(); const t = S.tasks.find(x => x.id === l.dataset.at); if (t) taskDialog(t); });
+    if (error) { $('lg_list').textContent = 'تعذّر التحميل (أو أنك في وضع عدم الاتصال)'; return; }
+    rows = more ? rows.concat(data || []) : (data || []);
+    try { localStorage.setItem('tt_activity_cache', JSON.stringify(rows.slice(0, 80))); } catch {}
+    if (!rows.length && !navigator.onLine) {
+      try { rows = JSON.parse(localStorage.getItem('tt_activity_cache') || '[]'); } catch {}
+    }
+    renderRows();
+    $('lg_more').style.display = (data || []).length === 80 ? '' : 'none';
   };
-  $('lg_who').onchange = () => go(false); $('lg_more').onclick = () => go(true); go(false);
+  $('lg_who').onchange = () => go(false);
+  if ($('lg_q')) $('lg_q').oninput = renderRows;
+  if ($('lg_act')) $('lg_act').onchange = renderRows;
+  if ($('lg_from')) $('lg_from').onchange = renderRows;
+  if ($('lg_to')) $('lg_to').onchange = renderRows;
+  if ($('lg_reset')) $('lg_reset').onclick = () => {
+    if ($('lg_q')) $('lg_q').value = '';
+    if ($('lg_who')) $('lg_who').value = '';
+    if ($('lg_act')) $('lg_act').value = '';
+    if ($('lg_from')) $('lg_from').value = '';
+    if ($('lg_to')) $('lg_to').value = '';
+    go(false);
+  };
+  $('lg_more').onclick = () => go(true);
+  go(false);
 }
