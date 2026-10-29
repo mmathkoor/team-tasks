@@ -23,8 +23,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses" || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Generate Release Keystore
         working-directory: android/app
@@ -42,38 +44,33 @@ jobs:
       - name: Build Release APK
         working-directory: android
         run: |
-          gradle assembleRelease --stacktrace
+          if command -v gradle >/dev/null 2>&1; then
+            gradle assembleRelease --no-daemon --stacktrace
+          elif [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          else
+            echo "Installing gradle..."
+            sudo apt-get update && sudo apt-get install -y gradle
+            gradle assembleRelease --no-daemon --stacktrace
+          fi
 
       - name: Prepare APK Asset
         run: |
           mkdir -p dist-apk
-          cp android/app/build/outputs/apk/release/*.apk dist-apk/team-tasks.apk || cp android/app/build/outputs/apk/*/*.apk dist-apk/team-tasks.apk
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} dist-apk/team-tasks.apk \;
           cp dist-apk/team-tasks.apk dist-apk/app-release.apk
           ls -lh dist-apk/
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: team-tasks-apk
-          path: dist-apk/*.apk
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         with:
           tag_name: latest
-          name: "📱 تطبيق أندرويد المستقل (APK) - أحدث إصدار"
+          name: "📱 تطبيق أندرويد للجوال (APK)"
           body: |
             ### 🤖 تطبيق مهام الفريق والمتجر (APK)
-            تم إنشاء هذه النسخة تلقائياً بواسطة **GitHub Actions** من الفرع الرئيسي.
-            
-            #### 🌟 المزايا:
-            - **إشعارات نظام 24 ساعة:** تظهر مباشرة في شريط إشعارات الهاتف مع نغمة واهتزاز وبدون أي قيود متصفح.
-            - **أداء فائق وسرعة تشغيل:** تطبيق مستقل يعمل بكفاءة وأمان كامل.
-            - **تحديث دائم:** يُبنى تلقائياً عند كل دفع وتحديث في المستودع.
-            
-            #### 📥 التحميل المباشر:
-            - [**اضغط هنا لتحميل team-tasks.apk**](https://github.com/${{ github.repository }}/releases/latest/download/team-tasks.apk)
+            أحدث نسخة جاهزة للتحميل والتثبيت المباشر على الهاتف.
           files: |
             dist-apk/team-tasks.apk
             dist-apk/app-release.apk
