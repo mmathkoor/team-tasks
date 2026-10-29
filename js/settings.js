@@ -544,12 +544,21 @@ function accountBlockHtml() {
     '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card" style="margin-bottom:12px;background:var(--col);border-color:var(--line)">' +
-    '<div style="display:flex;align-items:center;justify-content:justify-between;gap:8px;flex-wrap:wrap">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
       '<div>' +
         '<div style="font-weight:700;font-size:14px">📱 إصدار النظام الحالي: <span class="chip ok" style="font-size:12px">v' + VERSION + '</span></div>' +
         '<div class="m" style="font-size:11.5px;margin-top:3px">مزامنة أحدث الشاشات والتقسيمات ومسح الكاش للتطبيق على جوالك.</div>' +
       '</div>' +
       '<button class="s p" id="force_refresh_app" type="button" style="font-size:12px">🔄 تحديث ومزامنة الإصدار الآن</button>' +
+    '</div>' +
+  '</div>' +
+  '<div class="card" style="margin-bottom:12px;background:rgba(34,197,94,.08);border:1.5px solid rgba(34,197,94,.4)">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+      '<div>' +
+        '<div style="font-weight:700;font-size:14px;color:#16a34a">🤖 تطبيق أندرويد المستقل (APK) من GitHub</div>' +
+        '<div class="m" style="font-size:12px;margin-top:2px">تثبيت التطبيق مباشرة على جوالك لتنبيهات نظام 24 ساعة دون أي قيود للمتصفح.</div>' +
+      '</div>' +
+      '<button type="button" class="s p" id="account_apk_btn" style="background:#16a34a;border-color:#16a34a;color:#fff;font-size:12.5px;font-weight:700">📥 تحميل APK المباشر</button>' +
     '</div>' +
   '</div>' +
   '<div class="card" style="background:var(--latesoft);border-color:var(--latesoft);text-align:center"><button class="dng" id="out" style="background:transparent;width:100%;padding:10px">تسجيل الخروج الآمن</button></div>';
@@ -754,6 +763,12 @@ function bindSettings() {
     $('set_collapse_all').onclick = () => {
       S.settingsCollapsed = { staff: true, reps: true, stores: true, orders_cfg: true, notify: true, recur: true, tools: true, account: true };
       render();
+    };
+  }
+
+  if ($('account_apk_btn')) {
+    $('account_apk_btn').onclick = () => {
+      if (typeof apkInstallDialog === 'function') apkInstallDialog();
     };
   }
 

@@ -76,9 +76,8 @@ function startRing() {
   tick(); ALERT.timer = setInterval(tick, 2600);
 }
 function closeAlertOs(a) {
-  // مهم جداً: لا نغلق إشعار الجوال العلوي أبداً إذا كان المستخدم خارج التطبيق (document.hidden)!
-  if (document.hidden || !a || !a.tag || !('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.ready.then(r => r.getNotifications({ tag: a.tag }).then(l => l.forEach(n => n.close()))).catch(() => {});
+  // لا نغلق إشعار الجوال العلوي أبداً حتى يتمكن المستخدم من التفاعل معه من شريط إشعارات الجوال
+  return;
 }
 function ackAlert(a) { if (!a) return; if (a.nid && typeof markRead === 'function') markRead([a.nid]); if (a.nids && typeof markRead === 'function') markRead(a.nids); }
 function showAlert(a) { ALERT.q.push(a); if (!ALERT.cur) nextAlert(); }
@@ -91,7 +90,7 @@ function nextAlert() {
   ov.innerHTML = '<div class="al-box"><div class="al-bell">🔔</div><h2>' + esc(a.title || 'تنبيه') + '</h2><p>' + esc(a.body || '') + '</p>' +
     (ALERT.q.length ? '<div class="al-more">+ ' + ALERT.q.length + ' تنبيهات أخرى بانتظارك</div>' : '') +
     '<div class="al-act">' + (a.summary ? '<button class="al-ok" id="al_inbox">فتح صندوق التنبيهات</button>' : '') + (t && eff(t) !== 'done' ? '<button class="al-ok" id="al_done">إنجاز ✓</button>' : '') + (t ? '<button id="al_open">عرض المهمة</button>' : '') + (a.order_id ? '<button class="al-ok" id="al_order">عرض الطلب</button>' : '') + '<button id="al_x">إغلاق</button></div></div>';
-  startRing(); closeAlertOs(a);
+  startRing();
   document.getElementById('al_x').onclick = () => { ackAlert(a); nextAlert(); };
   if (document.getElementById('al_inbox')) document.getElementById('al_inbox').onclick = () => { ackAlert(a); ALERT.q = []; nextAlert(); inboxDialog(); };
   if (t) document.getElementById('al_open').onclick = () => { ackAlert(a); ALERT.q = []; nextAlert(); S.view = 'board'; render(); taskDialog(S.tasks.find(x => x.id === t.id)); };
@@ -215,7 +214,7 @@ function showHeadsUpAzkarBanner(opts) {
   el.innerHTML =
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
       '<div style="display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1">' +
-        '<div style="width:38px;height:38px;border-radius:11px;background:rgba(212,175,106,.2);border:1px solid rgba(212,175,106,.45);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📿</div>' +
+        '<div style="width:38px;height:38px;border-radius:11px;background:rgba(212,175,106,.2);border:1px solid rgba(212,175,106,.45);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⏰</div>' +
         '<div style="min-width:0;flex:1">' +
           '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
             '<b style="font-size:14px;color:#fff">' + esc(opts.title || '⏰ تذكير بالمهام المتأخرة') + '</b>' +
@@ -307,7 +306,7 @@ async function syncOverdueDigestToSw() {
   }
 }
 
-// إرسال إشعار جوال خارجي حقيقي (Web Push) عبر /api/remind بدون فتح نافذة داخلية تمسحه
+// إرسال إشعار جوال خارجي حقيقي (Web Push) عبر /api/remind بدون مسح الإشعار من شريط الجوال
 async function sendExternalRemindPush(title, body, firstTaskId, isTest = false, teamSlot = '') {
   if (!S.me || !S.me.email || !navigator.onLine) return false;
   try {
@@ -361,7 +360,7 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
     ? ('يا ' + ((S.me && S.me.name) || '') + '، لديك مهام تجاوزت موعد التسليم وتحتاج إنجازاً:')
     : todayTasks.length > 0
       ? ('لديك مهام مستحقة اليوم بانتظار التنفيذ:')
-      : 'وصلك هذا الإشعار بنجاح según الأوقات المجدولة!';
+      : 'وصلك هذا الإشعار بنجاح بحسب الأوقات المجدولة!';
   const pBody = sample.length
     ? ('• ' + sample.join('\n• '))
     : subtitle;
@@ -369,42 +368,34 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
     ? ('تذكير من مدير المهام: لديك ' + lateTasks.length + ' مهام متأخرة')
     : 'تذكير بالمهام المستحقة';
 
-  // 1) إذا كان الاختبار مخصصاً لـ "خارج التطبيق" (external_only): نرسله لنظام الجوال الخارجي فقط بعد المهلة المحددة
-  if (modeOpt === 'external_only') {
-    if ('serviceWorker' in navigator) {
+  const fireNow = async () => {
+    // 1) إشعار نظام أندرويد الرسمي دائماً (في شريط إشعارات الهاتف مثل الصورة 2)
+    if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {
         const reg = await navigator.serviceWorker.ready;
-        if (reg && reg.active) {
-          reg.active.postMessage({ type: 'CHECK_OVERDUE_NOW', force: true, delayMs: delayMs || 7000 });
-        }
+        await reg.showNotification(pTitle, {
+          body: pBody,
+          icon: '/icon-192.png',
+          badge: '/badge-96.png',
+          vibrate: [500, 150, 500, 150, 800],
+          requireInteraction: true,
+          renotify: true,
+          silent: false,
+          tag: 'azkar-overdue-remind',
+          timestamp: Date.now(),
+          actions: firstId
+            ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }]
+            : [{ action: 'open', title: '📋 عرض المهام' }],
+          data: { url: '/', task_id: firstId, task_title: sample[0] || '' }
+        });
       } catch (e) {}
     }
-    setTimeout(async () => {
-      playBackgroundAzkarToneAndVoice(azkarVoiceSettingOn() ? voiceMsg : '');
-      await sendExternalRemindPush(pTitle, pBody, firstId, true);
-      if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        try {
-          const reg = await navigator.serviceWorker.ready;
-          await reg.showNotification(pTitle, {
-            body: pBody,
-            icon: '/icon-192.png',
-            badge: '/badge-96.png',
-            vibrate: [500, 150, 500, 150, 800],
-            requireInteraction: true,
-            renotify: true,
-            tag: 'azkar-overdue-remind',
-            actions: firstId ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }] : [{ action: 'open', title: '📋 عرض المهام' }],
-            data: { url: '/', task_id: firstId, task_title: sample[0] || '' }
-          });
-        } catch (e) {}
-      }
-    }, delayMs || 7000);
-    return;
-  }
 
-  // 2) التنفيذ العادي (عند حلول الساعة المجدولة أو المعاينة الفورية داخل التطبيق)
-  const fireNow = async () => {
-    if (!document.hidden || modeOpt === 'inapp_only') {
+    // 2) نغمة واهتزاز وقراءة صوتية
+    playBackgroundAzkarToneAndVoice(azkarVoiceSettingOn() ? voiceMsg : '');
+
+    // 3) إذا كان المستخدم داخل التطبيق، لا نغطي الشاشة ببانر مزعج إلا إذا كان مفعّلاً اختيارياً
+    if (!document.hidden && (modeOpt === 'inapp_banner' || localStorage.getItem('azkar_inapp_banner') === 'on')) {
       showHeadsUpAzkarBanner({
         title: pTitle,
         subtitle,
@@ -413,28 +404,18 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
         lateCount: lateTasks.length,
         todayCount: todayTasks.length
       });
+    } else if (!document.hidden && typeof toast === 'function') {
+      toast('🔔 إشعار جديد في شريط إشعارات الجوال: ' + pTitle);
     }
-    playBackgroundAzkarToneAndVoice(azkarVoiceSettingOn() ? voiceMsg : '');
 
-    if (modeOpt !== 'inapp_only') {
-      // إرسال الإشعار الخارجي على شاشة الجوال
-      if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        try {
-          const reg = await navigator.serviceWorker.ready;
-          if (reg && reg.active) {
-            reg.active.postMessage({ type: 'CHECK_OVERDUE_NOW', force: true, delayMs: 0 });
-          }
-        } catch (e) {}
-      }
-      // في الساعة المجدولة نرسل Web Push للفريق لكي يصل الإشعار الخارجي حتى لمن تطبيقه مغلق تماماً
-      if (dueSlotKey && navigator.onLine) {
-        sendExternalRemindPush(pTitle, pBody, firstId, false, dueSlotKey);
-      }
+    // 4) إرسال Web Push للخادم إذا كان وقت مجدول فعلي لجميع أجهزة الموظف
+    if (dueSlotKey && navigator.onLine) {
+      sendExternalRemindPush(pTitle, pBody, firstId, false, dueSlotKey);
     }
   };
 
   if (delayMs > 0) setTimeout(fireNow, delayMs);
-  else fireNow();
+  else await fireNow();
 }
 
 let _azkarWorker = null;
@@ -579,14 +560,24 @@ function alertSettingsHtml() {
       '</div>' +
     '</div>' +
 
-    '<div class="row" style="gap:8px;flex-wrap:wrap">' +
-      '<button type="button" class="p s" id="azk_test_ext" style="flex:2 1 240px">📲 اختبار الإشعار من خارج التطبيق (اضغط ثم اخرج لشاشة الجوال — يصل بعد 7 ثوانٍ)</button>' +
-      '<button type="button" class="s" id="azk_test_in" style="flex:1 1 160px">👁️ معاينة الشريط داخل التطبيق</button>' +
+    '<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px">' +
+      '<button type="button" class="p s" id="azk_test_now" style="flex:1 1 200px">📲 تجربة إشعار نظام الجوال فوراً (في شريط الهاتف العلوي)</button>' +
+      '<button type="button" class="s" id="azk_test_ext" style="flex:1 1 200px">⏳ تجربة بعد 6 ثوانٍ (مع الخروج لشاشة الجوال)</button>' +
     '</div>' +
-    '<div id="azk_test_status" class="m" style="margin-top:8px;font-weight:700;color:var(--gold,#c9a24e)"></div>' +
+    '<div class="row" style="margin-bottom:10px">' +
+      '<label class="chk"><input type="checkbox" id="azk_banner_opt" ' + (localStorage.getItem('azkar_inapp_banner') === 'on' ? 'checked' : '') + '> <b>📌 إظهار شريط إضافي داخل التطبيق (مغلق افتراضياً — يظهر إشعار نظام الجوال الرسمي دائماً بدون تغطية الشاشة)</b></label>' +
+    '</div>' +
+    '<div id="azk_test_status" class="m" style="margin-top:6px;font-weight:700;color:var(--gold,#c9a24e)"></div>' +
+    '<div style="margin-top:14px;padding:12px;border-radius:12px;background:rgba(22,163,74,.1);border:1.5px solid rgba(22,163,74,.4);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
+      '<div>' +
+        '<b style="color:#16a34a;font-size:13.5px">🤖 الحل الجذري الشامل: تطبيق أندرويد المستقل (APK)</b>' +
+        '<div class="m" style="font-size:12px;margin-top:2px">تطبيق أندرويد مخصص يُبنى تلقائياً عبر GitHub Actions ويعمل في خلفية الجوال 24 ساعة بدون أي قيود للمتصفح.</div>' +
+      '</div>' +
+      '<button type="button" class="p s" id="azk_open_apk_dlg" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700">📥 تثبيت تطبيق APK الآن</button>' +
+    '</div>' +
   '</div>' +
   '<div class="card"><h2>🚨 نافذة التنبيه المنبثقة داخل التطبيق</h2>' +
-    '<p class="m" style="margin-bottom:10px">عند وصول تنبيه إداري مباشر تظهر نافذة كبيرة مع نغمة واهتزاز حتى يتفاعل معها الموظف.</p>' +
+    '<p class="m" style="margin-bottom:10px">عند وصول تنبيه إداري مباشر تظهر نافذة مع نغمة واهتزاز حتى يتفاعل معها الموظف.</p>' +
     '<label class="chk"><input type="checkbox" id="al_snd" ' + (alertSoundOn() ? 'checked' : '') + '> تشغيل النغمة والاهتزاز</label>' +
     '<div class="row" style="margin-top:10px"><button class="s" id="al_test">🔔 جرّب النافذة الآن</button></div></div>';
 }
@@ -622,6 +613,19 @@ function bindAlertSettings() {
 
   if ($('al_snd')) $('al_snd').onchange = e => { localStorage.setItem('alert_sound', e.target.checked ? 'on' : 'off'); };
   if ($('al_test')) $('al_test').onclick = () => { unlockAudio(); showAlert({ title: '🔔 تنبيه تجريبي', body: 'هكذا ستظهر لك التنبيهات والتطبيق مفتوح.' }); };
+
+  if ($('azk_banner_opt')) {
+    $('azk_banner_opt').onchange = e => {
+      localStorage.setItem('azkar_inapp_banner', e.target.checked ? 'on' : 'off');
+      if (typeof toast === 'function') toast(e.target.checked ? 'تم تفعيل الشريط الإضافي داخل التطبيق' : 'تم الاكتفاء بإشعار نظام الجوال الرسمي دائماً (بدون تغطية الشاشة) ✓');
+    };
+  }
+
+  if ($('azk_open_apk_dlg')) {
+    $('azk_open_apk_dlg').onclick = () => {
+      if (typeof apkInstallDialog === 'function') apkInstallDialog();
+    };
+  }
 
   if ($('azk_global_all')) {
     $('azk_global_all').onchange = async e => {
@@ -702,7 +706,19 @@ function bindAlertSettings() {
     };
   });
 
-  // زر اختبار الإشعار من خارج التطبيق (ينتظر 7 ثوانٍ حتى يخرج المستخدم لشاشة الجوال الرئيسية)
+  // زر تجربة الإشعار فوراً في شريط إشعارات الجوال
+  if ($('azk_test_now')) {
+    $('azk_test_now').onclick = async () => {
+      unlockAudio();
+      if (typeof autoEnablePush === 'function') await autoEnablePush(true);
+      const st = $('azk_test_status');
+      if (st) st.textContent = '🚀 جارٍ إرسال الإشعار لشريط إشعارات الجوال...';
+      await triggerAzkarCheckNow(true, 0, 'auto');
+      if (st) st.textContent = '✅ ظهر الإشعار الآن في شريط إشعارات الجوال العلوي!';
+    };
+  }
+
+  // زر اختبار الإشعار مع الخروج لشاشة الجوال (ينتظر 6 ثوانٍ)
   if ($('azk_test_ext')) {
     $('azk_test_ext').onclick = async () => {
       unlockAudio();
@@ -710,16 +726,16 @@ function bindAlertSettings() {
       if (typeof autoEnablePush === 'function') await autoEnablePush(true);
       const btn = $('azk_test_ext');
       const st = $('azk_test_status');
-      let sec = 7;
+      let sec = 6;
       btn.disabled = true;
       const updateMsg = s => {
-        const txt = '⏳ اخرج الآن فوراً لشاشة الجوال الرئيسية! سيصلك الإشعار الخارجي بعد (' + s + ') ثوانٍ...';
+        const txt = '⏳ اخرج الآن لشاشة الجوال الرئيسية! سيصلك الإشعار بعد (' + s + ') ثوانٍ...';
         if (st) st.textContent = txt;
-        btn.textContent = '⏳ اخرج لشاشة الجوال الآن (' + s + ' ث)...';
+        btn.textContent = '⏳ اخرج لشاشة الجوال (' + s + ' ث)...';
       };
       updateMsg(sec);
-      if (typeof toast === 'function') toast('📲 اخرج الآن لشاشة الجوال الرئيسية! سيصلك الإشعار الخارجي بعد 7 ثوانٍ 🔔');
-      triggerAzkarCheckNow(true, 7000, 'external_only');
+      if (typeof toast === 'function') toast('📲 اخرج الآن لشاشة الجوال الرئيسية! سيصلك الإشعار بعد 6 ثوانٍ 🔔');
+      triggerAzkarCheckNow(true, 6000, 'auto');
       const iv = setInterval(() => {
         sec--;
         if (sec > 0) {
@@ -727,18 +743,10 @@ function bindAlertSettings() {
         } else {
           clearInterval(iv);
           btn.disabled = false;
-          btn.textContent = '📲 اختبار الإشعار من خارج التطبيق (اضغط ثم اخرج لشاشة الجوال — يصل بعد 7 ثوانٍ)';
-          if (st) st.textContent = '✅ تم إرسال الإشعار الخارجي لنظام الجوال!';
+          btn.textContent = '⏳ تجربة بعد 6 ثوانٍ (مع الخروج لشاشة الجوال)';
+          if (st) st.textContent = '✅ تم إرسال الإشعار لشريط إشعارات الجوال!';
         }
       }, 1000);
-    };
-  }
-
-  // زر معاينة الشريط العلوي داخل التطبيق فوراً
-  if ($('azk_test_in')) {
-    $('azk_test_in').onclick = () => {
-      unlockAudio();
-      triggerAzkarCheckNow(true, 0, 'inapp_only');
     };
   }
 }

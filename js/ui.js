@@ -156,6 +156,7 @@ function bindHeader() {
   $('rf').onclick = () => { $('rf').textContent = '⏳'; load(); };
   if ($('net_status_pill')) $('net_status_pill').onclick = () => { if (navigator.onLine) { flushNow(); load(); } else toast('📡 أنت حالياً في وضع الأوفلاين — جميع تعديلاتك تُحفظ محلياً وتُزامَن تلقائياً فور عودة الإنترنت', false); };
   if ($('ver_badge_btn')) $('ver_badge_btn').onclick = () => { if (typeof forceAppUpdate === 'function') forceAppUpdate(); else location.reload(true); };
+  if ($('apk_dl_btn')) $('apk_dl_btn').onclick = () => apkInstallDialog();
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
   if ($('co_sw_btn')) $('co_sw_btn').onclick = toggleCoPopover;
@@ -205,6 +206,7 @@ function headerHtml() {
     '</div>' +
     '<div class="hbtns">' +
       netBadgeHtml +
+      '<button id="apk_dl_btn" type="button" class="s apk-pill" title="تثبيت تطبيق أندرويد المستقل (APK) المباشر من GitHub">🤖 <span>تطبيق APK</span></button>' +
       '<button id="ver_badge_btn" class="s ver-pill" title="إصدار النظام v' + VERSION + ' - انقر للتحديث الفوري ومسح الكاش">v' + VERSION + ' ↻</button>' +
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
@@ -212,4 +214,37 @@ function headerHtml() {
     '</div>' +
     (swHtml ? '<div class="top-co-bar">' + swHtml + '</div>' : '') +
   '</div>';
+}
+
+function apkInstallDialog() {
+  const apkUrl = 'https://github.com/mmathkoor/team-tasks/releases/latest/download/team-tasks.apk';
+  const ghReleases = 'https://github.com/mmathkoor/team-tasks/releases';
+  dlg.innerHTML =
+    '<div style="text-align:center;padding:6px 0 14px">' +
+      '<div style="width:58px;height:58px;border-radius:18px;background:rgba(34,197,94,.15);border:2px solid #22c55e;display:inline-flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px">🤖</div>' +
+      '<h2 style="font-size:18px;margin:0 0 4px;border:0;padding:0">تطبيق أندرويد المستقل (APK)</h2>' +
+      '<p class="m" style="margin:0;font-size:13px">الحل الجذري لتنبيهات الجوال والعمل دون قيود المتصفح</p>' +
+    '</div>' +
+    '<div style="background:var(--col);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="color:var(--ok)">✓ إشعارات نظام 24 ساعة:</b> تعمل في شريط الجوال العلوي كأي تطبيق مثبت.</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="color:var(--ok)">✓ تثبيت مباشر بنقرة واحدة:</b> ملف APK أصلي يُبنى تلقائياً عبر GitHub Actions.</div>' +
+      '<div style="display:flex;align-items:center;gap:6px"><b style="color:var(--ok)">✓ أداء فائق وسرعة:</b> وصول سريع بنقرة من شاشة هاتفك الرئيسية.</div>' +
+    '</div>' +
+    '<div style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">' +
+      '<a href="' + apkUrl + '" class="p" target="_blank" download style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:12px;background:#16a34a;border:1px solid #15803d;color:#fff;font-size:15px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px rgba(22,163,74,.3)">' +
+        '<span>📥 تحميل التطبيق الآن (team-tasks.apk)</span>' +
+      '</a>' +
+      '<a href="' + ghReleases + '" target="_blank" class="s" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:10px;text-decoration:none;font-size:12.5px;color:var(--mute)">' +
+        '<span>🐙 عرض التحديثات والإصدارات على GitHub ↗</span>' +
+      '</a>' +
+    '</div>' +
+    '<div style="background:rgba(212,175,106,.1);border:1px dashed var(--gold,#c9a24e);border-radius:10px;padding:10px;font-size:12px;line-height:1.6;margin-bottom:14px">' +
+      '<b>💡 خطوات التثبيت على جوالك:</b><br>' +
+      '1. اضغط على زر التحميل الأخضر أعلاه لحفظ ملف <code>team-tasks.apk</code>.<br>' +
+      '2. افتح الملف المحمل واضغط «تثبيت / Install».<br>' +
+      '3. إذا طُلب منك السماح بتثبيت التطبيقات من هذا المتصفح، اختر «سماح / Allow» لمرة واحدة.' +
+    '</div>' +
+    '<div style="display:flex;justify-content:flex-end"><button type="button" class="s" id="apk_dlg_close">إغلاق</button></div>';
+  dlg.showModal();
+  if ($('apk_dlg_close')) $('apk_dlg_close').onclick = () => dlg.close();
 }

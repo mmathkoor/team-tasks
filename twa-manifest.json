@@ -1,0 +1,17 @@
+{
+  "packageId": "com.matjark.tasks",
+  "host": "matjark.vercel.app",
+  "name": "مهام الفريق",
+  "launcherName": "المهام",
+  "themeColor": "#0E2144",
+  "navigationColor": "#0E2144",
+  "backgroundColor": "#0E2144",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://matjark.vercel.app/icon-512.png",
+  "maskableIconUrl": "https://matjark.vercel.app/icon-maskable-512.png",
+  "appVersionName": "5.2.9",
+  "appVersionCode": 50209,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli"
+}

@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.matjark.tasks'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.matjark.tasks"
+        minSdk 24
+        targetSdk 34
+        versionCode 50209
+        versionName "5.2.9"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('release.keystore')
+            storePassword 'matjark123'
+            keyAlias 'matjark'
+            keyPassword 'matjark123'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.webkit:webkit:1.10.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+}
