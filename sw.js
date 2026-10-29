@@ -1,5 +1,6 @@
-// Build version: 5.2.6 (timestamp: 2026-10-29)
-const SW_BUILD_VERSION = '5.2.6';
+// Build version: 5.2.8 (timestamp: 2026-10-29)
+const SW_BUILD_VERSION = '5.2.8';
+
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
@@ -76,16 +77,50 @@ async function flush() {
   if (done.size < q.length) throw new Error('retry');
 }
 
-// ===== منبّه المهام المتأخرة المنبثق من أعلى الشاشة (مثل تطبيق الذكر) =====
+function isSwScheduleDueNow(digest) {
+  const mode = digest.scheduleMode || 'scheduled';
+  const now = new Date();
+  const ymdStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const firedSlots = digest.firedSlots && typeof digest.firedSlots === 'object' ? digest.firedSlots : {};
+
+  if (mode === 'once_daily') {
+    const k = 'daily_' + ymdStr;
+    if (firedSlots[k]) return null;
+    return k;
+  }
+  if (mode === 'interval') {
+    const intervalMs = Math.max(15, Number(digest.intervalMin) || 120) * 60 * 1000;
+    const lastAt = Number(digest.lastShownAt) || 0;
+    if (Date.now() - lastAt >= intervalMs - 15000) return 'int_' + Math.floor(Date.now() / intervalMs);
+    return null;
+  }
+  // mode === 'scheduled'
+  const freq = digest.frequency || 'daily';
+  const day = now.getDay();
+  if (freq === 'workdays' && day === 5) return null; // الجمعة إجازة
+  if (freq === 'weekly' && day !== Number(digest.weekday || 0)) return null;
+
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const times = Array.isArray(digest.times) && digest.times.length ? digest.times : ['09:00', '20:00'];
+  for (const tStr of times) {
+    const parts = String(tStr || '').split(':');
+    if (parts.length !== 2) continue;
+    const slotMins = (+parts[0]) * 60 + (+parts[1]);
+    if (nowMins >= slotMins && nowMins <= slotMins + 25) {
+      const slotKey = ymdStr + '_' + tStr;
+      if (!firedSlots[slotKey]) return slotKey;
+    }
+  }
+  return null;
+}
+
+// ===== منبّه المهام المتأخرة الخارجي على شاشة الجوال =====
 async function showOverdueAzkarNotification(forceTest, delayMs) {
   if (delayMs && delayMs > 0) {
     await new Promise(r => setTimeout(r, delayMs));
   }
   const digest = (await kget('overdue_digest')) || {};
   if (!forceTest && digest.enabled === false) return;
-  const intervalMs = (Number(digest.intervalMin) || 30) * 60 * 1000;
-  const lastAt = Number(digest.lastShownAt) || 0;
-  if (!forceTest && Date.now() - lastAt < intervalMs - 15000) return;
 
   const lateCount = Number(digest.lateCount) || 0;
   const todayCount = Number(digest.todayCount) || 0;
@@ -94,7 +129,13 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
 
   if (!forceTest && lateCount === 0 && todayCount === 0) return;
 
-  let title = '⏰ تذكير بالمهام المتأخرة (' + lateCount + ' متأخرة)';
+  let slotKey = 'test_' + Date.now();
+  if (!forceTest) {
+    slotKey = isSwScheduleDueNow(digest);
+    if (!slotKey) return;
+  }
+
+  let title = '🚨 تذكير بالمهام المتأخرة (' + lateCount + ' متأخرة)';
   let body = '';
   if (lateCount > 0) {
     body = 'لديك ' + lateCount + ' مهام متأخرة' + (todayCount > 0 ? ' و ' + todayCount + ' مستحقة اليوم' : '') + ':\n• ' + sampleTitles.slice(0, 3).join('\n• ');
@@ -102,11 +143,13 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
     title = '🔥 تذكير بمهام اليوم (' + todayCount + ' مهمة)';
     body = 'لديك ' + todayCount + ' مهام مستحقة اليوم:\n• ' + sampleTitles.slice(0, 3).join('\n• ');
   } else {
-    title = '📿 منبّه المهام الذكي يعمل بنجاح!';
-    body = 'سيظهر لك هذا الإشعار المنبثق من أعلى الشاشة لتذكيرك بمهامك المتأخرة حتى وأنت تتصفح تطبيقات أخرى.';
+    title = '🔔 إشعار خارجي من مدير المهام';
+    body = 'يعمل هذا الإشعار من خارج التطبيق لتذكيرك بالمهام في الأوقات المحددة!';
   }
 
   digest.lastShownAt = Date.now();
+  if (!digest.firedSlots || typeof digest.firedSlots !== 'object') digest.firedSlots = {};
+  if (!forceTest && slotKey) digest.firedSlots[slotKey] = Date.now();
   await kset('overdue_digest', digest);
 
   await self.registration.showNotification(title, {
@@ -117,7 +160,7 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
     requireInteraction: true,
     renotify: true,
     silent: false,
-    tag: 'azkar-overdue-' + Math.floor(Date.now() / 1000),
+    tag: 'azkar-overdue-remind',
     timestamp: Date.now(),
     actions: firstTaskId
       ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }]
@@ -151,20 +194,25 @@ self.addEventListener('message', e => {
 self.addEventListener('push', e => {
   if (!e.data) return;
   const d = e.data.json();
-  const tag = d.task_id ? 'task-' + d.task_id + '-' + Math.floor(Date.now() / 1000) : 'msg-' + Date.now();
+  const isAzkar = !!d.is_azkar_remind;
+  const tag = isAzkar
+    ? 'azkar-overdue-remind'
+    : (d.task_id ? 'task-' + d.task_id + '-' + Math.floor(Date.now() / 1000) : 'msg-' + Date.now());
   e.waitUntil((async () => {
     await self.registration.showNotification(d.title, {
       body: d.body, icon: d.icon || '/icon-192.png', badge: '/badge-96.png',
       vibrate: [500, 150, 500, 150, 800, 200, 800], requireInteraction: true, silent: false, tag, renotify: true, timestamp: Date.now(),
       actions: d.actions || [], data: { url: '/', task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
     });
-    // نرسل للنافذة فقط إذا كانت مرئية أمام المستخدم حتى لا تقوم النافذة المخفية بمسح إشعار الجوال العلوي!
-    const l = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    l.forEach(c => {
-      if (c.visibilityState === 'visible' || c.focused) {
-        c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag, nid: d.nid, order_id: d.order_id });
-      }
-    });
+    // لتذكيرات المهام المجدولة (is_azkar_remind) نترك الإشعار في شريط الجوال الخارجي ولا نفتح النافذة المنبثقة القديمة التي تمسحه
+    if (!isAzkar) {
+      const l = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      l.forEach(c => {
+        if (c.visibilityState === 'visible' || c.focused) {
+          c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag, nid: d.nid, order_id: d.order_id });
+        }
+      });
+    }
   })());
 });
 async function markDone(d) {
