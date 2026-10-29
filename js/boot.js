@@ -1,5 +1,14 @@
 function showErrorBox(msg) {
-    msg = String(msg == null ? '' : msg).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const raw = String(msg == null ? '' : msg);
+    // تجاهل أخطاء الخلفية غير الحرجة (مثل الصوت التلقائي أو الإشعارات أو الأقفال)
+    if (/play\(\)|interact|Notification|PushManager|AbortError|LockManager|ResizeObserver|network/i.test(raw)) return;
+    // إذا كان النظام مفتوحاً والمستخدم مسجل الدخول، لا نمسح الشاشة أبداً بل نعرض تنبيهاً خفيفاً فقط
+    if (typeof S !== 'undefined' && S && S.me) {
+        console.warn('Runtime warning:', raw);
+        if (typeof toast === 'function') toast('تنبيه: ' + raw, false);
+        return;
+    }
+    msg = raw.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const a = document.getElementById('app');
     if (a) a.innerHTML = '<div class="card" style="margin:40px auto;max-width:400px;text-align:center">' +
         '<h2 style="color:var(--late);margin-bottom:10px">توقف الاتصال مؤقتاً</h2>' +
@@ -26,7 +35,7 @@ window.forceAppUpdate = async function() {
 };
 
 (function autoSyncVersion() {
-  const currentVer = '5.2.5';
+  const currentVer = '5.2.6';
   const savedVer = localStorage.getItem('last_seen_ver');
   if (savedVer && savedVer !== currentVer) {
     localStorage.setItem('last_seen_ver', currentVer);

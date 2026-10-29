@@ -145,6 +145,8 @@ class Q {
   ilike(c, v) { this.p.append(c, 'ilike.' + v); return this; }
   single() { this.p.set('limit', 1); return this; }
   then(res, rej) { return this.run().then(res, rej); }
+  catch(rej) { return this.run().catch(rej); }
+  finally(fn) { return this.run().finally(fn); }
   async run() {
     const mut = this.m !== 'GET';
     if (!navigator.onLine) {
@@ -645,6 +647,55 @@ async function saveAdminTaskVisibility(cfg) {
     await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true).catch(() => {});
   }
   applyCompanyScope();
+}
+
+// ===== الإعداد العام التلقائي لمنبّه المهام المتأخرة لجميع الموظفين (بدون طلب إذن) =====
+function getGlobalAzkarConfig() {
+  const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
+  for (let i = hv.length - 1; i >= 0; i--) {
+    const s = String(hv[i] || '');
+    if (s.startsWith('__azkar_cfg:')) {
+      try {
+        const obj = JSON.parse(s.slice(12));
+        return {
+          enabledForAll: obj.enabledForAll !== false,
+          intervalMin: +(obj.intervalMin || 15),
+          voiceEnabled: obj.voiceEnabled !== false,
+          bannerEnabled: obj.bannerEnabled !== false
+        };
+      } catch (e) {}
+    }
+  }
+  try {
+    const raw = localStorage.getItem('global_azkar_cfg_v1');
+    if (raw) {
+      const obj = JSON.parse(raw);
+      return {
+        enabledForAll: obj.enabledForAll !== false,
+        intervalMin: +(obj.intervalMin || 15),
+        voiceEnabled: obj.voiceEnabled !== false,
+        bannerEnabled: obj.bannerEnabled !== false
+      };
+    }
+  } catch (e) {}
+  return { enabledForAll: true, intervalMin: 15, voiceEnabled: true, bannerEnabled: true };
+}
+
+async function saveGlobalAzkarConfig(cfg) {
+  const clean = {
+    enabledForAll: cfg.enabledForAll !== false,
+    intervalMin: +(cfg.intervalMin || 15),
+    voiceEnabled: cfg.voiceEnabled !== false,
+    bannerEnabled: cfg.bannerEnabled !== false,
+    updatedAt: Date.now()
+  };
+  try { localStorage.setItem('global_azkar_cfg_v1', JSON.stringify(clean)); } catch (e) {}
+  if (S.ordSet) {
+    const base = (S.ordSet.hidden_views || []).filter(x => !String(x || '').startsWith('__azkar_cfg:'));
+    const nextHidden = base.concat(['__azkar_cfg:' + JSON.stringify(clean)]);
+    S.ordSet.hidden_views = nextHidden;
+    await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true).catch(() => {});
+  }
 }
 
 function canViewerSeeAdminInTasks(adminMember, viewerMember, activeCo) {

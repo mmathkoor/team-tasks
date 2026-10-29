@@ -1,5 +1,5 @@
-// Build version: 5.2.4 (timestamp: 2026-10-29)
-const SW_BUILD_VERSION = '5.2.4';
+// Build version: 5.2.6 (timestamp: 2026-10-29)
+const SW_BUILD_VERSION = '5.2.6';
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
@@ -77,7 +77,10 @@ async function flush() {
 }
 
 // ===== منبّه المهام المتأخرة المنبثق من أعلى الشاشة (مثل تطبيق الذكر) =====
-async function showOverdueAzkarNotification(forceTest) {
+async function showOverdueAzkarNotification(forceTest, delayMs) {
+  if (delayMs && delayMs > 0) {
+    await new Promise(r => setTimeout(r, delayMs));
+  }
   const digest = (await kget('overdue_digest')) || {};
   if (!forceTest && digest.enabled === false) return;
   const intervalMs = (Number(digest.intervalMin) || 30) * 60 * 1000;
@@ -110,9 +113,10 @@ async function showOverdueAzkarNotification(forceTest) {
     body,
     icon: '/icon-192.png',
     badge: '/badge-96.png',
-    vibrate: [350, 120, 350, 120, 600],
+    vibrate: [500, 150, 500, 150, 800],
     requireInteraction: true,
     renotify: true,
+    silent: false,
     tag: 'azkar-overdue-' + Math.floor(Date.now() / 1000),
     timestamp: Date.now(),
     actions: firstTaskId
@@ -124,10 +128,10 @@ async function showOverdueAzkarNotification(forceTest) {
 
 self.addEventListener('sync', e => {
   if (e.tag === 'flush-q') e.waitUntil(flushOnce());
-  if (e.tag === 'overdue-tasks-reminder') e.waitUntil(showOverdueAzkarNotification(false));
+  if (e.tag === 'overdue-tasks-reminder') e.waitUntil(showOverdueAzkarNotification(false, 0));
 });
 self.addEventListener('periodicsync', e => {
-  if (e.tag === 'overdue-tasks-reminder') e.waitUntil(showOverdueAzkarNotification(false));
+  if (e.tag === 'overdue-tasks-reminder') e.waitUntil(showOverdueAzkarNotification(false, 0));
 });
 self.addEventListener('message', e => {
   if (e.data === 'flush') e.waitUntil(flushOnce().catch(() => {}));
@@ -138,7 +142,7 @@ self.addEventListener('message', e => {
         await kset('overdue_digest', Object.assign({}, prev, e.data.digest));
       })());
     } else if (e.data.type === 'CHECK_OVERDUE_NOW') {
-      e.waitUntil(showOverdueAzkarNotification(!!e.data.force));
+      e.waitUntil(showOverdueAzkarNotification(!!e.data.force, Number(e.data.delayMs) || 0));
     }
   }
 });
@@ -147,16 +151,20 @@ self.addEventListener('message', e => {
 self.addEventListener('push', e => {
   if (!e.data) return;
   const d = e.data.json();
-  const tag = d.task_id ? 'task-' + d.task_id : 'msg-' + Date.now();
+  const tag = d.task_id ? 'task-' + d.task_id + '-' + Math.floor(Date.now() / 1000) : 'msg-' + Date.now();
   e.waitUntil((async () => {
     await self.registration.showNotification(d.title, {
       body: d.body, icon: d.icon || '/icon-192.png', badge: '/badge-96.png',
-      vibrate: [400, 150, 400, 150, 800, 200, 800], requireInteraction: true, tag, renotify: true, timestamp: Date.now(),
+      vibrate: [500, 150, 500, 150, 800, 200, 800], requireInteraction: true, silent: false, tag, renotify: true, timestamp: Date.now(),
       actions: d.actions || [], data: { url: '/', task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
     });
-    // إن كان التطبيق مفتوحاً تظهر نافذة تنبيه كاملة مع نغمة
+    // نرسل للنافذة فقط إذا كانت مرئية أمام المستخدم حتى لا تقوم النافذة المخفية بمسح إشعار الجوال العلوي!
     const l = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    l.forEach(c => c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag, nid: d.nid, order_id: d.order_id }));
+    l.forEach(c => {
+      if (c.visibilityState === 'visible' || c.focused) {
+        c.postMessage({ type: 'alert', title: d.title, body: d.body, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all, tag, nid: d.nid, order_id: d.order_id });
+      }
+    });
   })());
 });
 async function markDone(d) {
