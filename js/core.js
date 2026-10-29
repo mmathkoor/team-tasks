@@ -649,44 +649,49 @@ async function saveAdminTaskVisibility(cfg) {
   applyCompanyScope();
 }
 
-// ===== الإعداد العام التلقائي لمنبّه المهام المتأخرة لجميع الموظفين (بدون طلب إذن) =====
+// ===== الإعداد العام التلقائي لمنبّه المهام المتأخرة لجميع الموظفين (مع جدولة أوقات وساعات محددة مثل المهام المتكررة) =====
+function normalizeAzkarTimes(arr) {
+  const list = Array.isArray(arr) ? arr : ['09:00', '20:00'];
+  const clean = [...new Set(list.map(x => String(x || '').trim()).filter(x => /^\d{2}:\d{2}$/.test(x)))].sort();
+  return clean.length ? clean : ['09:00', '20:00'];
+}
+
 function getGlobalAzkarConfig() {
+  const parseCfg = obj => ({
+    enabledForAll: obj.enabledForAll !== false,
+    scheduleMode: obj.scheduleMode || 'scheduled', // 'scheduled' | 'once_daily' | 'interval'
+    frequency: obj.frequency || 'daily',           // 'daily' | 'workdays' | 'weekly'
+    weekday: obj.weekday != null ? +obj.weekday : 0,
+    times: normalizeAzkarTimes(obj.times),
+    intervalMin: +(obj.intervalMin || 120),
+    voiceEnabled: obj.voiceEnabled === true,
+    bannerEnabled: obj.bannerEnabled !== false
+  });
   const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
   for (let i = hv.length - 1; i >= 0; i--) {
     const s = String(hv[i] || '');
     if (s.startsWith('__azkar_cfg:')) {
-      try {
-        const obj = JSON.parse(s.slice(12));
-        return {
-          enabledForAll: obj.enabledForAll !== false,
-          intervalMin: +(obj.intervalMin || 15),
-          voiceEnabled: obj.voiceEnabled !== false,
-          bannerEnabled: obj.bannerEnabled !== false
-        };
-      } catch (e) {}
+      try { return parseCfg(JSON.parse(s.slice(12))); } catch (e) {}
     }
   }
   try {
     const raw = localStorage.getItem('global_azkar_cfg_v1');
-    if (raw) {
-      const obj = JSON.parse(raw);
-      return {
-        enabledForAll: obj.enabledForAll !== false,
-        intervalMin: +(obj.intervalMin || 15),
-        voiceEnabled: obj.voiceEnabled !== false,
-        bannerEnabled: obj.bannerEnabled !== false
-      };
-    }
+    if (raw) return parseCfg(JSON.parse(raw));
   } catch (e) {}
-  return { enabledForAll: true, intervalMin: 15, voiceEnabled: true, bannerEnabled: true };
+  return parseCfg({});
 }
 
 async function saveGlobalAzkarConfig(cfg) {
+  const prev = getGlobalAzkarConfig();
   const clean = {
-    enabledForAll: cfg.enabledForAll !== false,
-    intervalMin: +(cfg.intervalMin || 15),
-    voiceEnabled: cfg.voiceEnabled !== false,
-    bannerEnabled: cfg.bannerEnabled !== false,
+    enabledForAll: cfg.enabledForAll !== undefined ? !!cfg.enabledForAll : prev.enabledForAll,
+    scheduleMode: cfg.scheduleMode || prev.scheduleMode || 'scheduled',
+    frequency: cfg.frequency || prev.frequency || 'daily',
+    weekday: cfg.weekday != null ? +cfg.weekday : prev.weekday,
+    times: normalizeAzkarTimes(cfg.times || prev.times),
+    intervalMin: +(cfg.intervalMin || prev.intervalMin || 120),
+    voiceEnabled: cfg.voiceEnabled !== undefined ? cfg.voiceEnabled === true : prev.voiceEnabled,
+    bannerEnabled: cfg.bannerEnabled !== undefined ? cfg.bannerEnabled !== false : prev.bannerEnabled,
     updatedAt: Date.now()
   };
   try { localStorage.setItem('global_azkar_cfg_v1', JSON.stringify(clean)); } catch (e) {}
@@ -696,6 +701,7 @@ async function saveGlobalAzkarConfig(cfg) {
     S.ordSet.hidden_views = nextHidden;
     await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true).catch(() => {});
   }
+  return clean;
 }
 
 function canViewerSeeAdminInTasks(adminMember, viewerMember, activeCo) {

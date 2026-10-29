@@ -1,24 +1,47 @@
 /* ---------- الإعدادات ---------- */
-async function autoEnablePush() {
-    if (!S.me || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+let _pushGestureBound = false;
+async function autoEnablePush(fromGesture) {
+    if (!S.me || !('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') return false;
     try {
-        // طلب الصلاحية تلقائياً إذا لم تكن ممنوحة
-        const perm = await Notification.requestPermission();
-        if (perm !== 'granted') return;
+        let perm = Notification.permission;
+        if (perm === 'default') {
+            perm = await Notification.requestPermission().catch(() => 'default');
+        }
+        if (perm !== 'granted') return false;
 
         const reg = await navigator.serviceWorker.ready;
+        const vapidStr = (typeof window !== 'undefined' && window.__CFG && window.__CFG.vapid) || VAPID_PUBLIC;
+        const key = Uint8Array.from(atob(vapidStr.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+
         let sub = await reg.pushManager.getSubscription();
-        
-        const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-        
-        // إذا لم يكن هناك اشتراك، قم بإنشائه بصمت
+        if (sub && sub.options && sub.options.applicationServerKey) {
+            const curKey = new Uint8Array(sub.options.applicationServerKey);
+            if (curKey.length !== key.length || curKey.some((b, i) => b !== key[i])) {
+                await sub.unsubscribe().catch(() => {});
+                sub = null;
+            }
+        }
         if (!sub) {
             sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
         }
-        
-        // تحديث قاعدة البيانات بصمت لضمان وصول الإشعارات دائماً
-        await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() });
+        if (sub) {
+            await sb.from('push_subs').upsert({ endpoint: sub.endpoint, email: S.me.email, sub: sub.toJSON() }).catch(() => {});
+            return true;
+        }
     } catch (e) { console.log('Auto push error:', e); }
+    return false;
+}
+if (!_pushGestureBound) {
+    _pushGestureBound = true;
+    const _tryPushOnTap = () => {
+        if (typeof S !== 'undefined' && S && S.me) {
+            autoEnablePush(true);
+            document.removeEventListener('pointerdown', _tryPushOnTap);
+            document.removeEventListener('click', _tryPushOnTap);
+        }
+    };
+    document.addEventListener('pointerdown', _tryPushOnTap, { passive: true });
+    document.addEventListener('click', _tryPushOnTap, { passive: true });
 }
   
 function orgSettingsHtml() {

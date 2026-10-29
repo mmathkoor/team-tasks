@@ -1,7 +1,7 @@
 // ===== نافذة التنبيه المنبثقة + نغمة مطوّلة + الحل الذهبي للتنبيه بالخلفية =====
 const ALERT = { q: [], cur: null, ctx: null, timer: null, keepAliveAudio: null };
 const alertSoundOn = () => localStorage.getItem('alert_sound') !== 'off';
-const azkarVoiceOn = () => localStorage.getItem('azkar_voice_on') !== 'off';
+const azkarVoiceOn = () => localStorage.getItem('azkar_voice_on') === 'on';
 
 // توليد ملف WAV صامت متناهي الصغر لإبقاء جلسة الخلفية نشطة في أندرويد (مثل تطبيقات الأذكار)
 function createSilentWavDataUri() {
@@ -48,7 +48,7 @@ function playBackgroundAzkarToneAndVoice(spokenText) {
       setTimeout(() => { try { chime(ctx, ctx.currentTime + 0.02); } catch (e) {} }, 1200);
     }
     if (navigator.vibrate) navigator.vibrate([500, 150, 500, 150, 800]);
-    if (azkarVoiceOn() && spokenText && 'speechSynthesis' in window) {
+    if (azkarVoiceSettingOn() && spokenText && 'speechSynthesis' in window) {
       setTimeout(() => {
         try {
           window.speechSynthesis.cancel();
@@ -58,6 +58,8 @@ function playBackgroundAzkarToneAndVoice(spokenText) {
           window.speechSynthesis.speak(u);
         } catch (e) {}
       }, 900);
+    } else if ('speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
     }
   } catch (e) {}
 }
@@ -99,20 +101,100 @@ function nextAlert() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ALERT.cur) startRing(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const m = e.data; if (m && typeof m === 'object' && m.type === 'alert') { if (m.nid) { if (INBOX.alerted.has(m.nid)) return; INBOX.alerted.add(m.nid); } showAlert(m); } });
 
-const azkarGlobalCfg = () => typeof getGlobalAzkarConfig === 'function' ? getGlobalAzkarConfig() : { enabledForAll: true, intervalMin: 15, voiceEnabled: true, bannerEnabled: true };
+const AZKAR_WD = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const azkarGlobalCfg = () => typeof getGlobalAzkarConfig === 'function'
+  ? getGlobalAzkarConfig()
+  : { enabledForAll: true, scheduleMode: 'scheduled', frequency: 'daily', weekday: 0, times: ['09:00', '20:00'], intervalMin: 120, voiceEnabled: false, bannerEnabled: true };
+
 const azkarReminderOn = () => {
   const g = azkarGlobalCfg();
   if (g.enabledForAll) return localStorage.getItem('azkar_reminder_on') !== 'off';
   return localStorage.getItem('azkar_reminder_on') === 'on';
 };
-const azkarReminderMin = () => +(localStorage.getItem('azkar_reminder_min') || azkarGlobalCfg().intervalMin || 15);
+const azkarScheduleMode = () => localStorage.getItem('azkar_schedule_mode') || azkarGlobalCfg().scheduleMode || 'scheduled';
+const azkarFrequency = () => localStorage.getItem('azkar_frequency') || azkarGlobalCfg().frequency || 'daily';
+const azkarWeekday = () => {
+  const v = localStorage.getItem('azkar_weekday');
+  return v != null && v !== '' ? +v : +(azkarGlobalCfg().weekday || 0);
+};
+const azkarScheduledTimes = () => {
+  try {
+    const raw = localStorage.getItem('azkar_times_v1');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr;
+    }
+  } catch (e) {}
+  return azkarGlobalCfg().times || ['09:00', '20:00'];
+};
+const azkarReminderMin = () => +(localStorage.getItem('azkar_reminder_min') || azkarGlobalCfg().intervalMin || 120);
 const azkarVoiceSettingOn = () => {
   const local = localStorage.getItem('azkar_voice_on');
   if (local === 'on' || local === 'off') return local === 'on';
-  return azkarGlobalCfg().voiceEnabled !== false;
+  return azkarGlobalCfg().voiceEnabled === true;
 };
 
-// ===== شريط الإشعار العلوي المنبثق (بنفس شكل إشعار أندرويد/تطبيق ذكر — يعمل تلقائياً لجميع الموظفين بدون أي إذن!) =====
+function formatTimeArabic12h(hhmm) {
+  const parts = String(hhmm || '09:00').split(':');
+  const h24 = +parts[0] || 0;
+  const m = String(parts[1] || '00').padStart(2, '0');
+  const period = h24 >= 12 ? 'مساءً' : 'صباحاً';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return h12 + ':' + m + ' ' + period;
+}
+
+function getClientFiredSlots() {
+  try { return JSON.parse(localStorage.getItem('azkar_fired_slots_v1') || '{}') || {}; } catch (e) { return {}; }
+}
+function markClientSlotFired(slotKey) {
+  if (!slotKey) return;
+  const map = getClientFiredSlots();
+  map[slotKey] = Date.now();
+  // تنظيف المفاتيح القديمة (أكثر من 7 أيام)
+  const cutoff = Date.now() - 7 * 864e5;
+  Object.keys(map).forEach(k => { if (map[k] < cutoff) delete map[k]; });
+  try { localStorage.setItem('azkar_fired_slots_v1', JSON.stringify(map)); } catch (e) {}
+}
+
+// فحص ما إذا كان قد حان موعد التنبيه حسب الجدول المحدد (مثل المهام المتكررة)
+function checkClientScheduleSlotDue() {
+  const mode = azkarScheduleMode();
+  const now = new Date();
+  const ymdStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const fired = getClientFiredSlots();
+
+  if (mode === 'once_daily') {
+    const k = 'daily_' + ymdStr;
+    return fired[k] ? null : k;
+  }
+  if (mode === 'interval') {
+    const minMs = Math.max(15, azkarReminderMin()) * 60 * 1000;
+    const lastPush = +(localStorage.getItem('azkar_last_fcm_ts') || 0);
+    if (Date.now() - lastPush >= minMs) return 'int_' + Math.floor(Date.now() / minMs);
+    return null;
+  }
+  // الوضع الافتراضي: scheduled (في أوقات وساعات محددة مثل المهام المتكررة)
+  const freq = azkarFrequency();
+  const day = now.getDay();
+  if (freq === 'workdays' && day === 5) return null; // الجمعة إجازة
+  if (freq === 'weekly' && day !== azkarWeekday()) return null;
+
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const times = azkarScheduledTimes();
+  for (const tStr of times) {
+    const parts = String(tStr || '').split(':');
+    if (parts.length !== 2) continue;
+    const slotMins = (+parts[0]) * 60 + (+parts[1]);
+    // ينطلق خلال نافذة الساعة المحددة (حتى 20 دقيقة من حلولها) ولمرة واحدة فقط لهذه الساعة
+    if (nowMins >= slotMins && nowMins <= slotMins + 20) {
+      const slotKey = ymdStr + '_' + tStr;
+      if (!fired[slotKey]) return slotKey;
+    }
+  }
+  return null;
+}
+
+// ===== شريط الإشعار العلوي المنبثق (داخل التطبيق) =====
 function showHeadsUpAzkarBanner(opts) {
   if (!opts) return;
   let el = document.getElementById('azkar_headsup_banner');
@@ -137,7 +219,7 @@ function showHeadsUpAzkarBanner(opts) {
         '<div style="min-width:0;flex:1">' +
           '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
             '<b style="font-size:14px;color:#fff">' + esc(opts.title || '⏰ تذكير بالمهام المتأخرة') + '</b>' +
-            '<span style="font-size:10.5px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:99px;color:#cbd5e1">تذكير تلقائي</span>' +
+            '<span style="font-size:10.5px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:99px;color:#cbd5e1">تذكير مجدول</span>' +
           '</div>' +
           '<div style="font-size:12.5px;color:#e2e8f0;margin-top:3px">' + esc(opts.subtitle || '') + '</div>' +
           linesHtml +
@@ -150,19 +232,19 @@ function showHeadsUpAzkarBanner(opts) {
         ? '<button type="button" id="azk_bn_done" style="flex:1;padding:6px 10px;border-radius:9px;border:0;background:#16a34a;color:#fff;font:700 12px Tajawal;cursor:pointer">✅ إنجاز المهمة فوراً</button>'
         : '') +
       '<button type="button" id="azk_bn_open" style="flex:1;padding:6px 10px;border-radius:9px;border:1px solid #d4af6a;background:rgba(212,175,106,.18);color:#f6e3a8;font:700 12px Tajawal;cursor:pointer">📋 فتح المهام المتأخرة</button>' +
-      '<button type="button" id="azk_bn_snooze" style="padding:6px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#e2e8f0;font:600 11.5px Tajawal;cursor:pointer">⏰ غفوة 15د</button>' +
+      '<button type="button" id="azk_bn_snooze" style="padding:6px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#e2e8f0;font:600 11.5px Tajawal;cursor:pointer">⏰ غفوة ساعة</button>' +
     '</div>';
 
   clearTimeout(el._hideTm);
-  el._hideTm = setTimeout(() => { if (el) el.remove(); }, 22000);
+  el._hideTm = setTimeout(() => { if (el) el.remove(); }, 20000);
 
   const btnX = document.getElementById('azk_bn_x');
   if (btnX) btnX.onclick = () => el.remove();
   const btnSnooze = document.getElementById('azk_bn_snooze');
   if (btnSnooze) btnSnooze.onclick = () => {
-    localStorage.setItem('azkar_snooze_until', String(Date.now() + 15 * 60 * 1000));
+    localStorage.setItem('azkar_snooze_until', String(Date.now() + 60 * 60 * 1000));
     el.remove();
-    if (typeof toast === 'function') toast('تم تأجيل التذكير لمدة 15 دقيقة ⏰');
+    if (typeof toast === 'function') toast('تم تأجيل التذكير لمدة ساعة ⏰');
   };
   const btnOpen = document.getElementById('azk_bn_open');
   if (btnOpen) btnOpen.onclick = () => {
@@ -190,7 +272,12 @@ async function syncOverdueDigestToSw() {
 
   const digest = {
     enabled: azkarReminderOn(),
+    scheduleMode: azkarScheduleMode(),
+    frequency: azkarFrequency(),
+    weekday: azkarWeekday(),
+    times: azkarScheduledTimes(),
     intervalMin: azkarReminderMin(),
+    firedSlots: getClientFiredSlots(),
     lateCount: lateTasks.length,
     todayCount: todayTasks.length,
     titles: sample,
@@ -213,27 +300,27 @@ async function syncOverdueDigestToSw() {
       }
       if (reg && 'periodicSync' in reg && azkarReminderOn()) {
         await reg.periodicSync.register('overdue-tasks-reminder', {
-          minInterval: azkarReminderMin() * 60 * 1000
+          minInterval: 30 * 60 * 1000
         }).catch(() => {});
       }
     } catch (e) {}
   }
 }
 
-async function sendServerPushToSelf(title, body, firstTaskId) {
+// إرسال إشعار جوال خارجي حقيقي (Web Push) عبر /api/remind بدون فتح نافذة داخلية تمسحه
+async function sendExternalRemindPush(title, body, firstTaskId, isTest = false, teamSlot = '') {
   if (!S.me || !S.me.email || !navigator.onLine) return false;
   try {
     const token = typeof tok === 'function' ? await tok() : '';
-    const r = await fetch('/api/notify', {
+    const r = await fetch('/api/remind', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({
+        self: !teamSlot,
+        test: !!isTest,
+        team_slot: teamSlot || undefined,
         title: title || '⏰ تذكير بالمهام المتأخرة',
         body: body || 'لديك مهام تحتاج متابعة في النظام',
-        assignee_email: S.me.email,
-        for_all: false,
-        is_custom: true,
-        priority: 'urgent',
         task_id: firstTaskId || undefined
       })
     });
@@ -243,7 +330,7 @@ async function sendServerPushToSelf(title, body, firstTaskId) {
   }
 }
 
-async function triggerAzkarCheckNow(forceTest, delayMs = 0) {
+async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
   await syncOverdueDigestToSw();
   const snoozeUntil = +(localStorage.getItem('azkar_snooze_until') || 0);
   if (!forceTest && snoozeUntil > Date.now()) return;
@@ -255,68 +342,99 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0) {
   const sample = (lateTasks.length ? lateTasks : todayTasks).slice(0, 3).map(t => t.title);
   const firstId = (lateTasks[0] && lateTasks[0].id) || (todayTasks[0] && todayTasks[0].id) || null;
 
-  // 1) إرسال أمر لـ Service Worker بصمت إذا كانت صلاحية إشعارات المتصفح متوفرة (بدون إجبار أو توقف)
-  if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && reg.active) {
-        reg.active.postMessage({ type: 'CHECK_OVERDUE_NOW', force: !!forceTest, delayMs: delayMs || 0 });
-      }
-    } catch (e) {}
+  let dueSlotKey = null;
+  if (!forceTest) {
+    if (lateTasks.length === 0 && todayTasks.length === 0) return;
+    dueSlotKey = checkClientScheduleSlotDue();
+    if (!dueSlotKey) return;
+    markClientSlotFired(dueSlotKey);
+    localStorage.setItem('azkar_last_fcm_ts', String(Date.now()));
+    await syncOverdueDigestToSw();
   }
 
-  // 2) الحل الذهبي التلقائي لجميع الموظفين (يعمل 100% بدون أي أذونات من الجوال!)
-  const fireGolden = () => {
-    const lastPush = +(localStorage.getItem('azkar_last_fcm_ts') || 0);
-    const minMs = Math.max(5, azkarReminderMin()) * 60 * 1000;
-    const dueNow = forceTest || ((lateTasks.length > 0 || todayTasks.length > 0) && (Date.now() - lastPush >= minMs));
-    if (!dueNow) return;
-    localStorage.setItem('azkar_last_fcm_ts', String(Date.now()));
+  const pTitle = lateTasks.length > 0
+    ? ('🚨 تذكير: لديك ' + lateTasks.length + ' مهام متأخرة')
+    : todayTasks.length > 0
+      ? ('🔥 تذكير: لديك ' + todayTasks.length + ' مهام مستحقة اليوم')
+      : '🔔 إشعار خارجي من مدير المهام';
+  const subtitle = lateTasks.length > 0
+    ? ('يا ' + ((S.me && S.me.name) || '') + '، لديك مهام تجاوزت موعد التسليم وتحتاج إنجازاً:')
+    : todayTasks.length > 0
+      ? ('لديك مهام مستحقة اليوم بانتظار التنفيذ:')
+      : 'وصلك هذا الإشعار بنجاح según الأوقات المجدولة!';
+  const pBody = sample.length
+    ? ('• ' + sample.join('\n• '))
+    : subtitle;
+  const voiceMsg = lateTasks.length > 0
+    ? ('تذكير من مدير المهام: لديك ' + lateTasks.length + ' مهام متأخرة')
+    : 'تذكير بالمهام المستحقة';
 
-    const pTitle = lateTasks.length > 0
-      ? ('🚨 تذكير: لديك ' + lateTasks.length + ' مهام متأخرة')
-      : todayTasks.length > 0
-        ? ('🔥 تذكير: لديك ' + todayTasks.length + ' مهام مستحقة اليوم')
-        : '📿 المنبّه الذهبي التلقائي يعمل بنجاح!';
-    const subtitle = lateTasks.length > 0
-      ? ('يا ' + ((S.me && S.me.name) || '') + '، لديك مهام تجاوزت موعد التسليم وتحتاج إنجازاً:')
-      : todayTasks.length > 0
-        ? ('لديك مهام مستحقة اليوم بانتظار التنفيذ:')
-        : 'يظهر هذا الإشعار العلوي المنبثق تلقائياً لجميع الموظفين مع الصوت بدون الحاجة لأي إذن في الجوال!';
-    const pBody = sample.length
-      ? ('أبرز المهام:\n• ' + sample.join('\n• '))
-      : subtitle;
-    const voiceMsg = lateTasks.length > 0
-      ? ('تذكير من مدير المهام: لديك ' + lateTasks.length + ' مهام متأخرة بانتظار الإنجاز')
-      : todayTasks.length > 0
-        ? ('تذكير: لديك ' + todayTasks.length + ' مهام مستحقة اليوم')
-        : 'المنبّه الذهبي للمهام يعمل بنجاح';
-
-    // أ) إظهار شريط الإشعار العلوي المنبثق فوراً (بدون أي إذن من المتصفح!)
-    showHeadsUpAzkarBanner({
-      title: pTitle,
-      subtitle,
-      sample,
-      firstTaskId: firstId,
-      lateCount: lateTasks.length,
-      todayCount: todayTasks.length
-    });
-
-    // ب) تشغيل النغمة + القراءة الصوتية العربية بالخلفية والواجهة
-    if (azkarVoiceSettingOn()) {
-      playBackgroundAzkarToneAndVoice(voiceMsg);
-    } else {
-      playBackgroundAzkarToneAndVoice('');
+  // 1) إذا كان الاختبار مخصصاً لـ "خارج التطبيق" (external_only): نرسله لنظام الجوال الخارجي فقط بعد المهلة المحددة
+  if (modeOpt === 'external_only') {
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && reg.active) {
+          reg.active.postMessage({ type: 'CHECK_OVERDUE_NOW', force: true, delayMs: delayMs || 7000 });
+        }
+      } catch (e) {}
     }
+    setTimeout(async () => {
+      playBackgroundAzkarToneAndVoice(azkarVoiceSettingOn() ? voiceMsg : '');
+      await sendExternalRemindPush(pTitle, pBody, firstId, true);
+      if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification(pTitle, {
+            body: pBody,
+            icon: '/icon-192.png',
+            badge: '/badge-96.png',
+            vibrate: [500, 150, 500, 150, 800],
+            requireInteraction: true,
+            renotify: true,
+            tag: 'azkar-overdue-remind',
+            actions: firstId ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }] : [{ action: 'open', title: '📋 عرض المهام' }],
+            data: { url: '/', task_id: firstId, task_title: sample[0] || '' }
+          });
+        } catch (e) {}
+      }
+    }, delayMs || 7000);
+    return;
+  }
 
-    // ج) إرسال إشعار سحابي إضافي إن كان متاحاً
-    if (S.me && navigator.onLine && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      sendServerPushToSelf(pTitle, pBody, firstId);
+  // 2) التنفيذ العادي (عند حلول الساعة المجدولة أو المعاينة الفورية داخل التطبيق)
+  const fireNow = async () => {
+    if (!document.hidden || modeOpt === 'inapp_only') {
+      showHeadsUpAzkarBanner({
+        title: pTitle,
+        subtitle,
+        sample,
+        firstTaskId: firstId,
+        lateCount: lateTasks.length,
+        todayCount: todayTasks.length
+      });
+    }
+    playBackgroundAzkarToneAndVoice(azkarVoiceSettingOn() ? voiceMsg : '');
+
+    if (modeOpt !== 'inapp_only') {
+      // إرسال الإشعار الخارجي على شاشة الجوال
+      if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          if (reg && reg.active) {
+            reg.active.postMessage({ type: 'CHECK_OVERDUE_NOW', force: true, delayMs: 0 });
+          }
+        } catch (e) {}
+      }
+      // في الساعة المجدولة نرسل Web Push للفريق لكي يصل الإشعار الخارجي حتى لمن تطبيقه مغلق تماماً
+      if (dueSlotKey && navigator.onLine) {
+        sendExternalRemindPush(pTitle, pBody, firstId, false, dueSlotKey);
+      }
     }
   };
 
-  if (delayMs > 0) setTimeout(fireGolden, delayMs);
-  else fireGolden();
+  if (delayMs > 0) setTimeout(fireNow, delayMs);
+  else fireNow();
 }
 
 let _azkarWorker = null;
@@ -346,12 +464,12 @@ function startAzkarReminderEngine() {
   syncOverdueDigestToSw();
   acquireScreenAndBackgroundKeepAlive();
 
-  // عند أول دخول للموظف، إذا كان لديه مهام متأخرة ينزل له الإشعار العلوي تلقائياً بعد 6 ثوانٍ بدون أي إذن!
+  // فحص جدول المواعيد المحددة فقط (بدون إزعاج عشوائي عند كل فتح للتطبيق!)
   if (!S._initialAzkarChecked) {
     S._initialAzkarChecked = true;
     setTimeout(() => {
-      if (azkarReminderOn()) triggerAzkarCheckNow(false, 0);
-    }, 6000);
+      if (azkarReminderOn()) triggerAzkarCheckNow(false, 0, 'auto');
+    }, 4000);
   }
 
   if (_azkarWorker) return;
@@ -365,11 +483,11 @@ function startAzkarReminderEngine() {
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     _azkarWorker = new Worker(URL.createObjectURL(blob));
     _azkarWorker.onmessage = () => {
-      if (azkarReminderOn()) triggerAzkarCheckNow(false, 0);
+      if (azkarReminderOn()) triggerAzkarCheckNow(false, 0, 'auto');
     };
   } catch (e) {
     setInterval(() => {
-      if (azkarReminderOn()) triggerAzkarCheckNow(false, 0);
+      if (azkarReminderOn()) triggerAzkarCheckNow(false, 0, 'auto');
     }, 30000);
   }
 
@@ -380,7 +498,7 @@ function startAzkarReminderEngine() {
     }
     if (azkarReminderOn()) {
       startSilentAudioKeepAlive();
-      triggerAzkarCheckNow(false, 0);
+      triggerAzkarCheckNow(false, 0, 'auto');
     }
   });
 }
@@ -388,86 +506,239 @@ function startAzkarReminderEngine() {
 function alertSettingsHtml() {
   const isOn = azkarReminderOn();
   const vOn = azkarVoiceSettingOn();
+  const mode = azkarScheduleMode();
+  const freq = azkarFrequency();
+  const wd = azkarWeekday();
+  const times = azkarScheduledTimes();
   const minVal = azkarReminderMin();
   const gCfg = azkarGlobalCfg();
   const adm = typeof isAdmin === 'function' && isAdmin();
   const intervals = [
-    [5, 'كل 5 دقائق (تذكير فائق القوة)'],
-    [15, 'كل 15 دقيقة (موصى به لجميع الموظفين)'],
-    [30, 'كل 30 دقيقة'],
     [60, 'كل ساعة'],
-    [120, 'كل ساعتين'],
-    [240, 'كل 4 ساعات']
+    [120, 'كل ساعتين (موصى به)'],
+    [240, 'كل 4 ساعات'],
+    [360, 'كل 6 ساعات'],
+    [30, 'كل 30 دقيقة']
   ];
+
+  const timesBadgesHtml = times.map(t =>
+    '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;font-size:13px;background:var(--card);border:1px solid var(--gold,#c9a24e)">' +
+      '⏰ <b>' + esc(formatTimeArabic12h(t)) + '</b> <small class="m">(' + esc(t) + ')</small>' +
+      (times.length > 1 ? '<button type="button" class="s dng" data-rm-azktime="' + esc(t) + '" style="padding:1px 6px;font-size:11px;border-radius:6px" title="حذف هذا الوقت">✕</button>' : '') +
+    '</span>'
+  ).join(' ');
+
   return '<div class="card" style="margin-bottom:12px;border:2px solid var(--gold,#c9a24e)">' +
-    '<h2>📿 الحل الذهبي التلقائي لمنبّه المهام المتأخرة (يعمل لجميع الموظفين بدون أذونات!)</h2>' +
-    '<p class="m" style="margin-bottom:10px">يُظهر <b>شريط إشعار علوي منبثق (بنفس شكل إشعارات الجوال وتطبيق ذكر)</b> مع <b>نغمة + ناطق صوتي عربي</b> تلقائياً عند كل موظف لديه مهام متأخرة، <b>بدون الحاجة لأن يفعّل الموظف أي إذن أو يدخل لإعدادات جواله</b>.</p>' +
-    (adm ? '<label class="chk" style="margin-bottom:8px;background:var(--col);padding:8px 10px;border-radius:10px;border:1px solid var(--gold)"><input type="checkbox" id="azk_global_all" ' + (gCfg.enabledForAll ? 'checked' : '') + '> <b>👑 تعميم وتفعيل تلقائي لجميع الموظفين في كل المتاجر (بدون طلب إذن منهم)</b></label>' : '') +
-    '<label class="chk" style="margin-bottom:8px"><input type="checkbox" id="azk_on" ' + (isOn ? 'checked' : '') + '> <b>تفعيل الإشعار العلوي المنبثق للمهام المتأخرة</b></label>' +
-    '<label class="chk" style="margin-bottom:10px"><input type="checkbox" id="azk_voice" ' + (vOn ? 'checked' : '') + '> <b>🗣️ تفعيل الناطق الصوتي العربي («تذكير: لديك مهام متأخرة...»)</b></label>' +
-    '<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">' +
-      '<label style="flex:1 1 200px">⏱️ تكرار التذكير التلقائي للموظفين:<select id="azk_min" style="margin-top:4px">' +
-        intervals.map(([v, l]) => '<option value="' + v + '"' + (minVal === v ? ' selected' : '') + '>' + l + '</option>').join('') +
-      '</select></label>' +
-      '<button type="button" class="p s" id="azk_test" style="margin-top:18px">📲 جرّب الحل الذهبي الآن (فوري + بعد 4 ثوانٍ)</button>' +
+    '<h2>⏰ جدولة تنبيهات المهام المتأخرة (بأوقات وساعات محددة مثل المهام المتكررة)</h2>' +
+    '<p class="m" style="margin-bottom:10px">حدد الساعات والأيام الدقيقة التي ينطلق فيها تذكير المهام المتأخرة لجميع الموظفين <b>بدون إزعاج متكرر</b>، مع إرسال <b>إشعار خارجي لشاشة الجوال</b> في الأوقات المحددة.</p>' +
+    (adm ? '<label class="chk" style="margin-bottom:8px;background:var(--col);padding:8px 10px;border-radius:10px;border:1px solid var(--gold)"><input type="checkbox" id="azk_global_all" ' + (gCfg.enabledForAll ? 'checked' : '') + '> <b>👑 تعميم هذا الجدول تلقائياً على جميع الموظفين في كل المتاجر</b></label>' : '') +
+    '<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:10px">' +
+      '<label class="chk"><input type="checkbox" id="azk_on" ' + (isOn ? 'checked' : '') + '> <b>🔔 تفعيل منبّه المهام المتأخرة</b></label>' +
+      '<label class="chk"><input type="checkbox" id="azk_voice" ' + (vOn ? 'checked' : '') + '> <b>🗣️ القراءة الصوتية بالكلام (مغلق افتراضياً — نغمة فقط)</b></label>' +
     '</div>' +
+
+    '<div style="background:var(--col);padding:12px;border-radius:12px;border:1px solid var(--line);margin-bottom:12px">' +
+      '<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
+        '<label style="flex:1 1 240px"><b>📅 طريقة جدولة التنبيه:</b>' +
+          '<select id="azk_mode" style="margin-top:4px">' +
+            '<option value="scheduled"' + (mode === 'scheduled' ? ' selected' : '') + '>⏰ في أوقات وساعات محددة (مثل المهام المتكررة — بدون إزعاج)</option>' +
+            '<option value="once_daily"' + (mode === 'once_daily' ? ' selected' : '') + '>🌅 مرة واحدة فقط في اليوم</option>' +
+            '<option value="interval"' + (mode === 'interval' ? ' selected' : '') + '>🔁 تكرار دوري كل عدة ساعات</option>' +
+          '</select>' +
+        '</label>' +
+      '</div>' +
+
+      '<div id="azk_sched_box" style="' + (mode === 'scheduled' ? '' : 'display:none;') + 'padding-top:8px;border-top:1px dashed var(--line)">' +
+        '<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
+          '<label style="flex:1 1 180px">🔁 أيام التذكير:' +
+            '<select id="azk_freq" style="margin-top:4px">' +
+              '<option value="daily"' + (freq === 'daily' ? ' selected' : '') + '>يومياً</option>' +
+              '<option value="workdays"' + (freq === 'workdays' ? ' selected' : '') + '>أيام الدوام (السبت – الخميس)</option>' +
+              '<option value="weekly"' + (freq === 'weekly' ? ' selected' : '') + '>أسبوعياً (يوم محدد)</option>' +
+            '</select>' +
+          '</label>' +
+          '<label id="azk_wd_wrap" style="flex:1 1 150px;' + (freq === 'weekly' ? '' : 'display:none') + '">📆 يوم الأسبوع:' +
+            '<select id="azk_wd" style="margin-top:4px">' +
+              AZKAR_WD.map((d, i) => '<option value="' + i + '"' + (wd === i ? ' selected' : '') + '>' + d + '</option>').join('') +
+            '</select>' +
+          '</label>' +
+        '</div>' +
+        '<div style="margin-bottom:8px"><b>🕘 الساعات المحددة لإطلاق التنبيه:</b></div>' +
+        '<div id="azk_times_list" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + timesBadgesHtml + '</div>' +
+        '<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">' +
+          '<input type="time" id="azk_time_in" value="14:00" style="max-width:160px">' +
+          '<button type="button" class="p s" id="azk_time_add">＋ إضافة ساعة للتنبيه</button>' +
+          '<span class="m" style="font-size:12px">ينطلق التنبيه في هذه الساعات فقط إذا كان لدى الموظف مهام متأخرة.</span>' +
+        '</div>' +
+      '</div>' +
+
+      '<div id="azk_interval_box" style="' + (mode === 'interval' ? '' : 'display:none;') + 'padding-top:8px;border-top:1px dashed var(--line)">' +
+        '<label>⏱️ المدة بين كل تذكير والآخر:<select id="azk_min" style="margin-top:4px">' +
+          intervals.map(([v, l]) => '<option value="' + v + '"' + (minVal === v ? ' selected' : '') + '>' + l + '</option>').join('') +
+        '</select></label>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="row" style="gap:8px;flex-wrap:wrap">' +
+      '<button type="button" class="p s" id="azk_test_ext" style="flex:2 1 240px">📲 اختبار الإشعار من خارج التطبيق (اضغط ثم اخرج لشاشة الجوال — يصل بعد 7 ثوانٍ)</button>' +
+      '<button type="button" class="s" id="azk_test_in" style="flex:1 1 160px">👁️ معاينة الشريط داخل التطبيق</button>' +
+    '</div>' +
+    '<div id="azk_test_status" class="m" style="margin-top:8px;font-weight:700;color:var(--gold,#c9a24e)"></div>' +
   '</div>' +
   '<div class="card"><h2>🚨 نافذة التنبيه المنبثقة داخل التطبيق</h2>' +
     '<p class="m" style="margin-bottom:10px">عند وصول تنبيه إداري مباشر تظهر نافذة كبيرة مع نغمة واهتزاز حتى يتفاعل معها الموظف.</p>' +
     '<label class="chk"><input type="checkbox" id="al_snd" ' + (alertSoundOn() ? 'checked' : '') + '> تشغيل النغمة والاهتزاز</label>' +
     '<div class="row" style="margin-top:10px"><button class="s" id="al_test">🔔 جرّب النافذة الآن</button></div></div>';
 }
+
 function bindAlertSettings() {
-  const persistGlobalIfAdmin = async () => {
+  const saveAllSettings = async (overrideTimes) => {
+    const mode = $('azk_mode') ? $('azk_mode').value : azkarScheduleMode();
+    const freq = $('azk_freq') ? $('azk_freq').value : azkarFrequency();
+    const wd = $('azk_wd') ? +$('azk_wd').value : azkarWeekday();
+    const times = overrideTimes || azkarScheduledTimes();
+    const minVal = $('azk_min') ? +$('azk_min').value : azkarReminderMin();
+
+    localStorage.setItem('azkar_schedule_mode', mode);
+    localStorage.setItem('azkar_frequency', freq);
+    localStorage.setItem('azkar_weekday', String(wd));
+    localStorage.setItem('azkar_times_v1', JSON.stringify(times));
+    localStorage.setItem('azkar_reminder_min', String(minVal));
+
     if (typeof isAdmin === 'function' && isAdmin() && typeof saveGlobalAzkarConfig === 'function') {
       await saveGlobalAzkarConfig({
         enabledForAll: $('azk_global_all') ? $('azk_global_all').checked : true,
-        intervalMin: $('azk_min') ? +$('azk_min').value : 15,
-        voiceEnabled: $('azk_voice') ? $('azk_voice').checked : true,
+        scheduleMode: mode,
+        frequency: freq,
+        weekday: wd,
+        times,
+        intervalMin: minVal,
+        voiceEnabled: $('azk_voice') ? $('azk_voice').checked : false,
         bannerEnabled: $('azk_on') ? $('azk_on').checked : true
       });
     }
+    await syncOverdueDigestToSw();
   };
+
   if ($('al_snd')) $('al_snd').onchange = e => { localStorage.setItem('alert_sound', e.target.checked ? 'on' : 'off'); };
   if ($('al_test')) $('al_test').onclick = () => { unlockAudio(); showAlert({ title: '🔔 تنبيه تجريبي', body: 'هكذا ستظهر لك التنبيهات والتطبيق مفتوح.' }); };
+
   if ($('azk_global_all')) {
     $('azk_global_all').onchange = async e => {
-      await persistGlobalIfAdmin();
-      if (typeof toast === 'function') toast(e.target.checked ? 'تم تعميم المنبّه التلقائي لجميع الموظفين في كل المتاجر ✓' : 'تم إلغاء التعميم الإجباري');
+      await saveAllSettings();
+      if (typeof toast === 'function') toast(e.target.checked ? 'تم تعميم جدول التنبيهات لجميع الموظفين في كل المتاجر ✓' : 'تم إلغاء التعميم');
     };
   }
   if ($('azk_on')) {
     $('azk_on').onchange = async e => {
       localStorage.setItem('azkar_reminder_on', e.target.checked ? 'on' : 'off');
       if (e.target.checked) unlockAudio();
-      await persistGlobalIfAdmin();
-      await syncOverdueDigestToSw();
-      if (typeof toast === 'function') toast(e.target.checked ? 'تم تفعيل المنبّه الذهبي التلقائي ✓' : 'تم إيقاف المنبّه الدوري');
+      await saveAllSettings();
+      if (typeof toast === 'function') toast(e.target.checked ? 'تم تفعيل منبّه المهام المتأخرة ✓' : 'تم إيقاف المنبّه');
     };
   }
   if ($('azk_voice')) {
     $('azk_voice').onchange = async e => {
       localStorage.setItem('azkar_voice_on', e.target.checked ? 'on' : 'off');
-      await persistGlobalIfAdmin();
-      if (e.target.checked) playBackgroundAzkarToneAndVoice('تم تفعيل المنبّه الناطق لجميع الموظفين بنجاح');
+      if (!e.target.checked && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (err) {}
+      }
+      await saveAllSettings();
+      if (e.target.checked) {
+        playBackgroundAzkarToneAndVoice('تم تفعيل القراءة الصوتية بنجاح');
+      } else {
+        if (typeof toast === 'function') toast('تم إيقاف الكلام الصوتي — سيتم الاكتفاء بالنغمة فقط 🔔');
+      }
+    };
+  }
+  if ($('azk_mode')) {
+    $('azk_mode').onchange = async e => {
+      const m = e.target.value;
+      if ($('azk_sched_box')) $('azk_sched_box').style.display = m === 'scheduled' ? '' : 'none';
+      if ($('azk_interval_box')) $('azk_interval_box').style.display = m === 'interval' ? '' : 'none';
+      await saveAllSettings();
+      if (typeof toast === 'function') toast('تم تحديث طريقة جدولة التنبيه ✓');
+    };
+  }
+  if ($('azk_freq')) {
+    $('azk_freq').onchange = async e => {
+      if ($('azk_wd_wrap')) $('azk_wd_wrap').style.display = e.target.value === 'weekly' ? '' : 'none';
+      await saveAllSettings();
+      if (typeof toast === 'function') toast('تم تحديث أيام التذكير ✓');
+    };
+  }
+  if ($('azk_wd')) {
+    $('azk_wd').onchange = async () => {
+      await saveAllSettings();
+      if (typeof toast === 'function') toast('تم تحديد يوم الأسبوع ✓');
     };
   }
   if ($('azk_min')) {
     $('azk_min').onchange = async e => {
-      localStorage.setItem('azkar_reminder_min', e.target.value);
-      await persistGlobalIfAdmin();
-      await syncOverdueDigestToSw();
-      if (typeof toast === 'function') toast('تم ضبط تكرار التذكير التلقائي كل ' + e.target.value + ' دقيقة ✓');
+      await saveAllSettings();
+      if (typeof toast === 'function') toast('تم ضبط التكرار كل ' + e.target.value + ' دقيقة ✓');
     };
   }
-  if ($('azk_test')) {
-    $('azk_test').onclick = async () => {
+  if ($('azk_time_add')) {
+    $('azk_time_add').onclick = async () => {
+      const val = ($('azk_time_in') && $('azk_time_in').value || '').trim();
+      if (!/^\d{2}:\d{2}$/.test(val)) return;
+      const cur = azkarScheduledTimes();
+      if (!cur.includes(val)) cur.push(val);
+      cur.sort();
+      await saveAllSettings(cur);
+      if (typeof render === 'function') render();
+      if (typeof toast === 'function') toast('تمت إضافة الساعة ' + formatTimeArabic12h(val) + ' إلى جدول التنبيهات ⏰');
+    };
+  }
+  document.querySelectorAll('[data-rm-azktime]').forEach(btn => {
+    btn.onclick = async () => {
+      const target = btn.getAttribute('data-rm-azktime');
+      const cur = azkarScheduledTimes().filter(x => x !== target);
+      if (!cur.length) return;
+      await saveAllSettings(cur);
+      if (typeof render === 'function') render();
+      if (typeof toast === 'function') toast('تم حذف الساعة ' + formatTimeArabic12h(target));
+    };
+  });
+
+  // زر اختبار الإشعار من خارج التطبيق (ينتظر 7 ثوانٍ حتى يخرج المستخدم لشاشة الجوال الرئيسية)
+  if ($('azk_test_ext')) {
+    $('azk_test_ext').onclick = async () => {
       unlockAudio();
-      localStorage.removeItem('azkar_snooze_until');
-      // نعرض الإشعار العلوي المنبثق + الصوت فوراً بدون طلب أي إذن، ونكرره بعد 4 ثوانٍ لاختبار الخلفية
-      triggerAzkarCheckNow(true, 0);
-      if (typeof toast === 'function') toast('✨ انظر أعلى الشاشة! وسيتكرر أيضاً بعد 4 ثوانٍ بالخلفية...');
-      triggerAzkarCheckNow(true, 4000);
+      startSilentAudioKeepAlive();
+      if (typeof autoEnablePush === 'function') await autoEnablePush(true);
+      const btn = $('azk_test_ext');
+      const st = $('azk_test_status');
+      let sec = 7;
+      btn.disabled = true;
+      const updateMsg = s => {
+        const txt = '⏳ اخرج الآن فوراً لشاشة الجوال الرئيسية! سيصلك الإشعار الخارجي بعد (' + s + ') ثوانٍ...';
+        if (st) st.textContent = txt;
+        btn.textContent = '⏳ اخرج لشاشة الجوال الآن (' + s + ' ث)...';
+      };
+      updateMsg(sec);
+      if (typeof toast === 'function') toast('📲 اخرج الآن لشاشة الجوال الرئيسية! سيصلك الإشعار الخارجي بعد 7 ثوانٍ 🔔');
+      triggerAzkarCheckNow(true, 7000, 'external_only');
+      const iv = setInterval(() => {
+        sec--;
+        if (sec > 0) {
+          updateMsg(sec);
+        } else {
+          clearInterval(iv);
+          btn.disabled = false;
+          btn.textContent = '📲 اختبار الإشعار من خارج التطبيق (اضغط ثم اخرج لشاشة الجوال — يصل بعد 7 ثوانٍ)';
+          if (st) st.textContent = '✅ تم إرسال الإشعار الخارجي لنظام الجوال!';
+        }
+      }, 1000);
+    };
+  }
+
+  // زر معاينة الشريط العلوي داخل التطبيق فوراً
+  if ($('azk_test_in')) {
+    $('azk_test_in').onclick = () => {
+      unlockAudio();
+      triggerAzkarCheckNow(true, 0, 'inapp_only');
     };
   }
 }

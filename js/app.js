@@ -83,6 +83,7 @@ async function load() {
   if (typeof updateNet === 'function') updateNet();
   if (typeof rtStart === 'function') rtStart();
   if (typeof plStartHeartbeat === 'function') plStartHeartbeat();
+  if (typeof autoEnablePush === 'function') autoEnablePush(false);
   if (typeof startAzkarReminderEngine === 'function') startAzkarReminderEngine();
   inboxAfterLoad(); recurPing();
 }
