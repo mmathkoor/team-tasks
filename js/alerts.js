@@ -97,6 +97,30 @@ async function syncOverdueDigestToSw() {
   }
 }
 
+async function sendServerPushToSelf(title, body, firstTaskId) {
+  if (!S.me || !S.me.email || !navigator.onLine) return false;
+  try {
+    if (typeof autoEnablePush === 'function') await autoEnablePush();
+    const token = typeof tok === 'function' ? await tok() : '';
+    const r = await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        title: title || '⏰ تذكير بالمهام المتأخرة',
+        body: body || 'لديك مهام تحتاج متابعة في النظام',
+        assignee_email: S.me.email,
+        for_all: false,
+        is_custom: true,
+        priority: 'urgent',
+        task_id: firstTaskId || undefined
+      })
+    });
+    return r.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function triggerAzkarCheckNow(forceTest) {
   await syncOverdueDigestToSw();
   if (!('serviceWorker' in navigator)) return;
@@ -108,17 +132,55 @@ async function triggerAzkarCheckNow(forceTest) {
     if (reg && reg.active) {
       reg.active.postMessage({ type: 'CHECK_OVERDUE_NOW', force: !!forceTest });
     }
+    // تعزيز فائق القوة عبر سيرفر Google FCM Web Push ليوقظ الجوال حتى لو أُغلق المتصفح
+    if (S.me && navigator.onLine) {
+      const td = typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10);
+      const myTasks = (S.tasks || []).filter(t => typeof mine === 'function' && mine(t) && (typeof eff === 'function' ? eff(t) !== 'done' : t.status !== 'done'));
+      const lateTasks = myTasks.filter(t => t.due_on && t.due_on < td);
+      const todayTasks = myTasks.filter(t => t.due_on && t.due_on === td);
+      const lastPush = +(localStorage.getItem('azkar_last_fcm_ts') || 0);
+      const minMs = Math.max(5, azkarReminderMin()) * 60 * 1000;
+      if (forceTest || ((lateTasks.length > 0 || todayTasks.length > 0) && (Date.now() - lastPush >= minMs))) {
+        localStorage.setItem('azkar_last_fcm_ts', String(Date.now()));
+        const sample = (lateTasks.length ? lateTasks : todayTasks).slice(0, 3).map(t => t.title);
+        const firstId = (lateTasks[0] && lateTasks[0].id) || (todayTasks[0] && todayTasks[0].id) || null;
+        const pTitle = lateTasks.length > 0
+          ? ('🚨 تذكير: لديك ' + lateTasks.length + ' مهام متأخرة')
+          : todayTasks.length > 0
+            ? ('🔥 تذكير: لديك ' + todayTasks.length + ' مهام مستحقة اليوم')
+            : '📿 اختبار الإشعار الفوري (FCM Push)';
+        const pBody = sample.length
+          ? ('أبرز المهام:\n• ' + sample.join('\n• '))
+          : 'الإشعار السحابي الفائق يعمل بنجاح ويصل لجوالك حتى والبرنامج مغلق!';
+        sendServerPushToSelf(pTitle, pBody, firstId);
+      }
+    }
   } catch (e) {}
 }
 
 let _azkarWorker = null;
+let _keepAliveLockHeld = false;
+function acquireBackgroundKeepAlive() {
+  if (_keepAliveLockHeld) return;
+  try {
+    if (navigator.locks && navigator.locks.request) {
+      _keepAliveLockHeld = true;
+      navigator.locks.request('matjark_azkar_keep_alive', { mode: 'shared' }, () => new Promise(() => {})).catch(() => { _keepAliveLockHeld = false; });
+    }
+  } catch (e) {}
+}
+
 function startAzkarReminderEngine() {
   syncOverdueDigestToSw();
+  acquireBackgroundKeepAlive();
+  if (typeof autoEnablePush === 'function') {
+    setTimeout(() => autoEnablePush().catch(() => {}), 2500);
+  }
   if (_azkarWorker) return;
   try {
     // Web Worker يعمل في الخلفية حتى عند تصغير المتصفح أو فتح تطبيقات أخرى على الجوال
     const workerCode = `
-      let timer = setInterval(() => { postMessage('tick'); }, 60000);
+      let timer = setInterval(() => { postMessage('tick'); }, 45000);
       onmessage = e => {
         if (e.data === 'ping') postMessage('tick');
       };
@@ -129,10 +191,9 @@ function startAzkarReminderEngine() {
       if (azkarReminderOn()) triggerAzkarCheckNow(false);
     };
   } catch (e) {
-    // بديل في حال عدم دعم Blob Worker
     setInterval(() => {
       if (azkarReminderOn()) triggerAzkarCheckNow(false);
-    }, 60000);
+    }, 45000);
   }
 
   // عند الخروج من التطبيق لتصفح الجوال أو العودة، نحدّث الملخص ونفحص الموعد
@@ -148,6 +209,7 @@ function alertSettingsHtml() {
   const isOn = azkarReminderOn();
   const minVal = azkarReminderMin();
   const intervals = [
+    [5, 'كل 5 دقائق (تذكير فائق القوة)'],
     [15, 'كل 15 دقيقة (تذكير مكثّف)'],
     [30, 'كل 30 دقيقة (موصى به)'],
     [60, 'كل ساعة'],
@@ -155,14 +217,14 @@ function alertSettingsHtml() {
     [240, 'كل 4 ساعات']
   ];
   return '<div class="card" style="margin-bottom:12px;border:1.5px solid var(--gold,#c9a24e)">' +
-    '<h2>📿 منبّه المهام المتأخرة الذكي (إشعارات منبثقة مثل تطبيق الذكر)</h2>' +
-    '<p class="m" style="margin-bottom:10px">يُظهر لك إشعاراً منبثقاً من أعلى شاشة الجوال بالمهام المتأخرة ومهام اليوم حتى لو كان البرنامج مغلقاً أو كنت تتصفح تطبيقاً آخر على جوالك.</p>' +
+    '<h2>📿 منبّه المهام المتأخرة الفائق (FCM Push + إشعار منبثق مثل تطبيق ذكر)</h2>' +
+    '<p class="m" style="margin-bottom:10px">يدمج بين <b>إشعار السيرفر السحابي (Google FCM العاجل)</b> و<b>المنبّه المحلي</b> ليوقظ الجوال ويُظهر الإشعار من أعلى الشاشة حتى لو كان البرنامج مغلقاً تماماً.</p>' +
     '<label class="chk" style="margin-bottom:10px"><input type="checkbox" id="azk_on" ' + (isOn ? 'checked' : '') + '> <b>تفعيل الإشعارات المنبثقة الدورية للمهام المتأخرة على جوالي</b></label>' +
     '<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">' +
       '<label style="flex:1 1 200px">⏱️ تكرار ظهور الإشعار المنبثق:<select id="azk_min" style="margin-top:4px">' +
         intervals.map(([v, l]) => '<option value="' + v + '"' + (minVal === v ? ' selected' : '') + '>' + l + '</option>').join('') +
       '</select></label>' +
-      '<button type="button" class="p s" id="azk_test" style="margin-top:18px">📲 جرّب الإشعار المنبثق خارج البرنامج الآن</button>' +
+      '<button type="button" class="p s" id="azk_test" style="margin-top:18px">📲 جرّب الإشعار الفائق خارج البرنامج (بعد 4 ثوانٍ)</button>' +
     '</div>' +
   '</div>' +
   '<div class="card"><h2>🚨 نافذة التنبيه المنبثقة داخل التطبيق</h2>' +
@@ -179,8 +241,11 @@ function bindAlertSettings() {
       if (e.target.checked && typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
         await Notification.requestPermission().catch(() => {});
       }
+      if (e.target.checked && typeof autoEnablePush === 'function') {
+        await autoEnablePush().catch(() => {});
+      }
       await syncOverdueDigestToSw();
-      if (typeof toast === 'function') toast(e.target.checked ? 'تم تفعيل منبّه المهام المتأخرة الذكي ✓' : 'تم إيقاف المنبّه الدوري');
+      if (typeof toast === 'function') toast(e.target.checked ? 'تم تفعيل منبّه المهام المتأخرة الفائق ✓' : 'تم إيقاف المنبّه الدوري');
     };
   }
   if ($('azk_min')) {
@@ -196,10 +261,13 @@ function bindAlertSettings() {
         const p = await Notification.requestPermission();
         if (p !== 'granted') return alert('الرجاء السماح بالإشعارات في متصفح الجوال أولاً ليظهر الإشعار المنبثق من أعلى الشاشة.');
       }
-      if (typeof toast === 'function') toast('⏳ اخرج للشاشة الرئيسية الآن.. سيظهر الإشعار المنبثق خلال 3 ثوانٍ!');
+      if (typeof autoEnablePush === 'function') {
+        await autoEnablePush().catch(() => {});
+      }
+      if (typeof toast === 'function') toast('⏳ اخرج للشاشة الرئيسية الآن.. سيصلك إشعار سحابي + منبثق خلال 4 ثوانٍ!');
       setTimeout(() => {
         triggerAzkarCheckNow(true);
-      }, 3000);
+      }, 4000);
     };
   }
 }
