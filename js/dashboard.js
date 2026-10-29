@@ -24,7 +24,13 @@ function dashCompute(units, f, now, members) {
     return m && typeof parseMemberMeta === 'function' ? (parseMemberMeta(m).department || '') : '';
   };
   const coOf = u => typeof taskCompany === 'function' ? taskCompany(u.t) : 'متجرك';
-  const mine = u => (!f.who || same(u.who, f.who)) && (!f.meet || u.meeting_id === f.meet) && (!f.dep || depOf(u.who) === f.dep);
+  const qStr = String(f.q || '').trim().toLowerCase();
+  const matchQ = u => {
+    if (!qStr) return true;
+    const hay = ((u.t && u.t.title) || '') + ' ' + ((u.t && u.t.details) || '') + ' ' + (u.who ? nm(u.who) + ' ' + u.who : '') + ' ' + depOf(u.who) + ' ' + coOf(u) + ' ' + (u.note || '');
+    return hay.toLowerCase().includes(qStr);
+  };
+  const mine = u => (!f.who || same(u.who, f.who)) && (!f.meet || u.meeting_id === f.meet) && (!f.dep || depOf(u.who) === f.dep) && matchQ(u);
   const U = units.filter(u => mine(u) && (!u.done || !start || new Date(u.completed_at || u.created_at || 0) >= start));
   const done = U.filter(u => u.done), open = U.filter(u => !u.done);
   const isLate = u => !u.done && u.due_on && u.due_on < todayS;
@@ -220,7 +226,9 @@ function dashView() {
         '</div>' +
       '</div>' +
     '</div>' +
-    '<div class="dsh-toolbar"><select id="ds_p">' + Object.entries(per).map(([k, v]) => opt(k, v, String(f.period))).join('') + '</select>' +
+    '<div class="dsh-toolbar">' +
+    '<input id="ds_q" type="search" value="' + esc(f.q || '') + '" placeholder="🔍 بحث في تقارير المهام، الموظفين، الأقسام..." style="flex:1 1 210px;min-width:170px">' +
+    '<select id="ds_p">' + Object.entries(per).map(([k, v]) => opt(k, v, String(f.period))).join('') + '</select>' +
     '<select id="ds_dep">' + opt('', '🏛️ كل الأقسام والإدارات', f.dep || '') + allDeps.map(d => opt(d, d, f.dep || '')).join('') + '</select>' +
     '<select id="ds_w">' + opt('', '👤 كل الأعضاء', f.who) + S.members.map(m => opt(m.email, m.name, f.who)).join('') + '</select>' +
     '<select id="ds_m">' + opt('', '📅 كل الاجتماعات', f.meet) + S.meetings.map(m => opt(m.id, m.title, f.meet)).join('') + '</select></div>' +
@@ -268,7 +276,7 @@ function downloadText(name, text, type) {
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 function bindDash() {
-  const f = S.dash || (S.dash = { period: 'all', who: '', dep: '', meet: '', mode: 'tasks' });
+  const f = S.dash || (S.dash = { period: 'all', who: '', dep: '', meet: '', mode: 'tasks', q: '' });
   document.querySelectorAll('[data-dsh-mode]').forEach(b => b.onclick = () => { f.mode = b.dataset.dshMode; render(); });
   if (f.mode === 'orders') {
     if (typeof bindReports === 'function') bindReports();
@@ -276,6 +284,13 @@ function bindDash() {
   }
   const per = { all: 'كل الفترات', 7: 'آخر 7 أيام', 30: 'آخر 30 يوماً', 90: 'آخر 90 يوماً' };
   const D = dashCompute(dashUnits(S.tasks, S.done, S.members), f, new Date(), S.members);
+  if ($('ds_q')) $('ds_q').oninput = e => {
+    f.q = e.target.value;
+    const pos = e.target.selectionStart || f.q.length;
+    render();
+    const el = $('ds_q');
+    if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (_) {} }
+  };
   if ($('ds_p')) $('ds_p').onchange = e => { f.period = e.target.value; render(); };
   if ($('ds_dep')) $('ds_dep').onchange = e => { f.dep = e.target.value; render(); };
   if ($('ds_w')) $('ds_w').onchange = e => { f.who = e.target.value; render(); };

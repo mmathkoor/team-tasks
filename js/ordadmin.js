@@ -37,12 +37,19 @@ function repsCardHtml() {
     (R.length ? R.map(r => {
       const rCo = parseMemberMeta(r).company || 'متجرك';
       const coBadge = rCo === '__all' ? '<span class="chip all">🌐 كل المتاجر</span>' : '<span class="chip">🏢 ' + esc(rCo) + '</span>';
-      return '<div class="bar" style="background:var(--col);padding:10px 12px;border-radius:10px;margin-bottom:8px">' +
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>🛵 ' + esc(r.name) + '</b> <span class="m" dir="ltr">' + esc(r.phone || '') + '</span> ' + coBadge + '</div>' +
-        '<div class="row s" style="align-items:center;gap:6px">' +
-          '<select data-rco="' + esc(r.email) + '" title="تغيير متجر المندوب" style="padding:6px 10px;font-size:13px">' + repCoOpts(rCo) + '</select>' +
-          '<button class="s" data-rpw="' + esc(r.email) + '">🔑 كلمة مرور</button>' +
-          '<button class="dng s" data-rrm="' + esc(r.email) + '">إزالة</button>' +
+      S.openRepEdits = S.openRepEdits || {};
+      const isROpen = !!S.openRepEdits[r.email];
+      return '<div class="mem-row" style="background:var(--col);padding:10px 12px;border-radius:10px;margin-bottom:8px;border:1px solid var(--line)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>🛵 ' + esc(r.name) + '</b> <span class="m" dir="ltr">' + esc(r.phone || '') + '</span> ' + coBadge + '</div>' +
+          '<div class="row s" style="align-items:center;gap:6px">' +
+            '<button type="button" class="s' + (isROpen ? ' p' : '') + '" data-redit-tog="' + esc(r.email) + '" style="font-size:11.5px;padding:4px 10px">✏️ ' + (isROpen ? 'إغلاق' : 'تعديل') + '</button>' +
+            '<button class="s" data-rpw="' + esc(r.email) + '" style="font-size:11.5px;padding:4px 8px">🔑 كلمة مرور</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:' + (isROpen ? 'flex' : 'none') + ';margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);gap:6px;flex-wrap:wrap;align-items:center">' +
+          '<select data-rco="' + esc(r.email) + '" title="تغيير متجر المندوب" style="flex:1 1 160px;padding:6px 10px;font-size:13px">' + repCoOpts(rCo) + '</select>' +
+          '<button class="dng s" data-rrm="' + esc(r.email) + '">حذف المندوب</button>' +
         '</div>' +
       '</div>';
     }).join('') : '<div class="m" style="margin-bottom:8px">لا يوجد مندوبون في هذا المتجر بعد.</div>') +
@@ -84,7 +91,16 @@ function ordSettingsOnlyHtml() {
       '<label style="flex:2 1 200px">عنوان المتجر / الفرع<input id="os_a" value="' + esc(p.address || '') + '" placeholder="مثال: صنعاء - شارع حدة"></label>' +
       '<label style="flex:1 1 110px">العملة المعتمدة<input id="os_curr" value="' + esc(p.currency || 'ر.ي') + '" placeholder="ر.ي / ر.س / $"></label>' +
     '</div>' +
-    '<label style="margin-top:8px">عبارة تذييل الفاتورة ورسائل الواتساب<input id="os_foot" value="' + esc(p.footer || 'شكراً لتعاملكم معنا 🌹') + '"></label>' +
+    '<div class="row" style="margin-top:8px">' +
+      '<label style="flex:1 1 180px">🎨 تصميم وقالب الفاتورة المعتمد<select id="os_inv_tpl">' +
+        '<option value="navy"' + ((p.invoiceTemplate || 'navy') === 'navy' ? ' selected' : '') + '>🏛️ الكحلي الرسمي (إبداع)</option>' +
+        '<option value="orange"' + (p.invoiceTemplate === 'orange' ? ' selected' : '') + '>🧡 البرتقالي العصري (مبيعات)</option>' +
+        '<option value="yellow"' + (p.invoiceTemplate === 'yellow' ? ' selected' : '') + '>💛 الأصفر والأسود الهندسي</option>' +
+        '<option value="royal"' + (p.invoiceTemplate === 'royal' ? ' selected' : '') + '>👑 الملكي الذهبي الفاخر</option>' +
+      '</select></label>' +
+      '<label style="flex:1 1 180px">عبارة تذييل الفاتورة ورسائل الواتساب<input id="os_foot" value="' + esc(p.footer || 'شكراً لتعاملكم معنا 🌹') + '"></label>' +
+    '</div>' +
+    '<label style="margin-top:8px">شروط وقواعد الفاتورة (الاستبدال والاسترجاع)<textarea id="os_terms" rows="2">' + esc(p.terms || '') + '</textarea></label>' +
     '<label class="chk" style="margin-top:12px"><input type="checkbox" id="os_c" ' + (p.staffCanCost ? 'checked' : '') + '> يرى موظفو متجر «' + esc(p.displayName || targetCo) + '» سعر الشراء ويدخلونه (افتراضياً: للمدير فقط)</label>' +
     '<label style="margin-top:10px">حذف صور الأصناف بعد انتهاء الطلب<select id="os_k">' + [[0, 'فوراً عند التسليم/الإلغاء'], [1, 'بعد يوم'], [2, 'بعد يومين'], [3, 'بعد 3 أيام'], [7, 'بعد أسبوع']].map(([v, l]) => '<option value="' + v + '"' + ((p.imageKeepDays == null ? 1 : +p.imageKeepDays) === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<div class="row" style="margin-top:12px"><button class="p s" id="os_sv">💾 حفظ إعدادات متجر «' + esc(p.displayName || targetCo) + '»</button></div></div>';
@@ -183,6 +199,12 @@ function bindOrdAdmin() {
     const r = await repApi({ action: 'password', email: b.dataset.rpw, password: pw }); if (!r.ok) return alert(r.error);
     if (rep) credsDialog(rep.name, rep.phone, pw, parseMemberMeta(rep).company);
   });
+  document.querySelectorAll('[data-redit-tog]').forEach(b => b.onclick = () => {
+    const em = b.dataset.reditTog;
+    S.openRepEdits = S.openRepEdits || {};
+    S.openRepEdits[em] = !S.openRepEdits[em];
+    render();
+  });
   document.querySelectorAll('[data-rrm]').forEach(b => b.onclick = async () => {
     const allReps = (S.rawMembers || S.allMembers || S.reps || []).filter(m => m.role === 'rep');
     const rep = allReps.find(x => x.email === b.dataset.rrm);
@@ -198,6 +220,8 @@ function bindOrdAdmin() {
       phone: $('os_p').value.trim(),
       address: $('os_a').value.trim(),
       currency: ($('os_curr') && $('os_curr').value.trim()) || 'ر.ي',
+      invoiceTemplate: ($('os_inv_tpl') && $('os_inv_tpl').value) || 'navy',
+      terms: ($('os_terms') && $('os_terms').value.trim()) || '',
       footer: ($('os_foot') && $('os_foot').value.trim()) || 'شكراً لتعاملكم معنا 🌹',
       staffCanCost: $('os_c').checked,
       imageKeepDays: +$('os_k').value

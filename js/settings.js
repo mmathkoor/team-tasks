@@ -117,7 +117,16 @@ function companyConfigDialog(coName) {
       '<label>الرقم الضريبي / السجل التجاري (اختياري)<input id="cp_tax" dir="ltr" value="' + esc(p.taxNo) + '" placeholder="اختياري"></label>' +
     '</div>' +
     '<label style="margin-top:10px">العنوان التفصيلي للشركة / الفرع<input id="cp_addr" value="' + esc(p.address) + '" placeholder="مثال: صنعاء - شارع حدة"></label>' +
-    '<label style="margin-top:10px">عبارة تذييل الفاتورة ورسائل العملاء<input id="cp_foot" value="' + esc(p.footer) + '" placeholder="شكراً لتعاملكم معنا 🌹"></label>' +
+    '<div class="row" style="margin-top:10px">' +
+      '<label>🎨 القالب الافتراضي للفواتير<select id="cp_inv_tpl">' +
+        '<option value="navy"' + ((p.invoiceTemplate || 'navy') === 'navy' ? ' selected' : '') + '>🏛️ الكحلي الرسمي (إبداع)</option>' +
+        '<option value="orange"' + (p.invoiceTemplate === 'orange' ? ' selected' : '') + '>🧡 البرتقالي العصري (مبيعات)</option>' +
+        '<option value="yellow"' + (p.invoiceTemplate === 'yellow' ? ' selected' : '') + '>💛 الأصفر والأسود الهندسي</option>' +
+        '<option value="royal"' + (p.invoiceTemplate === 'royal' ? ' selected' : '') + '>👑 الملكي الذهبي الفاخر</option>' +
+      '</select></label>' +
+      '<label>عبارة تذييل الفاتورة ورسائل العملاء<input id="cp_foot" value="' + esc(p.footer) + '" placeholder="شكراً لتعاملكم معنا 🌹"></label>' +
+    '</div>' +
+    '<label style="margin-top:10px">شروط وقواعد الاستبدال والاسترجاع (تظهر في الفاتورة)<textarea id="cp_terms" rows="2">' + esc(p.terms || '') + '</textarea></label>' +
     '<div class="row" style="margin-top:10px">' +
       '<label>اللون الأساسي للهوية<input id="cp_color" type="color" value="' + esc(p.color || '#0b1426') + '" style="height:40px;padding:4px"></label>' +
       '<label>اللون الذهبي / المميز<input id="cp_accent" type="color" value="' + esc(p.accent || '#d4af6a') + '" style="height:40px;padding:4px"></label>' +
@@ -155,6 +164,8 @@ function companyConfigDialog(coName) {
       phone: $('cp_phone').value.trim(),
       taxNo: $('cp_tax').value.trim(),
       address: $('cp_addr').value.trim(),
+      invoiceTemplate: $('cp_inv_tpl') ? $('cp_inv_tpl').value : 'navy',
+      terms: $('cp_terms') ? $('cp_terms').value.trim() : '',
       footer: $('cp_foot').value.trim() || 'شكراً لتعاملكم معنا 🌹',
       color: $('cp_color').value,
       accent: $('cp_accent').value,
@@ -323,35 +334,59 @@ function staffBlockHtml() {
   const myCo = isSuperAdmin() ? '' : parseMemberMeta(S.me).company;
   if (S.setAdmCo === undefined) S.setAdmCo = activeCompanyFilter() || '';
   const admCo = myCo || S.setAdmCo || '';
+  const stfQ = norm(S.stfQ || '');
   const allStaff = (S.rawMembers || S.allMembers || S.members || []).filter(m => m.role !== 'rep');
-  const listMembers = admCo ? allStaff.filter(m => same(parseMemberMeta(m).company, admCo) || (S.me && same(m.email, S.me.email))) : allStaff;
+  let listMembers = admCo ? allStaff.filter(m => same(parseMemberMeta(m).company, admCo) || (S.me && same(m.email, S.me.email))) : allStaff;
+  if (stfQ) {
+    listMembers = listMembers.filter(m => {
+      const mt = parseMemberMeta(m);
+      return norm([m.name, m.email, m.title, mt.company, mt.department, mt.phone].join(' ')).includes(stfQ);
+    });
+  }
+  S.openMemberEdits = S.openMemberEdits || {};
 
   const memList = listMembers.map(m => {
       const meta = parseMemberMeta(m);
       const p = memberPerms(m);
       const isMeSuper = S.me && same(m.email, S.me.email) && m.role === 'admin';
-      let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">إزالة</button>';
+      let rmBtn = (S.me && same(m.email, S.me.email)) ? '' : '<button class="dng s" data-rm="' + esc(m.email) + '">حذف</button>';
       const allowedCos = myCo ? [myCo] : (isMeSuper ? [''].concat(cos) : cos);
       const selectedCo = isMeSuper ? (String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim()) : (meta.company || 'متجرك');
       const coOpts = allowedCos.map(c => '<option value="' + esc(c) + '"' + (same(selectedCo, c) ? ' selected' : '') + '>' + (c ? '🏢 ' + esc(c) : '👑 كل الشركات (المدير العام فقط)') + '</option>').join('');
       const depSet = new Set(deps); if (meta.department) depSet.add(meta.department);
       const depOpts = '<option value="">-- بدون إدارة/قسم --</option>' + [...depSet].map(d => '<option value="' + esc(d) + '"' + (same(meta.department, d) ? ' selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
       const ordScopeBadge = m.role === 'admin' ? '' : (p.ordersScope === 'own' ? '<span class="chip late" style="font-size:11px" title="لا يرى إلا طلباته الشخصية">🔒 طلباته فقط</span>' : '<span class="chip ok" style="font-size:11px" title="يرى كل طلبات الشركة">🌐 كل الطلبات</span>');
-      return '<div class="bar mem-row" style="background:var(--col);padding:10px 12px;border-radius:10px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b>' + esc(m.name) + '</b> <span class="m" dir="ltr">(' + esc(m.email) + ')</span> <span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '">' + ({ admin: 'مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span>' +
-        (selectedCo ? '<span class="chip">🏢 ' + esc(selectedCo) + '</span>' : '<span class="chip all">🌐 كل الشركات</span>') +
-        (meta.department ? '<span class="chip">🏛️ ' + esc(meta.department) + '</span>' : '') +
-        (meta.phone ? '<span class="chip ok" dir="ltr">📱 ' + esc(meta.phone) + '</span>' : '') +
-        ordScopeBadge +
-        '<button class="s" type="button" data-mpw="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px;background:var(--card);border-color:var(--line)" title="تعيين أو تغيير كلمة مرور الموظف">🔑 كلمة المرور</button>' +
-        '<button class="s" type="button" data-mperms="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px;background:var(--card);border-color:var(--line)" title="صلاحيات الشاشات ونطاق رؤية الطلبات">🔒 الصلاحيات والشاشات</button>' +
-        '<button class="s" type="button" data-mwa="' + esc(m.email) + '" style="font-size:11.5px;padding:3px 8px" title="إرسال تذكير واتساب بمهام الموظف">📲 تذكير واتساب</button>' +
-        '</div><div class="row" style="flex:1 1 100%;margin-top:8px;gap:6px">' +
-        '<input data-mt="' + esc(m.email) + '" value="' + esc(m.title || '') + '" placeholder="المسمى الوظيفي (مثال: مسؤول التسويق)" style="flex:2 1 140px">' +
-        '<input data-mph="' + esc(m.email) + '" dir="ltr" inputmode="tel" value="' + esc(meta.phone || '') + '" placeholder="📱 واتساب الموظف (77...)" style="flex:1 1 130px">' +
-        '<select data-mco="' + esc(m.email) + '" title="الشركة" style="flex:1 1 125px">' + coOpts + '</select>' +
-        '<select data-mdep="' + esc(m.email) + '" title="الإدارة / القسم" style="flex:1 1 125px">' + depOpts + '</select>' +
-        '<select data-mrole="' + esc(m.email) + '" title="الصلاحية" style="flex:0 1 100px"><option value="member"' + (m.role !== 'admin' ? ' selected' : '') + '>👤 عضو</option><option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>👑 مدير</option></select>' +
-        '<button class="s p" data-mts="' + esc(m.email) + '">حفظ</button>' + rmBtn + '</div></div>';
+      const isEditOpen = !!S.openMemberEdits[m.email];
+      return '<div class="mem-row" style="background:var(--col);padding:10px 12px;border-radius:12px;margin-bottom:8px;border:1px solid var(--line)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+          '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0">' +
+            '<b style="font-size:14.5px">' + esc(m.name) + '</b> ' +
+            (m.title ? '<span class="chip" style="font-size:11px">💼 ' + esc(m.title) + '</span>' : '') +
+            '<span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '" style="font-size:11px">' + ({ admin: '👑 مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span>' +
+            (selectedCo ? '<span class="chip" style="font-size:11px">🏢 ' + esc(selectedCo) + '</span>' : '<span class="chip all" style="font-size:11px">🌐 كل الشركات</span>') +
+            (meta.department ? '<span class="chip" style="font-size:11px">🏛️ ' + esc(meta.department) + '</span>' : '') +
+            (meta.phone ? '<span class="chip ok" dir="ltr" style="font-size:11px">📱 ' + esc(meta.phone) + '</span>' : '') +
+            ordScopeBadge +
+          '</div>' +
+          '<div class="row s" style="gap:5px;flex-wrap:wrap">' +
+            '<button class="s' + (isEditOpen ? ' p' : '') + '" type="button" data-medit-tog="' + esc(m.email) + '" style="font-size:11.5px;padding:4px 10px" title="إظهار أو إخفاء خانات تعديل بيانات الموظف">✏️ ' + (isEditOpen ? 'إغلاق التعديل' : 'تعديل البيانات') + '</button>' +
+            '<button class="s" type="button" data-mpw="' + esc(m.email) + '" style="font-size:11.5px;padding:4px 8px;background:var(--card);border-color:var(--line)" title="تعيين أو تغيير كلمة مرور الموظف">🔑 كلمة المرور</button>' +
+            '<button class="s" type="button" data-mperms="' + esc(m.email) + '" style="font-size:11.5px;padding:4px 8px;background:var(--card);border-color:var(--line)" title="صلاحيات الشاشات ونطاق رؤية الطلبات">🔒 الصلاحيات</button>' +
+            '<button class="s" type="button" data-mwa="' + esc(m.email) + '" style="font-size:11.5px;padding:4px 8px" title="إرسال تذكير واتساب بمهام الموظف">📲 واتساب</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mem-edit-drawer" data-medit-box="' + esc(m.email) + '" style="display:' + (isEditOpen ? 'block' : 'none') + ';margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">' +
+          '<div class="m" style="font-size:11.5px;margin-bottom:6px" dir="ltr">📧 ' + esc(m.email) + '</div>' +
+          '<div class="row" style="gap:6px;flex-wrap:wrap">' +
+            '<input data-mt="' + esc(m.email) + '" value="' + esc(m.title || '') + '" placeholder="المسمى الوظيفي (مثال: مسؤول التسويق)" style="flex:2 1 140px">' +
+            '<input data-mph="' + esc(m.email) + '" dir="ltr" inputmode="tel" value="' + esc(meta.phone || '') + '" placeholder="📱 واتساب الموظف (77...)" style="flex:1 1 130px">' +
+            '<select data-mco="' + esc(m.email) + '" title="الشركة" style="flex:1 1 125px">' + coOpts + '</select>' +
+            '<select data-mdep="' + esc(m.email) + '" title="الإدارة / القسم" style="flex:1 1 125px">' + depOpts + '</select>' +
+            '<select data-mrole="' + esc(m.email) + '" title="الصلاحية" style="flex:0 1 100px"><option value="member"' + (m.role !== 'admin' ? ' selected' : '') + '>👤 عضو</option><option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>👑 مدير</option></select>' +
+            '<button class="s p" data-mts="' + esc(m.email) + '">💾 حفظ التعديلات</button>' + rmBtn +
+          '</div>' +
+        '</div>' +
+      '</div>';
   }).join('');
 
   const defNewCo = admCo || activeCompanyFilter() || 'متجرك';
@@ -359,9 +394,9 @@ function staffBlockHtml() {
   const newDepOpts = '<option value="">-- الإدارة / القسم (اختياري) --</option>' + deps.map(d => '<option value="' + esc(d) + '">🏛️ ' + esc(d) + '</option>').join('');
 
   const scopeBar = isSuperAdmin() ? (
-    '<div class="store-scope-bar" style="margin-bottom:12px">' +
-      '<span>🏢 تصفية الموظفين بحسب المتجر:</span>' +
-      '<select id="adm_co_scope">' +
+    '<div class="store-scope-bar" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<span>🏢 تصفية بحسب المتجر:</span>' +
+      '<select id="adm_co_scope" style="flex:1 1 180px">' +
         '<option value=""' + (!admCo ? ' selected' : '') + '>🌐 جميع المتاجر والشركات (' + cos.length + ')</option>' +
         cos.map(c => '<option value="' + esc(c) + '"' + (same(admCo, c) ? ' selected' : '') + '>🏢 متجر: ' + esc(getCompanyProfile(c).displayName || c) + '</option>').join('') +
       '</select>' +
@@ -369,8 +404,11 @@ function staffBlockHtml() {
   ) : '';
 
   return scopeBar +
-    '<div class="bar" style="margin-bottom:10px"><b>👥 قائمة الموظفين والأعضاء (' + listMembers.length + (admCo ? ' في ' + esc(admCo) : '') + ')</b></div>' +
-    (memList || '<p class="m">لا يوجد موظفون مسجلون في هذا النطاق.</p>') +
+    '<div class="row" style="margin-bottom:10px;gap:8px;align-items:center">' +
+      '<input id="stf_q" type="search" value="' + esc(S.stfQ || '') + '" placeholder="🔎 ابحث عن موظف بالاسم، الجوال، الإيميل، أو المتجر..." style="flex:1 1 220px">' +
+      '<span class="chip ok">العدد: ' + listMembers.length + '</span>' +
+    '</div>' +
+    (memList || '<p class="m">لا يوجد موظفون مطابقون للبحث.</p>') +
     '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' +
     '<h3 style="font-size:14px;margin-top:14px">➕ إضافة عضو / موظف جديد (مع دعم الدخول بالجوال فقط وتوليد كلمة المرور):</h3>' +
     '<p class="m" style="margin-bottom:10px;font-size:12.5px">يمكنك إضافة موظف برقم جواله فقط (بدون إيميل) وسيتولى النظام إنشاء حساب الدخول وتعيين كلمة المرور ورسالة الواتساب الجاهزة فوراً.</p>' +
@@ -428,6 +466,42 @@ function toolsBlockHtml() {
   return toolsHtml() + (typeof dupCardHtml === 'function' ? dupCardHtml() : '');
 }
 
+function adminTaskVisibilityCardHtml() {
+  if (!isAdmin()) return '';
+  const cfg = typeof getAdminTaskVisibility === 'function' ? getAdminTaskVisibility(S.me && S.me.email) : { mode: 'all', companies: [], members: [] };
+  const cos = companiesList();
+  const nonAdminStaff = (S.rawMembers || S.allMembers || []).filter(m => m.role !== 'rep' && !same(m.email, S.me && S.me.email));
+  return '<div class="card" style="margin-bottom:12px;border:1.5px solid var(--gold,#c9a24e)">' +
+    '<h3>👁️ إعدادات ظهوري (المدير العام) في قائمة إسناد المهام عند المتاجر والموظفين</h3>' +
+    '<p class="m" style="margin-bottom:10px;font-size:12.5px">تحكّم بمن يظهر له اسمك (' + esc(S.me && S.me.name) + ') عند إضافة أو إسناد مهمة جديدة في شاشة المهام:</p>' +
+    '<label style="margin-bottom:10px;display:block">نطاق ظهور اسمي في المهام:' +
+      '<select id="adm_vis_mode" style="margin-top:4px">' +
+        '<option value="all"' + (cfg.mode === 'all' ? ' selected' : '') + '>🌐 الظهور عند جميع المتاجر وجميع الموظفين (الافتراضي)</option>' +
+        '<option value="companies"' + (cfg.mode === 'companies' ? ' selected' : '') + '>🏢 الظهور عند متاجر / شركات محددة فقط</option>' +
+        '<option value="members"' + (cfg.mode === 'members' ? ' selected' : '') + '>👤 الظهور عند موظفين محددين فقط</option>' +
+        '<option value="except_members"' + (cfg.mode === 'except_members' ? ' selected' : '') + '>🚫 الظهور عند الكل ما عدا موظفين محددين</option>' +
+        '<option value="none"' + (cfg.mode === 'none' ? ' selected' : '') + '>🔒 عدم الظهور عند أي موظف</option>' +
+      '</select>' +
+    '</label>' +
+    '<div id="adm_vis_cos_box" style="display:' + (cfg.mode === 'companies' ? 'block' : 'none') + ';padding:10px;background:var(--col);border-radius:10px;margin-bottom:10px">' +
+      '<b style="font-size:12.5px;display:block;margin-bottom:6px">🏢 اختر المتاجر التي يظهر اسمك لموظفيها في المهام:</b>' +
+      '<div class="row" style="gap:8px;flex-wrap:wrap">' +
+        cos.map(c => '<label class="chk" style="background:var(--card);padding:5px 10px;border-radius:8px;border:1px solid var(--line)"><input type="checkbox" data-adm-vis-co="' + esc(c) + '"' + ((cfg.companies || []).some(x => same(x, c)) ? ' checked' : '') + '> <span>🏢 ' + esc(getCompanyProfile(c).displayName || c) + '</span></label>').join('') +
+      '</div>' +
+    '</div>' +
+    '<div id="adm_vis_mem_box" style="display:' + (cfg.mode === 'members' || cfg.mode === 'except_members' ? 'block' : 'none') + ';padding:10px;background:var(--col);border-radius:10px;margin-bottom:10px">' +
+      '<b id="adm_vis_mem_lbl" style="font-size:12.5px;display:block;margin-bottom:6px">' + (cfg.mode === 'except_members' ? '🚫 اختر الموظفين المستثنين (الذين لن يظهر لهم اسمك):' : '👤 اختر الموظفين المسموح لهم برؤية اسمك وإسناد مهام لك:') + '</b>' +
+      '<div class="row" style="gap:8px;flex-wrap:wrap">' +
+        nonAdminStaff.map(m => {
+          const mc = parseMemberMeta(m).company || 'متجرك';
+          return '<label class="chk" style="background:var(--card);padding:5px 10px;border-radius:8px;border:1px solid var(--line)"><input type="checkbox" data-adm-vis-mem="' + esc(m.email) + '"' + ((cfg.members || []).some(e => same(e, m.email)) ? ' checked' : '') + '> <span>' + esc(m.name) + ' <small class="m">(' + esc(mc) + ')</small></span></label>';
+        }).join('') +
+      '</div>' +
+    '</div>' +
+    '<button type="button" class="p s" id="adm_vis_save">💾 حفظ إعدادات ظهوري في المهام</button>' +
+  '</div>';
+}
+
 function accountBlockHtml() {
   const me = S.me || {};
   const meta = parseMemberMeta(me);
@@ -438,6 +512,7 @@ function accountBlockHtml() {
       '<div class="m" style="font-size:12px;margin-top:3px" dir="ltr">' + esc(me.email || '') + (meta.phone ? ' · 📱 ' + esc(meta.phone) : '') + '</div>' +
     '</div>' +
   '</div>' +
+  adminTaskVisibilityCardHtml() +
   '<div class="card" style="margin-bottom:12px"><h3>🔑 تغيير كلمة المرور الخاصة بحسابي</h3><div class="row" style="margin-top:8px"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
   '<div class="card" style="margin-bottom:12px;border-color:var(--oksoft)">' +
     '<h3>🔔 تجربة الإشعارات الفورية على هذا الجهاز</h3>' +
@@ -445,7 +520,7 @@ function accountBlockHtml() {
     '<div class="row"><button class="s" id="test_push" style="background:var(--soon);border-color:var(--soon);color:#fff">تجربة وصول الإشعار في جوالي 🔔</button></div>' +
   '</div>' +
   '<div class="card" style="margin-bottom:12px;background:var(--col);border-color:var(--line)">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+    '<div style="display:flex;align-items:center;justify-content:justify-between;gap:8px;flex-wrap:wrap">' +
       '<div>' +
         '<div style="font-weight:700;font-size:14px">📱 إصدار النظام الحالي: <span class="chip ok" style="font-size:12px">v' + VERSION + '</span></div>' +
         '<div class="m" style="font-size:11.5px;margin-top:3px">مزامنة أحدث الشاشات والتقسيمات ومسح الكاش للتطبيق على جوالك.</div>' +
@@ -590,7 +665,18 @@ function settingsView() {
     html: accountBlockHtml()
   });
 
-  const filteredBlocks = curTab === 'all' ? blocks : blocks.filter(b => b.id === curTab);
+  const setQ = norm(S.setQ || '');
+  let filteredBlocks = curTab === 'all' ? blocks : blocks.filter(b => b.id === curTab);
+  if (setQ) {
+    filteredBlocks = blocks.filter(b => norm(b.title + ' ' + b.desc + ' ' + b.html.replace(/<[^>]+>/g, ' ')).includes(setQ));
+  }
+
+  const searchBar = '<div class="card" style="padding:10px 12px;margin-bottom:10px">' +
+    '<div class="row" style="gap:8px;align-items:center">' +
+      '<input id="set_q" type="search" value="' + esc(S.setQ || '') + '" placeholder="🔎 ابحث في الإعدادات، الموظفين، الشركات، أو الأدوات..." style="flex:1 1 220px">' +
+      (S.setQ ? '<button type="button" class="s" id="set_q_clr">✕ مسح</button>' : '') +
+    '</div>' +
+  '</div>';
 
   const toolbar = curTab === 'all' ? (
     '<div class="set-toolbar">' +
@@ -602,7 +688,7 @@ function settingsView() {
     '</div>'
   ) : '';
 
-  return subtabsBar + toolbar + filteredBlocks.map(b => settingsBlockHtml(b.id, b.icon, b.title, b.desc, b.badge, b.html, isBlockOpen(b.id))).join('');
+  return searchBar + subtabsBar + toolbar + filteredBlocks.map(b => settingsBlockHtml(b.id, b.icon, b.title, b.desc, b.badge, b.html, setQ ? true : isBlockOpen(b.id))).join('');
 }
 
 function bindSettings() {
@@ -797,6 +883,62 @@ function bindSettings() {
       $('svp').textContent = '...';
       const { error } = await sb.auth.updateUser({ password: v }); 
       alert(error ? error.message : 'تم التغيير.'); if ($('np')) $('np').value = ''; if ($('svp')) $('svp').textContent = 'حفظ التغيير';
+    };
+  }
+  if ($('set_q')) {
+    $('set_q').oninput = e => {
+      S.setQ = e.target.value;
+      const pos = e.target.selectionStart;
+      render();
+      if ($('set_q')) { $('set_q').focus(); try { $('set_q').setSelectionRange(pos, pos); } catch (err) {} }
+    };
+  }
+  if ($('set_q_clr')) {
+    $('set_q_clr').onclick = () => { S.setQ = ''; render(); };
+  }
+  if ($('stf_q')) {
+    $('stf_q').oninput = e => {
+      S.stfQ = e.target.value;
+      const pos = e.target.selectionStart;
+      render();
+      if ($('stf_q')) { $('stf_q').focus(); try { $('stf_q').setSelectionRange(pos, pos); } catch (err) {} }
+    };
+  }
+  // تفعيل إظهار/إخفاء خانات تعديل الموظف عند الضغط على زر التعديل فقط
+  document.querySelectorAll('[data-medit-tog]').forEach(b => {
+    b.onclick = () => {
+      const em = b.dataset.meditTog;
+      S.openMemberEdits = S.openMemberEdits || {};
+      S.openMemberEdits[em] = !S.openMemberEdits[em];
+      render();
+    };
+  });
+  // تفعيل إعدادات ظهور المدير العام في المهام
+  if ($('adm_vis_mode')) {
+    $('adm_vis_mode').onchange = () => {
+      const m = $('adm_vis_mode').value;
+      if ($('adm_vis_cos_box')) $('adm_vis_cos_box').style.display = m === 'companies' ? 'block' : 'none';
+      if ($('adm_vis_mem_box')) $('adm_vis_mem_box').style.display = (m === 'members' || m === 'except_members') ? 'block' : 'none';
+      if ($('adm_vis_mem_lbl')) $('adm_vis_mem_lbl').textContent = m === 'except_members' ? '🚫 اختر الموظفين المستثنين (الذين لن يظهر لهم اسمك):' : '👤 اختر الموظفين المسموح لهم برؤية اسمك وإسناد مهام لك:';
+    };
+  }
+  if ($('adm_vis_save')) {
+    $('adm_vis_save').onclick = async () => {
+      const mode = $('adm_vis_mode') ? $('adm_vis_mode').value : 'all';
+      const companies = [...document.querySelectorAll('[data-adm-vis-co]')].filter(c => c.checked).map(c => c.dataset.admVisCo);
+      const members = [...document.querySelectorAll('[data-adm-vis-mem]')].filter(c => c.checked).map(c => c.dataset.admVisMem);
+      $('adm_vis_save').disabled = true;
+      $('adm_vis_save').textContent = 'جارٍ الحفظ...';
+      await saveAdminTaskVisibility({
+        adminEmail: S.me && S.me.email,
+        mode,
+        companies,
+        members
+      });
+      $('adm_vis_save').disabled = false;
+      $('adm_vis_save').textContent = '💾 حفظ إعدادات ظهوري في المهام';
+      if (typeof toast === 'function') toast('تم حفظ إعدادات ظهورك في المهام بنجاح ✓');
+      render();
     };
   }
   if ($('admin_wa_batch') && typeof waRemindDialog === 'function') {

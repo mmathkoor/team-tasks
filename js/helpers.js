@@ -162,18 +162,33 @@ async function generateInvoicePdfBlob(data) {
   const font = (weight, size) => `${weight} ${size}px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif`;
   const fmt = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
   const cur = data.currency || 'ر.ي';
-  const accent = data.accent || '#c9a24e';
-  const navy = '#0b1426';
+  const tpl = data.template || 'navy';
+  const themes = {
+    navy: { primary: '#1e2f4d', accent: '#1e2f4d', thBg: '#1e2f4d', thFg: '#ffffff', totBg: '#1e2f4d', totFg: '#ffffff', title: 'فــــــــاتورة' },
+    orange: { primary: '#2e2550', accent: '#f28b30', thBg: '#f28b30', thFg: '#1e1b4b', totBg: '#f28b30', totFg: '#1e1b4b', title: 'فاتورة مبيعات' },
+    yellow: { primary: '#111827', accent: '#facc15', thBg: '#111827', thFg: '#ffffff', totBg: '#facc15', totFg: '#111827', title: 'فاتورة مبيعات' },
+    royal: { primary: '#0b1426', accent: data.accent || '#c9a24e', thBg: '#0b1426', thFg: '#ffffff', totBg: '#0b1426', totFg: '#f6e3a8', title: 'فاتورة مبيعات رسمية' }
+  };
+  const th = themes[tpl] || themes.navy;
+  const accent = th.accent;
+  const navy = th.primary;
 
   // خلفية بيضاء نقية
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
   // شريط علوي مزدوج الهوية
-  ctx.fillStyle = navy;
-  ctx.fillRect(0, 0, W, 16);
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, 16, W, 6);
+  if (tpl === 'yellow') {
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, W * 0.42, 22);
+    ctx.fillStyle = '#facc15';
+    ctx.fillRect(W * 0.42, 0, W * 0.58, 22);
+  } else {
+    ctx.fillStyle = navy;
+    ctx.fillRect(0, 0, W, 16);
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 16, W, 6);
+  }
 
   let y = 58;
 
@@ -203,7 +218,7 @@ async function generateInvoicePdfBlob(data) {
 
   // صندوق رقم الفاتورة (يسار)
   const boxW = 360, boxH = 122, boxX = pad, boxY = y - 8;
-  ctx.fillStyle = '#f8fafc';
+  ctx.fillStyle = tpl === 'navy' ? '#1e2f4d' : '#f8fafc';
   ctx.fillRect(boxX, boxY, boxW, boxH);
   ctx.strokeStyle = '#cbd5e1';
   ctx.lineWidth = 1.5;
@@ -212,15 +227,15 @@ async function generateInvoicePdfBlob(data) {
   ctx.fillRect(boxX + boxW - 6, boxY, 6, boxH);
 
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#64748b';
-  ctx.font = font('700', 17);
-  ctx.fillText(data.docTitle || 'فاتورة مبيعات إلكترونية معتمدة', boxX + boxW - 20, boxY + 30);
+  ctx.fillStyle = tpl === 'navy' ? '#cbd5e1' : '#64748b';
+  ctx.font = font('700', 18);
+  ctx.fillText(data.docTitle || th.title, boxX + boxW - 20, boxY + 30);
 
-  ctx.fillStyle = navy;
+  ctx.fillStyle = tpl === 'navy' ? '#ffffff' : navy;
   ctx.font = font('700', 30);
   ctx.fillText('#' + (data.orderNo || '—'), boxX + boxW - 20, boxY + 66);
 
-  ctx.fillStyle = '#475467';
+  ctx.fillStyle = tpl === 'navy' ? '#e2e8f0' : '#475467';
   ctx.font = font('400', 17);
   ctx.fillText('التاريخ: ' + (data.orderDate || ''), boxX + boxW - 20, boxY + 98);
 
@@ -259,7 +274,7 @@ async function generateInvoicePdfBlob(data) {
   // العمود 1: العميل
   ctx.fillStyle = '#64748b';
   ctx.font = font('400', 16);
-  ctx.fillText('بيانات العميل', W - pad - 18, y + 32);
+  ctx.fillText('فـــاتورة إلى / العميل', W - pad - 18, y + 32);
   ctx.fillStyle = '#0f172a';
   ctx.font = font('700', 22);
   ctx.fillText(String(data.customerName || 'عميل الكرام').slice(0, 32), W - pad - 18, y + 66);
@@ -295,7 +310,7 @@ async function generateInvoicePdfBlob(data) {
 
   // جدول الأصناف
   const thH = 50;
-  ctx.fillStyle = navy;
+  ctx.fillStyle = th.thBg;
   ctx.fillRect(pad, y, innerW, thH);
 
   // أعمدة الجدول من اليمين لليسار: # (60) | الصنف (520) | الكمية (120) | السعر (180) | الإجمالي (208)
@@ -305,11 +320,10 @@ async function generateInvoicePdfBlob(data) {
   const c4 = pad + 208 + 90;
   const c5 = pad + 24;
 
-  ctx.fillStyle = '#f6e3a8';
+  ctx.fillStyle = th.thFg;
   ctx.font = font('700', 18);
   ctx.textAlign = 'center';
-  ctx.fillText('#', c1, y + 32);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillText(tpl === 'navy' ? 'NO' : 'م', c1, y + 32);
   ctx.textAlign = 'right';
   ctx.fillText('الصنف / البيان', c2, y + 32);
   ctx.textAlign = 'center';
@@ -333,7 +347,13 @@ async function generateInvoicePdfBlob(data) {
     ctx.lineWidth = 1;
     ctx.strokeRect(pad, y, innerW, rowH);
 
-    ctx.fillStyle = '#64748b';
+    if (tpl === 'yellow') {
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(W - pad - 60, y, 60, rowH);
+      ctx.fillStyle = '#ffffff';
+    } else {
+      ctx.fillStyle = '#64748b';
+    }
     ctx.font = font('700', 18);
     ctx.textAlign = 'center';
     ctx.fillText(String(idx + 1), c1, y + 34);
@@ -369,7 +389,7 @@ async function generateInvoicePdfBlob(data) {
   ctx.fillText('إجمالي الأصناف: ' + items.length + ' صنف  |  إجمالي القطع: ' + totQty, W - pad - 18, y + 28);
   y += 66;
 
-  // ملخص الحساب النهائي (يسار) + ختم الاعتماد (يمين)
+  // ملخص الحساب النهائي (يسار) + القواعد والتعليمات (يمين)
   const sumW = 460;
   const sumX = pad;
   let sumY = y;
@@ -397,33 +417,35 @@ async function generateInvoicePdfBlob(data) {
   drawSumRow('المجموع الفرعي:', fmt(data.subtotal) + ' ' + cur, false);
   if (+data.deliveryFee > 0) drawSumRow('رسوم التوصيل:', '+' + fmt(data.deliveryFee) + ' ' + cur, false);
   if (+data.discount > 0) drawSumRow('الخصم الممنوح:', '-' + fmt(data.discount) + ' ' + cur, false, null, '#b42318');
-  drawSumRow('الإجمالي النهائي:', fmt(data.total) + ' ' + cur, true, navy, '#f6e3a8');
+  drawSumRow('الإجمالي النهائي:', fmt(data.total) + ' ' + cur, true, th.totBg, th.totFg);
   drawSumRow('المبلغ المدفوع:', fmt(data.paid) + ' ' + cur, false, null, '#15803d');
   drawSumRow('المتبقي للتحصيل:', fmt(data.balance) + ' ' + cur, true, (+data.balance > 0 ? '#fef2f2' : '#dcfce7'), (+data.balance > 0 ? '#b42318' : '#15803d'));
 
-  // صندوق الاعتماد والملاحظات (يمين)
+  // صندوق القواعد والتعليمات والاعتماد (يمين)
   const rightW = innerW - sumW - 28;
   const rightX = W - pad - rightW;
   ctx.fillStyle = '#f8fafc';
-  ctx.fillRect(rightX, y, rightW, 130);
+  ctx.fillRect(rightX, y, rightW, 165);
   ctx.strokeStyle = '#e2e8f0';
-  ctx.strokeRect(rightX, y, rightW, 130);
+  ctx.strokeRect(rightX, y, rightW, 165);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = navy;
   ctx.font = font('700', 20);
-  ctx.fillText('🛡️ وثيقة إلكترونية رسمية معتمدة', rightX + rightW - 18, y + 38);
+  ctx.fillText('📋 القواعد والتعليمات (الاستبدال والاسترجاع):', rightX + rightW - 18, y + 36);
   ctx.fillStyle = '#475467';
-  ctx.font = font('400', 17);
-  ctx.fillText('صدرت آلياً من نظام ' + (data.storeName || 'المتجر') + ' للطلب رقم #' + (data.orderNo || ''), rightX + rightW - 18, y + 72);
-  ctx.fillText('معتمدة إلكترونياً ولا تتطلب توقيعاً أو ختماً يدوياً.', rightX + rightW - 18, y + 102);
+  ctx.font = font('400', 16);
+  const termLines = wrapCanvasText(ctx, data.terms || 'لا يمكن استرجاع أو استبدال البضائع بعد مرور 14 يوم من تاريخ الشراء إلا في حالة وجود عيب مصنعي.', rightW - 36).slice(0, 3);
+  termLines.forEach((ln, idx) => {
+    ctx.fillText(ln, rightX + rightW - 18, y + 68 + idx * 28);
+  });
 
   // التذييل
   const footY = Math.max(sumY + 42, H - 40);
-  ctx.fillStyle = '#475467';
-  ctx.font = font('700', 20);
+  ctx.fillStyle = navy;
+  ctx.font = font('700', 21);
   ctx.textAlign = 'center';
-  ctx.fillText(data.footer || 'شكراً لتعاملكم معنا 🌹', W / 2, footY);
+  ctx.fillText(data.footer || 'مـــــع خـــــالص الشـــــكر 🌹', W / 2, footY);
 
   const jpegBytes = await canvasToJpegUint8(c, 0.92);
   return jpegBytesToPdfBlob(jpegBytes, W, H);

@@ -205,7 +205,7 @@ function headerHtml() {
     '</div>' +
     '<div class="hbtns">' +
       netBadgeHtml +
-      '<button id="ver_badge_btn" class="s iconbtn" style="width:auto;padding:0 8px;font-size:11.5px;font-weight:700;color:var(--gold);border-color:var(--line)" title="إصدار النظام v' + VERSION + ' - انقر للتحديث الفوري ومسح الكاش">v' + VERSION + ' ↻</button>' +
+      '<button id="ver_badge_btn" class="s ver-pill" title="إصدار النظام v' + VERSION + ' - انقر للتحديث الفوري ومسح الكاش">v' + VERSION + ' ↻</button>' +
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +

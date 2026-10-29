@@ -1,5 +1,5 @@
-// Build version: 5.2.1 (timestamp: 2026-10-25)
-const SW_BUILD_VERSION = '5.2.1';
+// Build version: 5.2.3 (timestamp: 2026-10-29)
+const SW_BUILD_VERSION = '5.2.3';
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
 const idb = () => new Promise((ok, no) => { const r = indexedDB.open('tt', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
@@ -75,8 +75,73 @@ async function flush() {
   if (done.size) await tell();
   if (done.size < q.length) throw new Error('retry');
 }
-self.addEventListener('sync', e => { if (e.tag === 'flush-q') e.waitUntil(flushOnce()); });
-self.addEventListener('message', e => { if (e.data === 'flush') e.waitUntil(flushOnce().catch(() => {})); });
+
+// ===== منبّه المهام المتأخرة المنبثق من أعلى الشاشة (مثل تطبيق الذكر) =====
+async function showOverdueAzkarNotification(forceTest) {
+  const digest = (await kget('overdue_digest')) || {};
+  if (!forceTest && digest.enabled === false) return;
+  const intervalMs = (Number(digest.intervalMin) || 30) * 60 * 1000;
+  const lastAt = Number(digest.lastShownAt) || 0;
+  if (!forceTest && Date.now() - lastAt < intervalMs - 15000) return;
+
+  const lateCount = Number(digest.lateCount) || 0;
+  const todayCount = Number(digest.todayCount) || 0;
+  const sampleTitles = Array.isArray(digest.titles) ? digest.titles : [];
+  const firstTaskId = digest.firstTaskId || null;
+
+  if (!forceTest && lateCount === 0 && todayCount === 0) return;
+
+  let title = '⏰ تذكير بالمهام المتأخرة (' + lateCount + ' متأخرة)';
+  let body = '';
+  if (lateCount > 0) {
+    body = 'لديك ' + lateCount + ' مهام متأخرة' + (todayCount > 0 ? ' و ' + todayCount + ' مستحقة اليوم' : '') + ':\n• ' + sampleTitles.slice(0, 3).join('\n• ');
+  } else if (todayCount > 0) {
+    title = '🔥 تذكير بمهام اليوم (' + todayCount + ' مهمة)';
+    body = 'لديك ' + todayCount + ' مهام مستحقة اليوم:\n• ' + sampleTitles.slice(0, 3).join('\n• ');
+  } else {
+    title = '📿 منبّه المهام الذكي يعمل بنجاح!';
+    body = 'سيظهر لك هذا الإشعار المنبثق من أعلى الشاشة لتذكيرك بمهامك المتأخرة حتى وأنت تتصفح تطبيقات أخرى.';
+  }
+
+  digest.lastShownAt = Date.now();
+  await kset('overdue_digest', digest);
+
+  await self.registration.showNotification(title, {
+    body,
+    icon: '/icon-192.png',
+    badge: '/badge-96.png',
+    vibrate: [350, 120, 350, 120, 600],
+    requireInteraction: true,
+    renotify: true,
+    tag: 'azkar-overdue-' + Math.floor(Date.now() / 1000),
+    timestamp: Date.now(),
+    actions: firstTaskId
+      ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }]
+      : [{ action: 'open', title: '📋 عرض المهام' }],
+    data: { url: '/', task_id: firstTaskId, task_title: sampleTitles[0] || '' }
+  });
+}
+
+self.addEventListener('sync', e => {
+  if (e.tag === 'flush-q') e.waitUntil(flushOnce());
+  if (e.tag === 'overdue-tasks-reminder') e.waitUntil(showOverdueAzkarNotification(false));
+});
+self.addEventListener('periodicsync', e => {
+  if (e.tag === 'overdue-tasks-reminder') e.waitUntil(showOverdueAzkarNotification(false));
+});
+self.addEventListener('message', e => {
+  if (e.data === 'flush') e.waitUntil(flushOnce().catch(() => {}));
+  if (e.data && typeof e.data === 'object') {
+    if (e.data.type === 'SYNC_OVERDUE_DIGEST' && e.data.digest) {
+      e.waitUntil((async () => {
+        const prev = (await kget('overdue_digest')) || {};
+        await kset('overdue_digest', Object.assign({}, prev, e.data.digest));
+      })());
+    } else if (e.data.type === 'CHECK_OVERDUE_NOW') {
+      e.waitUntil(showOverdueAzkarNotification(!!e.data.force));
+    }
+  }
+});
 
 // ===== الإشعارات وأزرار الإجراء =====
 self.addEventListener('push', e => {

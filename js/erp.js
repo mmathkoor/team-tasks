@@ -1187,7 +1187,8 @@ function erpView() {
         '<h2 style="margin:4px 0 2px;font-size:19px">الصندوق والبنك · السندات والقيود · الموردين · عهد المناديب · الأرباح' + (curCo ? ' — ' + esc(getCompanyProfile(curCo).displayName) : ' — جميع المتاجر') + '</h2>' +
         '<div class="m">الفترة المعروضة: <b>' + esc(rng.label) + '</b> · العملة: <b>' + esc(cur) + '</b></div>' +
       '</div>' +
-      '<div class="row s" style="gap:6px">' +
+      '<div class="row s" style="gap:6px;flex-wrap:wrap">' +
+        '<input id="erp_q" type="search" value="' + esc(S.erpQ || '') + '" placeholder="🔎 بحث في القيود، الموردين، المناديب، المصروفات..." style="min-width:210px">' +
         '<select id="erp_per" title="الفترة الزمنية">' + periods.map(([k, l]) => '<option value="' + k + '"' + (S.erpPeriod === k ? ' selected' : '') + '>📅 ' + l + '</option>').join('') + '</select>' +
       '</div>' +
     '</div>' +
@@ -1214,6 +1215,19 @@ function bindErp() {
   const cur = getCompanyProfile(curCo || 'متجرك').currency || BRAND.currency || 'ر.ي';
   const rng = erpRangeDates(S.erpPeriod || 'all');
 
+  if ($('erp_q')) {
+    $('erp_q').oninput = e => {
+      const v = e.target.value;
+      S.erpQ = v;
+      S.erpSupQ = v;
+      S.erpJf = S.erpJf || { q: '', dir: '', method: '' };
+      S.erpJf.q = v;
+      if (S.erpTab === 'overview' && v.trim()) S.erpTab = 'journal';
+      const pos = e.target.selectionStart;
+      render();
+      if ($('erp_q')) { $('erp_q').focus(); try { $('erp_q').setSelectionRange(pos, pos); } catch (err) {} }
+    };
+  }
   if ($('erp_per')) $('erp_per').onchange = e => { S.erpPeriod = e.target.value; render(); };
   document.querySelectorAll('[data-etab]').forEach(b => b.onclick = () => { S.erpTab = b.dataset.etab; render(); });
 

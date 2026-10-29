@@ -70,15 +70,34 @@ const bn = o => bProf(o).displayName || (S.ordSet && S.ordSet.store_name) || BRA
 const bphone = o => bProf(o).phone || (S.ordSet && S.ordSet.store_phone) || BRAND.phone;
 const baddr = o => bProf(o).address || (S.ordSet && S.ordSet.store_address) || BRAND.address;
 const bcurr = o => bProf(o).currency || BRAND.currency || 'ر.ي';
-function buildOrderPdfData(o) {
+const INV_TEMPLATES = {
+  navy: { id: 'navy', label: '🏛️ الكحلي الرسمي (إبداع)', accent: '#1e2f4d' },
+  orange: { id: 'orange', label: '🧡 البرتقالي العصري (مبيعات)', accent: '#f28b30' },
+  yellow: { id: 'yellow', label: '💛 الأصفر والأسود الهندسي', accent: '#facc15' },
+  royal: { id: 'royal', label: '👑 الملكي الذهبي الفاخر', accent: '#c9a24e' }
+};
+function currentInvoiceTemplate(o, tplOpt) {
+  if (tplOpt && INV_TEMPLATES[tplOpt]) return tplOpt;
+  const p = bProf(o);
+  if (p && p.invoiceTemplate && INV_TEMPLATES[p.invoiceTemplate]) return p.invoiceTemplate;
+  try {
+    const saved = localStorage.getItem('inv_tpl_v1');
+    if (saved && INV_TEMPLATES[saved]) return saved;
+  } catch (e) {}
+  return 'navy';
+}
+function buildOrderPdfData(o, tplOpt) {
   const its = oItems(o.id), p = bProf(o), cur = bcurr(o), catM = orderCatMeta(o);
+  const tpl = currentInvoiceTemplate(o, tplOpt);
   return {
+    template: tpl,
     storeName: bn(o),
     slogan: p.slogan || '',
     storePhone: bphone(o) || '',
     storeAddress: baddr(o) || '',
     taxNo: p.taxNo || '',
-    accent: p.accent || '#c9a24e',
+    terms: p.terms || 'لا يمكن استرجاع أو استبدال البضائع بعد مرور 14 يوم من تاريخ الشراء إلا في حالة وجود عيب مصنعي.\nيجب إحضار الفاتورة الأصلية عند الاسترجاع أو الاستبدال.',
+    accent: (INV_TEMPLATES[tpl] && INV_TEMPLATES[tpl].accent) || p.accent || '#c9a24e',
     currency: cur,
     footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
     orderNo: o.order_no,
@@ -99,9 +118,9 @@ function buildOrderPdfData(o) {
     balance: +o.balance || 0
   };
 }
-async function sendOrderInvoicePdf(o, btnEl) {
+async function sendOrderInvoicePdf(o, btnEl, tplOpt) {
   if (!o || typeof shareOrSendInvoicePdf !== 'function') return;
-  await shareOrSendInvoicePdf(buildOrderPdfData(o), o.phone, btnEl);
+  await shareOrSendInvoicePdf(buildOrderPdfData(o, tplOpt), o.phone, btnEl);
 }
 function invoiceText(o) {
   const its = oItems(o.id), p = bProf(o), cur = bcurr(o), catKey = orderCatOf(o), catM = orderCatMeta(o);
@@ -411,19 +430,242 @@ function payDialog(o) {
   $('pm_ok').onclick = async () => { const a = +$('pm_a').value; if (!(a > 0)) return $('pm_a').focus(); const { error } = await sb.from('ord_payments').insert({ order_id: o.id, amount: a, method: $('pm_m').value, note: $('pm_n').value.trim() || null, created_by: S.me.email }); if (error) return alert('تعذّر الحفظ: ' + error.message); dlg.close(); load(); };
   dlg.showModal(); $('pm_a').focus();
 }
-// ===== الفاتورة الاحترافية: محتوى واحد يُستخدم للمعاينة والطباعة (بسعر البيع فقط: بلا سعر شراء وبلا اسم التاجر) =====
-function invoiceInner(o) {
+// ===== الفاتورة الاحترافية بـ 4 قوالب مصممة بدقة ومطابقة للنماذج المرفقة (بسعر البيع فقط) =====
+function invoiceInner(o, tplOpt) {
   const its = oItems(o.id), pays = oPays(o.id), p = bProf(o), cur = bcurr(o);
+  const tpl = currentInvoiceTemplate(o, tplOpt);
   const rawLogo = p.logo || BRAND.logo;
   const logo = rawLogo && rawLogo.startsWith('/') ? location.origin + rawLogo : rawLogo;
   const accent = p.accent || '#c9a24e';
   const bal = +o.balance;
   const totQty = its.reduce((a, i) => a + (+i.qty || 0), 0);
+  const termsText = p.terms || 'لا يمكن استرجاع أو استبدال البضائع بعد مرور 14 يوم من تاريخ الشراء إلا في حالة وجود عيب مصنعي.\nيجب إحضار الفاتورة الأصلية عند الاسترجاع أو الاستبدال.';
   const stamp = bal <= 0 && +o.total > 0
     ? '<span class="inv-stamp ok">✓ مسدّدة بالكامل</span>'
     : (+o.paid > 0 ? '<span class="inv-stamp part">مدفوع جزئياً · متبقي ' + money(bal) + ' ' + esc(cur) + '</span>' : '<span class="inv-stamp due">⏳ مستحقة الدفع: ' + money(bal) + ' ' + esc(cur) + '</span>');
 
-  return '<div class="inv" style="--inv-acc:' + esc(accent) + '">' +
+  // 1) القالب الكحلي الرسمي (مطابق للنموذج الأول: شريط كحلي علوي عريض "فــــاتورة" + شعار يمين + جدول كحلي + القواعد والتعليمات + مع خالص الشكر)
+  if (tpl === 'navy') {
+    const navy = '#1e2f4d';
+    return '<div class="inv inv-tpl-navy" style="background:#fff;color:#0f172a;padding:0;overflow:hidden;border:1px solid #cbd5e1;border-radius:14px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:22px 24px 14px;gap:16px;flex-wrap:wrap">' +
+        '<div style="background:' + navy + ';color:#fff;padding:14px 36px;border-radius:10px;min-width:240px;text-align:center;box-shadow:0 4px 14px rgba(30,47,77,.18)">' +
+          '<div style="font-size:30px;font-weight:800;letter-spacing:2px;line-height:1.1">فــــــــاتورة</div>' +
+          (p.slogan ? '<div style="font-size:12px;color:#cbd5e1;margin-top:4px">' + esc(p.slogan) + '</div>' : '') +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px;margin-inline-start:auto">' +
+          '<div style="text-align:end">' +
+            '<div style="font-size:24px;font-weight:800;color:' + navy + '">' + esc(bn(o)) + '</div>' +
+            (p.taxNo ? '<div style="font-size:11.5px;color:#64748b">الرقم الضريبي: ' + esc(p.taxNo) + '</div>' : '') +
+          '</div>' +
+          '<img src="' + esc(logo) + '" alt="" width="64" height="64" style="object-fit:cover;border-radius:14px;border:2px solid ' + navy + '">' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 24px 18px;gap:20px;flex-wrap:wrap">' +
+        '<div style="flex:1 1 240px">' +
+          '<div style="font-weight:800;font-size:15px;color:' + navy + ';margin-bottom:6px">فـــاتورة إلى:</div>' +
+          '<div style="padding:4px 0;border-bottom:1px dashed #cbd5e1;font-weight:700;font-size:15px">' + esc(o.customer_name) + '</div>' +
+          (o.address ? '<div style="padding:4px 0;border-bottom:1px dashed #cbd5e1;color:#334155;font-size:13px">📍 ' + esc(o.address) + '</div>' : '') +
+          (o.phone ? '<div dir="ltr" style="padding:4px 0;border-bottom:1px dashed #cbd5e1;color:#334155;font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums">📞 ' + esc(o.phone) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:end;min-width:190px;padding-top:4px">' +
+          '<div style="font-size:20px;font-weight:800;color:' + navy + ';font-variant-numeric:tabular-nums">#' + o.order_no + '</div>' +
+          '<div style="font-size:13.5px;color:#334155;margin-top:4px;font-weight:700">' + esc(o.order_date) + '</div>' +
+          (o.channel ? '<div style="font-size:12px;color:#64748b;margin-top:2px">القناة: ' + esc(o.channel) + '</div>' : '') +
+          '<div style="margin-top:8px">' + stamp + '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="padding:0 24px">' +
+        '<table style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1">' +
+          '<thead><tr style="background:' + navy + ';color:#fff;font-size:13px">' +
+            '<th style="width:46px;padding:10px 8px;text-align:center;border-left:1px solid rgba(255,255,255,.2)">NO</th>' +
+            '<th style="padding:10px 12px;text-align:center;border-left:1px solid rgba(255,255,255,.2)">اسم الصنف</th>' +
+            '<th style="width:110px;padding:10px 8px;text-align:center;border-left:1px solid rgba(255,255,255,.2)">سعر القطعة</th>' +
+            '<th style="width:76px;padding:10px 8px;text-align:center;border-left:1px solid rgba(255,255,255,.2)">العدد</th>' +
+            '<th style="width:125px;padding:10px 10px;text-align:center">المجموع (' + esc(cur) + ')</th>' +
+          '</tr></thead><tbody>' +
+          its.map((i, idx) =>
+            '<tr style="border-bottom:1px solid #cbd5e1;background:' + (idx % 2 === 1 ? '#f8fafc' : '#fff') + '">' +
+              '<td style="padding:9px 8px;text-align:center;border-left:1px solid #cbd5e1;font-weight:700;color:' + navy + '">' + (idx + 1) + '</td>' +
+              '<td style="padding:9px 12px;text-align:center;border-left:1px solid #cbd5e1;font-weight:700">' + esc(i.name) + '</td>' +
+              '<td style="padding:9px 8px;text-align:center;border-left:1px solid #cbd5e1;font-variant-numeric:tabular-nums">' + money(i.price) + '</td>' +
+              '<td style="padding:9px 8px;text-align:center;border-left:1px solid #cbd5e1;font-weight:700;font-variant-numeric:tabular-nums">' + (+i.qty) + '</td>' +
+              '<td style="padding:9px 10px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums">' + money(i.line_total) + '</td>' +
+            '</tr>'
+          ).join('') +
+        '</tbody></table>' +
+      '</div>' +
+
+      '<div style="display:flex;justify-content:space-between;align-items:stretch;padding:16px 24px;gap:18px;flex-wrap:wrap">' +
+        '<div style="flex:1 1 250px;padding:10px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0">' +
+          '<div style="font-weight:800;color:' + navy + ';font-size:13.5px;margin-bottom:4px">القــــــــواعد والتعــــــــليمات:</div>' +
+          '<div style="font-size:12px;color:#334155;line-height:1.7;white-space:pre-line">' + esc(termsText) + '</div>' +
+          (pays.length ? '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed #cbd5e1;font-size:12px"><b>الدفعات المسجلة:</b> ' + pays.map(py => esc(py.method || 'نقداً') + ': ' + money(py.amount) + ' ' + esc(cur)).join(' | ') + '</div>' : '') +
+        '</div>' +
+        '<div style="width:280px;max-width:100%;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">' +
+          '<div style="display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #cbd5e1;font-size:13px"><b>المجموع الفرعي (' + totQty + ' قطعة)</b><span style="font-variant-numeric:tabular-nums">' + money(o.subtotal) + ' ' + esc(cur) + '</span></div>' +
+          (+o.delivery_fee ? '<div style="display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #cbd5e1;font-size:13px"><b>رسوم التوصيل</b><span style="font-variant-numeric:tabular-nums">+' + money(o.delivery_fee) + ' ' + esc(cur) + '</span></div>' : '') +
+          (+o.discount ? '<div style="display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #cbd5e1;font-size:13px;color:#b42318"><b>الخصم</b><span style="font-variant-numeric:tabular-nums">-' + money(o.discount) + ' ' + esc(cur) + '</span></div>' : '') +
+          '<div style="display:flex;justify-content:space-between;padding:10px 14px;background:' + navy + ';color:#fff;font-weight:800;font-size:15.5px"><span>المجمــــوع النهائي</span><span style="font-variant-numeric:tabular-nums">' + money(o.total) + ' ' + esc(cur) + '</span></div>' +
+          '<div style="display:flex;justify-content:space-between;padding:7px 14px;background:#f8fafc;font-size:12.5px"><span>المدفوع: <b style="color:#15803d">' + money(o.paid) + '</b></span><span>المتبقي: <b style="color:' + (bal > 0 ? '#b42318' : '#15803d') + '">' + money(o.balance) + ' ' + esc(cur) + '</b></span></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="text-align:center;font-size:18px;font-weight:800;color:' + navy + ';padding:8px 20px 14px;letter-spacing:1px">مــــــــع خــــــــالص الشــــــــكر</div>' +
+      '<div style="background:' + navy + ';color:#fff;padding:10px 24px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:10px;font-size:12.5px">' +
+        (bphone(o) ? '<span dir="ltr">📞 ' + esc(bphone(o)) + '</span>' : '') +
+        (baddr(o) ? '<span>📍 ' + esc(baddr(o)) + '</span>' : '') +
+        '<span>' + esc(p.footer || 'شكراً لتعاملكم معنا 🌹') + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // 2) القالب البرتقالي العصري (مطابق للنموذج الثاني: فاتورة مبيعات بالمنتصف + جدول برتقالي #f28b30 + صندوق إجمالي برتقالي + ملاحظات نقاط + شريط سفلي برتقالي)
+  if (tpl === 'orange') {
+    const org = '#f28b30', dark = '#2e2550';
+    return '<div class="inv inv-tpl-orange" style="background:#fcfcfd;color:#1e293b;padding:0;overflow:hidden;border:1px solid #fed7aa;border-radius:16px;position:relative">' +
+      '<div style="background:linear-gradient(90deg,' + dark + ' 0%,' + org + ' 100%);height:8px"></div>' +
+      '<div style="padding:20px 24px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<img src="' + esc(logo) + '" alt="" width="56" height="56" style="object-fit:cover;border-radius:14px;border:2px solid ' + org + '">' +
+          '<div><div style="font-size:19px;font-weight:800;color:' + dark + '">' + esc(bn(o)) + '</div>' +
+          (p.slogan ? '<div style="font-size:12px;color:' + org + ';font-weight:700">' + esc(p.slogan) + '</div>' : '') + '</div>' +
+        '</div>' +
+        '<div>' + stamp + '</div>' +
+      '</div>' +
+      '<div style="text-align:center;margin:4px 0 16px"><span style="font-size:30px;font-weight:800;color:' + dark + ';border-bottom:3px solid ' + org + ';padding-bottom:4px">فاتورة مبيعات</span></div>' +
+
+      '<div style="display:flex;justify-content:space-between;padding:0 26px 16px;gap:16px;flex-wrap:wrap;font-size:14px">' +
+        '<div style="flex:1 1 220px">' +
+          '<div style="margin-bottom:6px"><b style="color:' + dark + '">فــــاتورة إلى:</b> &nbsp;<span>' + esc(o.customer_name) + '</span></div>' +
+          (o.address ? '<div style="margin-bottom:4px"><b style="color:' + dark + '">العنــــوان:</b> &nbsp;<span style="color:#475467">' + esc(o.address) + '</span></div>' : '') +
+          (o.phone ? '<div><b style="color:' + dark + '">الهــــاتف:</b> &nbsp;<span dir="ltr" style="color:#475467;font-variant-numeric:tabular-nums">' + esc(o.phone) + '</span></div>' : '') +
+        '</div>' +
+        '<div style="min-width:190px;text-align:end">' +
+          '<div style="margin-bottom:6px"><b style="color:' + dark + '">رقم الفاتورة:</b> &nbsp;<span style="font-weight:800;font-variant-numeric:tabular-nums">#' + o.order_no + '</span></div>' +
+          '<div><b style="color:' + dark + '">التــــاريخ:</b> &nbsp;<span style="font-variant-numeric:tabular-nums">' + esc(o.order_date) + '</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="padding:0 24px">' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:' + org + ';color:#1e1b4b;font-size:13.5px;font-weight:800">' +
+            '<th style="width:45px;padding:10px;text-align:center">م</th>' +
+            '<th style="padding:10px 14px;text-align:center">الصنــــــــــــــــــــف</th>' +
+            '<th style="width:85px;padding:10px;text-align:center">الكمية</th>' +
+            '<th style="width:110px;padding:10px;text-align:center">السعر</th>' +
+            '<th style="width:125px;padding:10px;text-align:center">الإجمالي (' + esc(cur) + ')</th>' +
+          '</tr></thead><tbody>' +
+          its.map((i, idx) =>
+            '<tr style="border-bottom:1px solid #fed7aa">' +
+              '<td style="padding:9px;text-align:center;font-weight:700">' + (idx + 1) + '</td>' +
+              '<td style="padding:9px 14px;text-align:center;font-weight:700">' + esc(i.name) + '</td>' +
+              '<td style="padding:9px;text-align:center;font-variant-numeric:tabular-nums">' + (+i.qty) + '</td>' +
+              '<td style="padding:9px;text-align:center;font-variant-numeric:tabular-nums">' + money(i.price) + '</td>' +
+              '<td style="padding:9px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums">' + money(i.line_total) + '</td>' +
+            '</tr>'
+          ).join('') +
+        '</tbody></table>' +
+        '<div style="border-top:2px solid ' + org + ';margin-top:4px"></div>' +
+      '</div>' +
+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 24px;gap:20px;flex-wrap:wrap">' +
+        '<div style="width:250px;max-width:100%;margin-inline-end:auto">' +
+          '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-weight:700"><span>السعر الفرعي</span><span style="font-variant-numeric:tabular-nums">' + money(o.subtotal) + '</span></div>' +
+          (+o.delivery_fee ? '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-weight:700"><span>التوصيل</span><span style="font-variant-numeric:tabular-nums">+' + money(o.delivery_fee) + '</span></div>' : '') +
+          (+o.discount ? '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-weight:700;color:#b42318"><span>الخصم</span><span style="font-variant-numeric:tabular-nums">-' + money(o.discount) + '</span></div>' : '') +
+          '<div style="display:flex;justify-content:space-between;padding:10px 14px;background:' + org + ';color:#1e1b4b;font-weight:800;font-size:16px;border-radius:6px;margin-top:4px"><span>الإجمــــالي</span><span style="font-variant-numeric:tabular-nums">' + money(o.total) + ' ' + esc(cur) + '</span></div>' +
+          '<div style="display:flex;justify-content:space-between;padding:6px 10px;font-size:12.5px"><span>المدفوع: <b style="color:#15803d">' + money(o.paid) + '</b></span><span>المتبقي: <b style="color:' + (bal > 0 ? '#b42318' : '#15803d') + '">' + money(o.balance) + '</b></span></div>' +
+        '</div>' +
+        '<div style="flex:1 1 250px;text-align:right">' +
+          '<div style="font-weight:800;color:' + dark + ';font-size:14.5px;margin-bottom:4px">ملاحظات:</div>' +
+          '<div style="font-size:12.5px;color:#475467;line-height:1.75;white-space:pre-line">' + esc(termsText) + '</div>' +
+          (bphone(o) || baddr(o) ? '<div style="margin-top:8px;font-size:12px;color:#64748b">' + [bphone(o) ? '📞 ' + esc(bphone(o)) : '', baddr(o) ? '📍 ' + esc(baddr(o)) : ''].filter(Boolean).join(' · ') + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+
+      '<div style="text-align:center;font-size:20px;font-weight:800;color:' + dark + ';padding:8px 0 16px">شكراً لكم...</div>' +
+      '<div style="background:' + org + ';height:16px"></div>' +
+    '</div>';
+  }
+
+  // 3) القالب الأصفر والأسود الهندسي (مطابق للنموذج الثالث: شريط هندسي أصفر وأسود + رؤوس سوداء منفصلة + عمود أرقام أسود + شريط أصفر للإجمالي + Amount Due)
+  if (tpl === 'yellow') {
+    const yel = '#facc15', blk = '#111827';
+    return '<div class="inv inv-tpl-yellow" style="background:#fff;color:#111827;padding:0;overflow:hidden;border:1px solid #e5e7eb;border-radius:14px">' +
+      '<div style="display:flex;height:18px"><div style="width:42%;background:' + blk + ';clip-path:polygon(0 0,100% 0,92% 100%,0 100%)"></div><div style="flex:1;background:' + yel + ';margin-right:-16px"></div></div>' +
+      '<div style="background:#f9fafb;padding:22px 26px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;border-bottom:1px solid #e5e7eb">' +
+        '<div>' +
+          '<div style="font-size:32px;font-weight:800;color:#374151;line-height:1.1">فاتورة مبيعات</div>' +
+          '<div style="font-size:13px;color:#6b7280;margin-top:4px">رقم الفاتورة: <b>#' + o.order_no + '</b> &nbsp;|&nbsp; التاريخ: <b>' + esc(o.order_date) + '</b></div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+          '<div style="text-align:end">' +
+            '<div style="font-size:20px;font-weight:800;color:' + blk + '">' + esc(bn(o)) + '</div>' +
+            (p.slogan ? '<div style="font-size:12px;color:#6b7280">' + esc(p.slogan) + '</div>' : '') +
+          '</div>' +
+          '<div style="background:' + yel + ';padding:6px;border-radius:14px;box-shadow:0 4px 10px rgba(0,0,0,.08)"><img src="' + esc(logo) + '" alt="" width="54" height="54" style="object-fit:cover;border-radius:10px;display:block"></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 24px;padding:16px 26px;font-size:13.5px">' +
+        '<div><b>اسم العميل :</b> &nbsp;' + esc(o.customer_name) + '</div>' +
+        '<div><b>العنوان :</b> &nbsp;' + esc(o.address || '—') + '</div>' +
+        '<div><b>رقم الهاتف :</b> &nbsp;<span dir="ltr" style="font-variant-numeric:tabular-nums">' + esc(o.phone || '—') + '</span></div>' +
+        '<div><b>حالة الدفع :</b> &nbsp;' + stamp + '</div>' +
+      '</div>' +
+
+      '<div style="padding:0 24px">' +
+        '<table style="width:100%;border-collapse:separate;border-spacing:4px 4px">' +
+          '<thead><tr style="background:' + blk + ';color:#fff;font-size:13px">' +
+            '<th style="width:52px;padding:10px 6px;text-align:center;background:' + blk + '">الرقم</th>' +
+            '<th style="padding:10px 12px;text-align:right;background:' + blk + '">أسم المنتج</th>' +
+            '<th style="width:105px;padding:10px 8px;text-align:center;background:' + blk + '">السعر</th>' +
+            '<th style="width:78px;padding:10px 8px;text-align:center;background:' + blk + '">الكمية</th>' +
+            '<th style="width:120px;padding:10px 8px;text-align:center;background:' + blk + '">إجمالي</th>' +
+          '</tr></thead><tbody>' +
+          its.map((i, idx) =>
+            '<tr>' +
+              '<td style="padding:9px 6px;text-align:center;background:' + blk + ';color:#fff;font-weight:800">' + (idx + 1) + '</td>' +
+              '<td style="padding:9px 12px;background:' + (idx % 2 === 0 ? '#f3f4f6' : '#fff') + ';font-weight:700">' + esc(i.name) + '</td>' +
+              '<td style="padding:9px 8px;text-align:center;background:' + (idx % 2 === 0 ? '#f3f4f6' : '#fff') + ';font-variant-numeric:tabular-nums">' + money(i.price) + '</td>' +
+              '<td style="padding:9px 8px;text-align:center;background:' + (idx % 2 === 0 ? '#f3f4f6' : '#fff') + ';font-weight:700;font-variant-numeric:tabular-nums">' + (+i.qty) + '</td>' +
+              '<td style="padding:9px 8px;text-align:center;background:' + (idx % 2 === 0 ? '#f3f4f6' : '#fff') + ';font-weight:800;font-variant-numeric:tabular-nums">' + money(i.line_total) + '</td>' +
+            '</tr>'
+          ).join('') +
+        '</tbody></table>' +
+      '</div>' +
+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:18px 26px;gap:24px;flex-wrap:wrap">' +
+        '<div style="flex:1 1 250px">' +
+          '<div style="font-weight:800;font-size:14px;margin-bottom:6px">الاستبدال و الاسترجاع :</div>' +
+          '<div style="font-size:12.5px;color:#4b5563;line-height:1.7;white-space:pre-line">' + esc(termsText) + '</div>' +
+          '<div style="margin-top:20px;display:inline-block;text-align:center;min-width:160px">' +
+            '<div style="font-weight:800;font-size:14.5px;margin-bottom:14px">توقيع البائع / الختم</div>' +
+            '<div style="border-bottom:2px solid ' + blk + ';width:160px"></div>' +
+            '<div style="font-size:11.5px;color:#6b7280;margin-top:4px">' + esc(bn(o)) + (bphone(o) ? ' · ' + esc(bphone(o)) : '') + '</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div style="width:270px;max-width:100%">' +
+          '<div style="display:flex;justify-content:space-between;padding:5px 8px;font-weight:700"><span>الإجمالي الفرعي</span><span style="font-variant-numeric:tabular-nums">' + money(o.subtotal) + ' ' + esc(cur) + '</span></div>' +
+          (+o.delivery_fee ? '<div style="display:flex;justify-content:space-between;padding:5px 8px;font-weight:700"><span>رسوم التوصيل</span><span style="font-variant-numeric:tabular-nums">+' + money(o.delivery_fee) + ' ' + esc(cur) + '</span></div>' : '') +
+          (+o.discount ? '<div style="display:flex;justify-content:space-between;padding:5px 8px;font-weight:700;color:#b42318"><span>الخصم</span><span style="font-variant-numeric:tabular-nums">-' + money(o.discount) + ' ' + esc(cur) + '</span></div>' : '') +
+          '<div style="display:flex;justify-content:space-between;padding:10px 14px;background:' + yel + ';color:' + blk + ';font-weight:800;font-size:16px;margin:8px 0"><span>الإجمالي النهائي</span><span style="font-variant-numeric:tabular-nums">' + money(o.total) + ' ' + esc(cur) + '</span></div>' +
+          '<div style="margin-top:10px;text-align:left" dir="ltr">' +
+            '<div style="font-size:13.5px;color:#4b5563">Amount Due (المتبقي) :</div>' +
+            '<div style="font-size:26px;font-weight:900;color:' + blk + ';font-variant-numeric:tabular-nums">' + money(o.balance) + ' <span style="font-size:15px">' + esc(cur) + '</span></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;height:18px;margin-top:6px"><div style="flex:1;background:' + yel + '"></div><div style="width:42%;background:' + blk + ';clip-path:polygon(8% 0,100% 0,100% 100%,0 100%);margin-right:-16px"></div></div>' +
+    '</div>';
+  }
+
+  // 4) القالب الملكي الذهبي الفاخر (royal)
+  return '<div class="inv inv-tpl-royal" style="--inv-acc:' + esc(accent) + '">' +
     '<div class="inv-ribbon" style="background:linear-gradient(90deg, #0b1426 0%, ' + esc(accent) + ' 100%);height:6px;border-radius:12px 12px 0 0;margin:-22px -22px 18px -22px"></div>' +
     '<div class="inv-h" style="border-bottom:2px solid ' + esc(accent) + ';padding-bottom:16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">' +
       '<div style="display:flex;align-items:center;gap:14px">' +
@@ -479,8 +721,8 @@ function invoiceInner(o) {
       '<div style="flex:1 1 250px">' +
         (pays.length ? '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;font-size:12.5px"><b style="display:block;margin-bottom:4px;color:#0f172a">💳 سجل الدفعات المسجّلة:</b>' + pays.map(py => '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #e2e8f0"><span>✓ ' + esc(py.method || 'نقداً') + ' (' + esc(py.paid_on) + ')</span><b style="color:#15803d">' + money(py.amount) + ' ' + esc(cur) + '</b></div>').join('') + '</div>' : '') +
         '<div style="padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;color:#475467;font-size:12px;line-height:1.7">' +
-          '<div style="font-weight:700;color:#0f172a;margin-bottom:2px">🛡️ فاتورة إلكترونية معتمدة آلياً</div>' +
-          '<div>صادرة إلكترونياً من نظام <b>' + esc(bn(o)) + '</b> بتاريخ ' + esc(o.order_date) + ' للطلب رقم <b>#' + o.order_no + '</b> وهي معتمدة تلقائياً دون الحاجة إلى توقيع أو ختم يدوي.</div>' +
+          '<div style="font-weight:700;color:#0f172a;margin-bottom:2px">🛡️ القواعد والتعليمات</div>' +
+          '<div style="white-space:pre-line">' + esc(termsText) + '</div>' +
         '</div>' +
       '</div>' +
 
@@ -498,51 +740,77 @@ function invoiceInner(o) {
   '</div>';
 }
 // صفحة مستقلة تماماً للطباعة (لا تتأثر بتنسيقات التطبيق) — تعمل مع «حفظ كـ PDF» في المتصفح
-function invoiceDoc(o, toolbar) {
+function invoiceDoc(o, toolbar, tplOpt) {
   const O = location.origin, F = (f, w, r) => "@font-face{font-family:'IBM Plex Sans Arabic';font-weight:" + w + ";src:url(" + O + "/fonts/ibm-plex-sans-arabic-" + f + "-" + w + "-normal.woff2) format('woff2');unicode-range:" + r + "}";
   const AR = 'U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC';
   const LA = 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2212,U+FEFF,U+FFFD';
   const css = F('arabic', 400, AR) + F('arabic', 700, AR) + F('latin', 400, LA) + F('latin', 700, LA) +
     "@page{size:A4;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{margin:0;background:#fff}body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif;color:#0f172a;font-size:13.5px;line-height:1.65;padding:14px;direction:rtl}" +
-    ".inv{max-width:800px;margin:0 auto;border:1px solid #cbd5e1;border-radius:14px;padding:22px;background:#fff;box-shadow:0 6px 24px rgba(15,23,42,.06)}.m{color:#475467;font-size:12.5px}" +
+    ".inv{max-width:800px;margin:0 auto;border:1px solid #cbd5e1;border-radius:14px;padding:22px;background:#fff;box-shadow:0 6px 24px rgba(15,23,42,.06)}.inv-tpl-navy,.inv-tpl-orange,.inv-tpl-yellow{padding:0}.m{color:#475467;font-size:12.5px}" +
     ".inv-stamp{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:700}.inv-stamp.ok{background:#dcfce7;color:#15803d}.inv-stamp.part{background:#fef3c7;color:#b45309}.inv-stamp.due{background:#fee2e2;color:#b91c1c}" +
-    ".tb{position:sticky;top:0;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);padding:10px 0 14px;text-align:center;border-bottom:1px solid #e2e8f0;margin-bottom:14px;z-index:9}.tb button{font:inherit;font-weight:700;padding:10px 22px;border-radius:10px;border:0;background:#0b1426;color:#f6e3a8;cursor:pointer;margin:0 4px}@media print{.tb{display:none}.inv{border:1px solid #cbd5e1;box-shadow:none;padding:18px}}";
+    ".tb{position:sticky;top:0;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);padding:10px 0 14px;text-align:center;border-bottom:1px solid #e2e8f0;margin-bottom:14px;z-index:9}.tb button{font:inherit;font-weight:700;padding:10px 22px;border-radius:10px;border:0;background:#0b1426;color:#f6e3a8;cursor:pointer;margin:0 4px}@media print{.tb{display:none}.inv{border:1px solid #cbd5e1;box-shadow:none}}";
   return '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>فاتورة #' + o.order_no + ' - ' + esc(bn(o)) + '</title><style>' + css + '</style></head><body>' +
-    (toolbar ? '<div class="tb"><button onclick="window.print()">🖨 طباعة / حفظ PDF</button><button onclick="window.close()" style="background:#e2e8f0;color:#0f172a">إغلاق</button></div>' : '') + invoiceInner(o) + '</body></html>';
+    (toolbar ? '<div class="tb"><button onclick="window.print()">🖨 طباعة / حفظ PDF</button><button onclick="window.close()" style="background:#e2e8f0;color:#0f172a">إغلاق</button></div>' : '') + invoiceInner(o, tplOpt) + '</body></html>';
 }
-function printInvoice(o) {
+function printInvoice(o, tplOpt) {
   const f = document.createElement('iframe');
   f.setAttribute('aria-hidden', 'true'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
   document.body.appendChild(f);
   const w = f.contentWindow, d = w.document;
-  d.open(); d.write(invoiceDoc(o, false)); d.close();
+  d.open(); d.write(invoiceDoc(o, false, tplOpt)); d.close();
   const ready = Promise.all([(d.fonts && d.fonts.ready) || Promise.resolve()].concat([...d.images].map(im => im.complete ? 1 : new Promise(r => { im.onload = im.onerror = r; }))));
   Promise.race([ready, new Promise(r => setTimeout(r, 2500))]).then(() => setTimeout(() => {
-    try { w.focus(); w.print(); } catch (e) { f.remove(); return openInvoice(o); }
+    try { w.focus(); w.print(); } catch (e) { f.remove(); return openInvoice(o, tplOpt); }
     setTimeout(() => f.remove(), 120000);
   }, 200));
 }
-function openInvoice(o) {   // بديل: صفحة فاتورة في نافذة جديدة فيها زر الطباعة
+function openInvoice(o, tplOpt) {   // بديل: صفحة فاتورة في نافذة جديدة فيها زر الطباعة
   const w = window.open('', '_blank');
   if (!w) return alert('اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة');
-  w.document.open(); w.document.write(invoiceDoc(o, true)); w.document.close();
+  w.document.open(); w.document.write(invoiceDoc(o, true, tplOpt)); w.document.close();
 }
 function invoiceDialog(o) {
-  dlg.innerHTML = invoiceInner(o) +
-    '<div class="row dact no-print" style="flex-wrap:wrap;gap:6px">' +
-      '<button class="p s" id="iv_pdf_wa" style="background:#15803d;border-color:#15803d;color:#fff">📄 إرسال فاتورة PDF للعميل مباشرة</button>' +
-      '<button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' +
-      '<button class="s" id="iv_o">↗ فتح في نافذة</button>' +
-      (o.phone ? '<button class="s" id="iv_w">💬 إرسال نص واتساب</button>' : '') +
-      '<button class="s" id="iv_cp">📋 نسخ النص</button>' +
-      '<button class="s" id="iv_x">إغلاق</button>' +
+  let activeTpl = currentInvoiceTemplate(o);
+  const renderDlg = () => {
+    const tplBar = '<div class="no-print" style="margin-bottom:12px;padding:10px 12px;background:var(--col);border:1px solid var(--line);border-radius:12px">' +
+      '<div class="bar" style="margin-bottom:6px;gap:8px"><b style="font-size:13px">🎨 اختر تصميم وتنسيق الفاتورة (٤ قوالب احترافية):</b><span class="m" style="font-size:11.5px">يُحفظ اختيارك تلقائياً للمتجر</span></div>' +
+      '<div class="row s" style="gap:6px;flex-wrap:wrap">' +
+        Object.values(INV_TEMPLATES).map(t =>
+          '<button type="button" class="s' + (activeTpl === t.id ? ' p' : '') + '" data-inv-tpl="' + t.id + '" style="font-size:12px;padding:6px 12px;border-radius:8px">' + t.label + '</button>'
+        ).join('') +
+      '</div>' +
     '</div>';
-  $('iv_x').onclick = () => dlg.close();
-  $('iv_pdf_wa').onclick = () => sendOrderInvoicePdf(o, $('iv_pdf_wa'));
-  $('iv_p').onclick = () => printInvoice(o);
-  $('iv_o').onclick = () => openInvoice(o);
-  $('iv_cp').onclick = async () => { try { await navigator.clipboard.writeText(invoiceText(o)); $('iv_cp').textContent = 'تم النسخ ✓'; if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓'); } catch (e) { alert('تعذّر النسخ'); } };
-  if ($('iv_w')) $('iv_w').onclick = () => window.open('https://wa.me/' + waPhone(o.phone) + '?text=' + encodeURIComponent(invoiceText(o)), '_blank');
+
+    dlg.innerHTML = tplBar +
+      '<div id="iv_preview_wrap" style="overflow-x:auto">' + invoiceInner(o, activeTpl) + '</div>' +
+      '<div class="row dact no-print" style="flex-wrap:wrap;gap:6px">' +
+        '<button class="p s" id="iv_pdf_wa" style="background:#15803d;border-color:#15803d;color:#fff">📄 إرسال فاتورة PDF للعميل مباشرة</button>' +
+        '<button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' +
+        '<button class="s" id="iv_o">↗ فتح في نافذة</button>' +
+        (o.phone ? '<button class="s" id="iv_w">💬 إرسال نص واتساب</button>' : '') +
+        '<button class="s" id="iv_cp">📋 نسخ النص</button>' +
+        '<button class="s" id="iv_x">إغلاق</button>' +
+      '</div>';
+
+    dlg.querySelectorAll('[data-inv-tpl]').forEach(btn => {
+      btn.onclick = async () => {
+        activeTpl = btn.dataset.invTpl;
+        try { localStorage.setItem('inv_tpl_v1', activeTpl); } catch (e) {}
+        if (typeof saveCompanyProfile === 'function') {
+          const coName = orderCompany(o) || activeCompanyFilter() || 'متجرك';
+          saveCompanyProfile(coName, { invoiceTemplate: activeTpl }).catch(() => {});
+        }
+        renderDlg();
+      };
+    });
+    $('iv_x').onclick = () => dlg.close();
+    $('iv_pdf_wa').onclick = () => sendOrderInvoicePdf(o, $('iv_pdf_wa'), activeTpl);
+    $('iv_p').onclick = () => printInvoice(o, activeTpl);
+    $('iv_o').onclick = () => openInvoice(o, activeTpl);
+    $('iv_cp').onclick = async () => { try { await navigator.clipboard.writeText(invoiceText(o)); $('iv_cp').textContent = 'تم النسخ ✓'; if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓'); } catch (e) { alert('تعذّر النسخ'); } };
+    if ($('iv_w')) $('iv_w').onclick = () => window.open('https://wa.me/' + waPhone(o.phone) + '?text=' + encodeURIComponent(invoiceText(o)), '_blank');
+  };
+  renderDlg();
   dlg.showModal();
 }
 /* ---------- نافذة الطلب (إنشاء / تعديل) ---------- */
@@ -709,7 +977,19 @@ function orderDialog(o) {
       }
       if (!error) {
         ({ error } = await sb.from('ord_items').upsert(its.map((i, k) => ({ id: i.id, order_id: id, pos: k, name: String(i.name).trim(), supplier: String(i.supplier).trim() || null, qty: +i.qty > 0 ? +i.qty : 1, price: +i.price || 0, image_path: i.newPath }))));
-        if (!error && cc) ({ error } = await sb.from('ord_item_costs').upsert(its.map(i => ({ item_id: i.id, cost: +i.cost || 0 }))));
+        if (!error && cc) {
+          // معالجة خطأ RLS لجدول ord_item_costs عند حفظ الطلب من قِبل موظف غير أدمن
+          const costRows = its.map(i => ({ item_id: i.id, cost: +i.cost || 0 }));
+          const costRes = await sb.from('ord_item_costs').upsert(costRows);
+          if (costRes && costRes.error) {
+            // حفظ التكاليف في السحابة الاحتياطية والذاكرة دون إيقاف حفظ الطلب
+            if (typeof saveCloudItemCostsFallback === 'function') {
+              await saveCloudItemCostsFallback(its);
+            }
+          } else {
+            its.forEach(i => { if (S.ocost) S.ocost[i.id] = +i.cost || 0; });
+          }
+        }
       }
       if (!error) await imgRemove(toRemove);
     }

@@ -445,6 +445,8 @@ function getCompanyProfile(coName) {
     logo: p.logo || '',
     footer: p.footer || 'شكراً لتعاملكم معنا 🌹',
     taxNo: p.taxNo || '',
+    invoiceTemplate: p.invoiceTemplate || (S.ordSet && S.ordSet.invoice_template) || localStorage.getItem('inv_tpl_v1') || 'navy',
+    terms: p.terms || 'لا يمكن استرجاع أو استبدال البضائع بعد مرور 14 يوم من تاريخ الشراء إلا في حالة وجود عيب مصنعي.\nيجب إحضار الفاتورة الأصلية عند الاسترجاع أو الاستبدال.',
     staffCanCost: p.staffCanCost !== undefined ? !!p.staffCanCost : !!(S.ordSet && S.ordSet.staff_can_cost),
     imageKeepDays: p.imageKeepDays !== undefined ? +p.imageKeepDays : (S.ordSet && S.ordSet.image_keep_days != null ? +S.ordSet.image_keep_days : 1)
   };
@@ -563,6 +565,9 @@ async function saveCompanyProfile(coName, profileData) {
   const profs = companyProfilesMap();
   const existingKey = Object.keys(profs).find(k => same(k, name)) || name;
   profs[existingKey] = Object.assign({}, profs[existingKey] || {}, profileData, { id: name });
+  if (profileData.invoiceTemplate) {
+    try { localStorage.setItem('inv_tpl_v1', profileData.invoiceTemplate); } catch (e) {}
+  }
   const cos = companiesList();
   if (!cos.some(c => same(c, name))) cos.push(name);
   await persistOrgLists(cos, departmentsList(), profs);
@@ -580,6 +585,150 @@ async function saveCompanyProfile(coName, profileData) {
     }
   }
 }
+
+// ===== التحكم في ظهور المدير العام (الأدمن) في قوائم المهام عند المتاجر والموظفين =====
+function getAdminTaskVisibility(adminEmailOpt) {
+  const email = norm(adminEmailOpt || (S.me && S.me.email) || '');
+  const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
+  for (let i = hv.length - 1; i >= 0; i--) {
+    const item = String(hv[i] || '');
+    if (item.startsWith('__adm_vis:')) {
+      try {
+        const obj = JSON.parse(item.slice(10));
+        if (!email || !obj.adminEmail || same(obj.adminEmail, email)) {
+          return {
+            adminEmail: obj.adminEmail || email,
+            mode: obj.mode || 'all', // 'all' | 'companies' | 'members' | 'except_members' | 'none'
+            companies: Array.isArray(obj.companies) ? obj.companies : [],
+            members: Array.isArray(obj.members) ? obj.members : []
+          };
+        }
+      } catch (e) {}
+    }
+  }
+  try {
+    const raw = localStorage.getItem('adm_task_vis_v1');
+    if (raw) {
+      const obj = JSON.parse(raw);
+      return {
+        adminEmail: obj.adminEmail || email,
+        mode: obj.mode || 'all',
+        companies: Array.isArray(obj.companies) ? obj.companies : [],
+        members: Array.isArray(obj.members) ? obj.members : []
+      };
+    }
+  } catch (e) {}
+  return { adminEmail: email, mode: 'all', companies: [], members: [] };
+}
+
+async function saveAdminTaskVisibility(cfg) {
+  const email = norm((cfg && cfg.adminEmail) || (S.me && S.me.email) || '');
+  const clean = {
+    adminEmail: email,
+    mode: (cfg && cfg.mode) || 'all',
+    companies: Array.isArray(cfg && cfg.companies) ? cfg.companies.filter(Boolean) : [],
+    members: Array.isArray(cfg && cfg.members) ? cfg.members.map(norm).filter(Boolean) : []
+  };
+  try { localStorage.setItem('adm_task_vis_v1', JSON.stringify(clean)); } catch (e) {}
+  if (S.ordSet) {
+    const base = (S.ordSet.hidden_views || []).filter(x => {
+      const s = String(x || '');
+      if (!s.startsWith('__adm_vis:')) return true;
+      try {
+        const parsed = JSON.parse(s.slice(10));
+        return parsed.adminEmail && !same(parsed.adminEmail, email);
+      } catch (e) { return false; }
+    });
+    const nextHidden = base.concat(['__adm_vis:' + JSON.stringify(clean)]);
+    S.ordSet.hidden_views = nextHidden;
+    await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true).catch(() => {});
+  }
+  applyCompanyScope();
+}
+
+function canViewerSeeAdminInTasks(adminMember, viewerMember, activeCo) {
+  if (!adminMember || adminMember.role !== 'admin') return false;
+  const viewer = viewerMember || S.me;
+  if (!viewer) return true;
+  if (same(adminMember.email, viewer.email) || viewer.role === 'admin') return true;
+  const cfg = getAdminTaskVisibility(adminMember.email);
+  const mode = cfg.mode || 'all';
+  if (mode === 'all') return true;
+  if (mode === 'none') return false;
+  const viewerCo = activeCo || parseMemberMeta(viewer).company || DEFAULT_COMPANY;
+  const viewerEmail = norm(viewer.email);
+  if (mode === 'companies') {
+    return (cfg.companies || []).some(c => same(c, viewerCo));
+  }
+  if (mode === 'members') {
+    return (cfg.members || []).some(e => same(e, viewerEmail));
+  }
+  if (mode === 'except_members') {
+    return !(cfg.members || []).some(e => same(e, viewerEmail));
+  }
+  return true;
+}
+
+// مزامنة تكاليف الأصناف الاحتياطية عند إضافة موظف غير أدمن لتجنب خطأ RLS في ord_item_costs
+function syncCloudItemCosts() {
+  if (!S.ocost) S.ocost = {};
+  const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
+  hv.forEach(x => {
+    const s = String(x || '');
+    if (s.startsWith('__icost:')) {
+      try {
+        const map = JSON.parse(s.slice(8));
+        if (map && typeof map === 'object') {
+          Object.keys(map).forEach(id => {
+            if (S.ocost[id] === undefined) S.ocost[id] = +map[id] || 0;
+          });
+        }
+      } catch (e) {}
+    }
+  });
+  try {
+    const localMap = JSON.parse(localStorage.getItem('fallback_item_costs_v1') || '{}');
+    Object.keys(localMap).forEach(id => {
+      if (S.ocost[id] === undefined) S.ocost[id] = +localMap[id] || 0;
+    });
+  } catch (e) {}
+}
+
+async function saveCloudItemCostsFallback(itemsList) {
+  if (!Array.isArray(itemsList) || !itemsList.length) return;
+  if (!S.ocost) S.ocost = {};
+  let localMap = {};
+  try { localMap = JSON.parse(localStorage.getItem('fallback_item_costs_v1') || '{}') || {}; } catch (e) {}
+  itemsList.forEach(i => {
+    if (i && i.id) {
+      const c = +i.cost || 0;
+      S.ocost[i.id] = c;
+      localMap[i.id] = c;
+    }
+  });
+  try { localStorage.setItem('fallback_item_costs_v1', JSON.stringify(localMap)); } catch (e) {}
+  if (S.ordSet) {
+    const hv = (S.ordSet.hidden_views || []).slice();
+    let merged = {};
+    hv.forEach(x => {
+      if (String(x || '').startsWith('__icost:')) {
+        try { Object.assign(merged, JSON.parse(String(x).slice(8))); } catch (e) {}
+      }
+    });
+    Object.assign(merged, localMap);
+    // الاحتفاظ بآخر 350 صنف حتى لا يتضخم الحقل
+    const keys = Object.keys(merged);
+    if (keys.length > 350) {
+      const trimmed = {};
+      keys.slice(keys.length - 350).forEach(k => { trimmed[k] = merged[k]; });
+      merged = trimmed;
+    }
+    const nextHidden = hv.filter(x => !String(x || '').startsWith('__icost:')).concat(['__icost:' + JSON.stringify(merged)]);
+    S.ordSet.hidden_views = nextHidden;
+    await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true).catch(() => {});
+  }
+}
+
 const isSuperAdmin = () => isAdmin() && !String(S.me && (S.me.company || (S.me.telegram_chat_id && S.me.telegram_chat_id.startsWith('{') ? (JSON.parse(S.me.telegram_chat_id).co || '') : '')) || '').trim();
 function activeCompanyFilter() {
   if (!S.me) return '';
@@ -588,6 +737,7 @@ function activeCompanyFilter() {
 }
 function applyCompanyScope() {
   if (!S.rawMembers) return;
+  syncCloudItemCosts();
   const co = activeCompanyFilter();
   if (!co) {
     S.allMembers = S.rawMembers.slice();
@@ -606,11 +756,19 @@ function applyCompanyScope() {
   }
   S.allMembers = S.rawMembers.filter(m => {
     const mc = parseMemberMeta(m).company;
-    return same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email);
+    if (same(mc, co) || (m.role === 'rep' && mc === '__all') || same(m.email, S.me && S.me.email)) return true;
+    // إظهار المدير العام (الأدمن) في قائمة إسناد المهام للموظفين حسب إعدادات ظهور المدير العام
+    if (m.role === 'admin' && canViewerSeeAdminInTasks(m, S.me, co)) return true;
+    return false;
   });
   S.members = S.allMembers.filter(m => m.role !== 'rep');
   S.reps = S.allMembers.filter(m => m.role === 'rep');
-  S.tasks = (S.rawTasks || []).filter(t => same(taskCompany(t), co));
+  // السماح للموظف برؤية مهام شركته + المهام المسندة منه لمدير عام أو المسندة له
+  S.tasks = (S.rawTasks || []).filter(t => {
+    if (same(taskCompany(t), co)) return true;
+    if (S.me && (same(t.created_by, S.me.email) || same(t.assignee_email, S.me.email))) return true;
+    return false;
+  });
   let compOrders = (S.rawOrders || []).filter(o => same(orderCompany(o), co));
   // عزل صلاحيات الطلبات: إذا لم يُسمح للموظف برؤية طلبات زملائه يرى طلباته الخاصة فقط
   if (S.me && S.me.role !== 'admin' && typeof canMemberViewOtherOrders === 'function' && !canMemberViewOtherOrders(S.me)) {

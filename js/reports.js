@@ -14,7 +14,15 @@ function rpRange() {
 }
 const dOf = o => S.rp.basis === 'delivered' ? String(o.delivered_at || '').slice(0, 10) : String(o.order_date);
 function rpData() {
-  const [f, t] = rpRange(), inR = (S.orders || []).filter(o => { const d = dOf(o); return d && d >= f && d <= t; });
+  const qStr = String((S.rp && S.rp.q) || '').trim().toLowerCase();
+  const [f, t] = rpRange(), inR = (S.orders || []).filter(o => {
+    const d = dOf(o);
+    if (!d || d < f || d > t) return false;
+    if (!qStr) return true;
+    const its = oItems(o.id).map(i => (i.name || '') + ' ' + (i.supplier || '')).join(' ');
+    const hay = [o.order_no, o.customer_name, o.phone, o.address, o.channel, o.rep_email ? repName(o.rep_email) : '', creatorName(o.created_by), its].join(' ').toLowerCase();
+    return hay.includes(qStr);
+  });
   const live = o => o.status !== 'cancelled' && o.status !== 'returned';
   const scope = S.rp.scope === 'delivered' ? inR.filter(o => o.status === 'delivered') : S.rp.scope === 'live' ? inR.filter(live) : inR;
   return { all: inR, rows: scope, f, t };
@@ -288,7 +296,9 @@ function reportsHtml() {
   '</div>';
 
   // شريط الفلاتر والتبويبات الفرعية للتقارير
-  h += '<div class="tools rpf" style="align-items:flex-end;margin-bottom:10px"><label>الفترة<select id="rp_p">' + [['1', 'اليوم'], ['7', 'آخر 7 أيام'], ['30', 'آخر 30 يوماً'], ['m', 'هذا الشهر'], ['pm', 'الشهر الماضي'], ['y', 'هذه السنة'], ['all', 'الكل'], ['x', 'مخصص']].map(([v, l]) => '<option value="' + v + '"' + (S.rp.period === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+  h += '<div class="tools rpf" style="align-items:flex-end;margin-bottom:10px">' +
+    '<label style="flex:1 1 220px">بحث سريع<input id="rp_q" type="search" value="' + esc(S.rp.q || '') + '" placeholder="🔍 ابحث بالعميل، المندوب، التاجر، الصنف، رقم الطلب..."></label>' +
+    '<label>الفترة<select id="rp_p">' + [['1', 'اليوم'], ['7', 'آخر 7 أيام'], ['30', 'آخر 30 يوماً'], ['m', 'هذا الشهر'], ['pm', 'الشهر الماضي'], ['y', 'هذه السنة'], ['all', 'الكل'], ['x', 'مخصص']].map(([v, l]) => '<option value="' + v + '"' + (S.rp.period === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     (S.rp.period === 'x' ? '<label>من<input id="rp_f" type="date" value="' + esc(S.rp.from) + '"></label><label>إلى<input id="rp_t" type="date" value="' + esc(S.rp.to) + '"></label>' : '') +
     '<label>الاعتماد على<select id="rp_b"><option value="order"' + (S.rp.basis === 'order' ? ' selected' : '') + '>تاريخ الطلب</option><option value="delivered"' + (S.rp.basis === 'delivered' ? ' selected' : '') + '>تاريخ التوصيل</option></select></label>' +
     '<label>الطلبات المحتسبة<select id="rp_s"><option value="delivered"' + (S.rp.scope === 'delivered' ? ' selected' : '') + '>المسلّمة فقط</option><option value="live"' + (S.rp.scope === 'live' ? ' selected' : '') + '>كل غير الملغية</option><option value="all"' + (S.rp.scope === 'all' ? ' selected' : '') + '>الكل</option></select></label></div>';
@@ -341,6 +351,13 @@ function reportsHtml() {
 }
 function bindReports() {
   const set = (k, v) => { S.rp[k] = v; render(); };
+  if ($('rp_q')) $('rp_q').oninput = e => {
+    S.rp.q = e.target.value;
+    const pos = e.target.selectionStart || S.rp.q.length;
+    render();
+    const el = $('rp_q');
+    if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (_) {} }
+  };
   if ($('rp_p')) $('rp_p').onchange = e => set('period', e.target.value);
   if ($('rp_f')) { $('rp_f').onchange = e => set('from', e.target.value); $('rp_t').onchange = e => set('to', e.target.value); }
   if ($('rp_b')) $('rp_b').onchange = e => set('basis', e.target.value);

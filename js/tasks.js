@@ -487,10 +487,18 @@ function waRemindDialog(preEmail = '', preScope = 'late', singleTaskId = '') {
   dlg.showModal();
 }
 
+function isTaskCardExpanded(id) {
+  if (S.tkDefaultFolded === undefined) S.tkDefaultFolded = true; // مطوية افتراضياً لتوفير المساحة على الجوال
+  S.tkExpanded = S.tkExpanded || {};
+  if (S.tkExpanded[id] !== undefined) return !!S.tkExpanded[id];
+  return !S.tkDefaultFolded;
+}
+
 function card(t) {
   const st = eff(t), d = dueInfo(t), mt = S.meetings.find(m => m.id === t.meeting_id);
   const acts = (t.for_all ? ACT_ALL : ACT)[st];
   const dn = doneBy(t);
+  const isExp = isTaskCardExpanded(t.id);
   
   let waBtn = '';
   if (!t.for_all && t.assignee_email && S.me) {
@@ -501,21 +509,40 @@ function card(t) {
   let handoffBtn = (!t.for_all && st !== 'done') ? '<button class="s" data-hf="' + t.id + '" style="background:var(--accsoft);color:var(--acc)">إحالة 🔄</button>' : '';
 
   let metaAll = t.for_all 
-    ? '<span class="chip all" title="' + esc(dn.map(x => nm(x.email)).join('\n')) + '">👥 فريق (' + dn.length + '/' + S.members.length + ')</span>' 
-    : '<span class="chip" style="font-weight:700">👤 ' + esc(nm(t.assignee_email)) + '</span>';
+    ? '<span class="chip all" style="font-size:11px" title="' + esc(dn.map(x => nm(x.email)).join('\n')) + '">👥 على: الفريق (' + dn.length + '/' + S.members.length + ')</span>' 
+    : '<span class="chip" style="font-weight:700;font-size:11.5px">👤 على: ' + esc(nm(t.assignee_email)) + '</span>';
 
   const asDep = !t.for_all && t.assignee_email && typeof memberDept === 'function' ? memberDept(t.assignee_email) : '';
   let metaDep = asDep ? '<span class="chip">🏛️ ' + esc(asDep) + '</span>' : '';
-  let metaD = d ? '<span class="chip ' + d.c + '">' + esc(d.t) + '</span>' : '';
+  let metaD = d ? '<span class="chip ' + d.c + '" style="font-size:11px">' + esc(d.t) + '</span>' : '';
   let metaMt = mt ? '<span class="chip">📌 ' + esc(mt.title) + '</span>' : '';
 
-  return '<div class="tk ' + st + (prioOf(t) !== 'normal' ? ' pr-' + prioOf(t) : '') + '" draggable="true" data-id="' + t.id + '">' +
-    '<div class="tt">' + esc(t.title) + '</div>' +
-    (t.progress > 0 && st !== 'done' ? '<div style="height:5px;background:var(--line);border-radius:3px;margin:6px 0"><div style="height:100%;width:' + t.progress + '%;background:var(--acc);border-radius:3px"></div></div>' : '') +
-    flowLine(t) +
-    renderNotesAndWorkflow(t.notes) + ckRows(t) + doneNoteLine(t) +
-    '<div class="meta" style="align-items:center;">' + prioChip(t) + metaAll + metaDep + groupChip(t) + metaD + metaMt + ckChip(t) + waBtn + '</div>' +
-    '<div class="acts">' + actsHtml + ' ' + handoffBtn + '</div>' +
+  return '<div class="tk ' + st + (prioOf(t) !== 'normal' ? ' pr-' + prioOf(t) : '') + (isExp ? ' tk-open' : ' tk-compact') + '" draggable="true" data-id="' + t.id + '">' +
+    '<div class="tk-head-row" data-tk-tog="' + t.id + '" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="tt" style="margin:0;font-size:13.5px;line-height:1.4;display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+          '<span>' + esc(t.title) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px">' +
+          metaAll + metaD + prioChip(t) + ckChip(t) +
+        '</div>' +
+      '</div>' +
+      '<div class="row s" style="gap:4px;flex-shrink:0;align-items:center">' +
+        waBtn +
+        '<button type="button" class="s tk-pop-btn" data-tk-pop="' + t.id + '" style="padding:4px 8px;font-size:12px" title="فتح التفاصيل والتعديل في شاشة منبثقة">⤢</button>' +
+        '<button type="button" class="s tk-chev-btn' + (isExp ? ' p' : '') + '" data-tk-tog="' + t.id + '" style="padding:4px 9px;font-size:12.5px;font-weight:800" title="عرض أو طي تفاصيل المهمة في نفس الشاشة">' + (isExp ? '▴' : '▾') + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="tk-details-body" style="display:' + (isExp ? 'block' : 'none') + ';margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)">' +
+      (t.progress > 0 && st !== 'done' ? '<div style="height:5px;background:var(--line);border-radius:3px;margin:4px 0 8px"><div style="height:100%;width:' + t.progress + '%;background:var(--acc);border-radius:3px"></div></div>' : '') +
+      flowLine(t) +
+      renderNotesAndWorkflow(t.notes) + ckRows(t) + doneNoteLine(t) +
+      '<div class="meta" style="align-items:center;margin-top:6px">' + metaDep + groupChip(t) + metaMt + '</div>' +
+      '<div class="acts" style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">' +
+        actsHtml + ' ' + handoffBtn +
+        '<button type="button" class="s" data-tk-pop="' + t.id + '" style="margin-inline-start:auto;font-size:11.5px;padding:4px 10px">✏️ التفاصيل / تعديل ⤢</button>' +
+      '</div>' +
+    '</div>' +
   '</div>';
 }
 
@@ -647,6 +674,7 @@ function taskBoardColsHtml() {
 
 function boardView() {
   const tf = ensureTaskFilterState();
+  if (S.tkDefaultFolded === undefined) S.tkDefaultFolded = true;
   const deps = typeof departmentsList === 'function' ? departmentsList() : [];
   const { list: all } = filterTasksAdvanced();
   const activeCnt = activeTaskFiltersCount();
@@ -685,8 +713,9 @@ function boardView() {
     '<option value="emp_asc"' + (tf.sort === 'emp_asc' ? ' selected' : '') + '>🔤 حسب اسم الموظف</option>';
 
   let adminBtn = '<button class="s" id="nmt" style="background:transparent;border-color:var(--mute)">+ قسم/اجتماع</button>';
-  let waBatchBtn = '<button class="s" id="wa_batch_btn" type="button" style="background:rgba(18,140,126,.12);color:#128c7e;border-color:rgba(18,140,126,.35);font-weight:700" title="إرسال رسائل تذكير للموظفين بالمهام المتأخرة والمفتوحة دفعة واحدة">📲 تذكير واتساب للموظفين</button>';
+  let waBatchBtn = '<button class="s" id="wa_batch_btn" type="button" style="background:rgba(18,140,126,.12);color:#128c7e;border-color:rgba(18,140,126,.35);font-weight:700" title="إرسال رسائل تذكير للموظفين بالمهام المتأخرة والمفتوحة دفعة واحدة">📲 تذكير واتساب</button>';
   let advToggleBtn = '<button class="s' + (tf.open || activeCnt ? ' p' : '') + '" id="tf_tog" type="button">🎛️ فلترة متقدمة' + (activeCnt ? ' (' + activeCnt + ')' : '') + '</button>';
+  let foldAllBtn = '<button class="s" id="tk_fold_all" type="button" style="font-size:12px;padding:5px 10px" title="طي أو توسيع تفاصيل جميع بطاقات المهام">' + (S.tkDefaultFolded ? '🔼 توسيع الكل' : '🔽 طي الكل') + '</button>';
 
   const quickChips = [
     ['', '', '📋 الكل (' + S.tasks.length + ')'],
@@ -726,7 +755,7 @@ function boardView() {
   '<div class="tools" style="margin-bottom:8px">' +
     '<div class="seg"><button data-f="mine" class="' + (S.filter === 'mine' ? 'on' : '') + '">مهامي فقط</button><button data-f="all" class="' + (S.filter === 'all' ? 'on' : '') + '">كل الفريق</button></div>' +
     '<input id="tf_q" type="search" placeholder="🔎 بحث فوري: عنوان المهمة، موظف، ملاحظات، مشروع…" value="' + esc(tf.q) + '" style="flex:2 1 200px">' +
-    advToggleBtn +
+    advToggleBtn + foldAllBtn +
     (!tf.open && !activeCnt ? '<select id="fm" style="border-radius:6px">' + mtOpts + '</select>' + (deps.length ? '<select id="fdep" style="border-radius:6px">' + depOpts + '</select>' : '') : '') +
     '<span class="sp"></span>' +
     waBatchBtn + adminBtn + '<button class="p s" id="nt">➕ إضافة مهمة</button>' +
@@ -748,8 +777,29 @@ function bindTaskColsEvents() {
       if (tk) waRemindDialog(tk.assignee_email || '', 'single', tk.id);
     };
   });
+  document.querySelectorAll('[data-tk-pop]').forEach(b => {
+    b.onclick = e => {
+      e.stopPropagation();
+      const tk = S.tasks.find(x => x.id === b.dataset.tkPop);
+      if (tk) taskDialog(tk);
+    };
+  });
+  document.querySelectorAll('[data-tk-tog]').forEach(b => {
+    b.onclick = e => {
+      if (e.target.closest('[data-tk-pop]') || e.target.closest('[data-wa-tk]')) return;
+      e.stopPropagation();
+      const id = b.dataset.tkTog;
+      S.tkExpanded = S.tkExpanded || {};
+      S.tkExpanded[id] = !isTaskCardExpanded(id);
+      if ($('t_board_wrap')) {
+        $('t_board_wrap').innerHTML = taskBoardColsHtml();
+        bindTaskColsEvents();
+      } else {
+        render();
+      }
+    };
+  });
   document.querySelectorAll('.tk').forEach(el => {
-    el.onclick = e => { if (e.target.closest('.ckrows') || e.target.closest('[data-wa-tk]')) return; taskDialog(S.tasks.find(t => t.id === el.dataset.id)); };
     el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('drag'); };
     el.ondragend = () => el.classList.remove('drag');
   });
@@ -766,6 +816,13 @@ function bindBoard() {
   document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { S.kpi = S.kpi === b.dataset.kpi ? '' : b.dataset.kpi; S.filter = 'mine'; render(); });
   if ($('kpi_x')) $('kpi_x').onclick = () => { S.kpi = ''; render(); };
   if ($('tf_tog')) $('tf_tog').onclick = () => { tf.open = !tf.open; render(); };
+  if ($('tk_fold_all')) {
+    $('tk_fold_all').onclick = () => {
+      S.tkDefaultFolded = !S.tkDefaultFolded;
+      S.tkExpanded = {};
+      render();
+    };
+  }
   if ($('tf_q')) {
     $('tf_q').oninput = e => {
       tf.q = e.target.value;
