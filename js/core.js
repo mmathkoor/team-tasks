@@ -223,6 +223,7 @@ const $app = $('app'), dlg = $('dlg');
 const S = { me: null, members: [], meetings: [], tasks: [], done: [], props: [], votes: [], propsErr: false, view: 'board', filter: 'mine', meeting: '', col: 'todo', pf: 'open' };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toISOString().slice(0, 10);
+const norm = s => String(s ?? '').trim().toLowerCase();
 const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
 const daysTo = d => Math.round((new Date(d) - new Date(today())) / 864e5);
 const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجزة' };

@@ -334,13 +334,14 @@ function staffBlockHtml() {
   const myCo = isSuperAdmin() ? '' : parseMemberMeta(S.me).company;
   if (S.setAdmCo === undefined) S.setAdmCo = activeCompanyFilter() || '';
   const admCo = myCo || S.setAdmCo || '';
-  const stfQ = norm(S.stfQ || '');
+  const _nrm = s => String(s ?? '').trim().toLowerCase();
+  const stfQ = _nrm(S.stfQ || '');
   const allStaff = (S.rawMembers || S.allMembers || S.members || []).filter(m => m.role !== 'rep');
   let listMembers = admCo ? allStaff.filter(m => same(parseMemberMeta(m).company, admCo) || (S.me && same(m.email, S.me.email))) : allStaff;
   if (stfQ) {
     listMembers = listMembers.filter(m => {
       const mt = parseMemberMeta(m);
-      return norm([m.name, m.email, m.title, mt.company, mt.department, mt.phone].join(' ')).includes(stfQ);
+      return _nrm([m.name, m.email, m.title, mt.company, mt.department, mt.phone].join(' ')).includes(stfQ);
     });
   }
   S.openMemberEdits = S.openMemberEdits || {};
@@ -665,10 +666,11 @@ function settingsView() {
     html: accountBlockHtml()
   });
 
-  const setQ = norm(S.setQ || '');
+  const _nrm = s => String(s ?? '').trim().toLowerCase();
+  const setQ = _nrm(S.setQ || '');
   let filteredBlocks = curTab === 'all' ? blocks : blocks.filter(b => b.id === curTab);
   if (setQ) {
-    filteredBlocks = blocks.filter(b => norm(b.title + ' ' + b.desc + ' ' + b.html.replace(/<[^>]+>/g, ' ')).includes(setQ));
+    filteredBlocks = blocks.filter(b => _nrm(b.title + ' ' + b.desc + ' ' + b.html.replace(/<[^>]+>/g, ' ')).includes(setQ));
   }
 
   const searchBar = '<div class="card" style="padding:10px 12px;margin-bottom:10px">' +

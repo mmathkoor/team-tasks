@@ -26,7 +26,7 @@ window.forceAppUpdate = async function() {
 };
 
 (function autoSyncVersion() {
-  const currentVer = '5.2.3';
+  const currentVer = '5.2.4';
   const savedVer = localStorage.getItem('last_seen_ver');
   if (savedVer && savedVer !== currentVer) {
     localStorage.setItem('last_seen_ver', currentVer);
