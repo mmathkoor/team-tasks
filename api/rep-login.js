@@ -19,11 +19,14 @@ module.exports = async (req, res) => {
   if (rawInput.length < 2 || !password) return bad('الرجاء كتابة اسم المستخدم / رقم الجوال وكلمة المرور');
 
   try {
+    const rawKey = process.env.SUPABASE_ANON_KEY;
+    const anonKey = (rawKey && rawKey.startsWith('eyJ')) ? rawKey : DEFAULT_KEY;
     const anon = createClient(
       process.env.SUPABASE_URL || DEFAULT_URL,
-      process.env.SUPABASE_ANON_KEY || DEFAULT_KEY,
+      anonKey,
       { auth: { persistSession: false, autoRefreshToken: false } }
     );
+
 
     // البحث عن المندوب أو العضو برقم الجوال أو بالاسم أو بالبريد
     const { data: allMem } = await supabase.from('members').select('email,phone,name,role');

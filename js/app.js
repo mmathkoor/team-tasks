@@ -101,8 +101,8 @@ function loginView() {
   $app.innerHTML = '<div class="card" id="login"><h1><svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><br>مدير المهام</h1><p class="m">سجّل الدخول برقم الجوال أو البريد الإلكتروني أو اسم المستخدم مع كلمة المرور</p>' +
   '<div class="row"><input id="em" type="text" autocomplete="username" placeholder="رقم الجوال (77...) أو البريد الإلكتروني أو الاسم" dir="ltr" style="width:100%"></div>' +
   '<div class="row" style="margin-top:12px;position:relative">' +
-    '<input id="pw" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr" style="width:100%;padding-inline-end:42px">' +
-    '<button type="button" id="pw_tog" title="إظهار/إخفاء كلمة المرور" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;padding:4px 8px;font-size:16px;cursor:pointer;color:var(--mute)">👁</button>' +
+    '<input id="pw" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr" style="width:100%;padding-right:44px;padding-left:12px">' +
+    '<button type="button" id="pw_tog" title="إظهار/إخفاء كلمة المرور" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;padding:4px 8px;font-size:16px;cursor:pointer;color:var(--mute)">👁</button>' +
   '</div>' +
   '<button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button>' +
   '<p class="m" id="msg" style="margin-top:12px;color:var(--late);font-size:13px;line-height:1.5"></p></div>';
@@ -138,6 +138,7 @@ function loginView() {
       const res = await sb.auth.signInWithPassword({ email: id, password: pw });
       if (!res.error) {
         loggedIn = true;
+        return;
       } else {
         error = res.error;
       }

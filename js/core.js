@@ -1,6 +1,8 @@
+const norm = s => String(s ?? '').trim().toLowerCase();
 let AUTH = { s: null };
 try { AUTH.s = JSON.parse(localStorage.getItem('sbs') || 'null'); } catch(e){}
 const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); idbSet('sbs', s || null); };
+
 
 async function tok() {
   const s = AUTH.s;
@@ -225,8 +227,8 @@ const $app = $('app'), dlg = $('dlg');
 const S = { me: null, members: [], meetings: [], tasks: [], done: [], props: [], votes: [], propsErr: false, view: 'board', filter: 'mine', meeting: '', col: 'todo', pf: 'open' };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toISOString().slice(0, 10);
-const norm = s => String(s ?? '').trim().toLowerCase();
 const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+
 const daysTo = d => Math.round((new Date(d) - new Date(today())) / 864e5);
 const ST = { todo: 'للتنفيذ', doing: 'قيد العمل', done: 'منجزة' };
 const ACT = { todo: [['doing', 'بدء التنفيذ'], ['done', 'إنجاز ✓']], doing: [['done', 'إنجاز ✓'], ['todo', 'إيقاف']], done: [['doing', 'إعادة فتح']] };
