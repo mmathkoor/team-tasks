@@ -1273,4 +1273,85 @@ dlg.addEventListener('click', e => {
   dlg.close();
 });
 const _showModal = HTMLDialogElement.prototype.showModal;
-dlg.showModal = function () { dlg._dirty = false; if (!dlg.open) _showModal.call(dlg); };
+dlg.showModal = function () {
+  dlg._dirty = false;
+  if (!dlg.open) {
+    _showModal.call(dlg);
+    try { history.pushState({ matjarkModal: true, view: S.view }, ''); } catch (e) {}
+  }
+};
+
+// ===== حماية زر الرجوع في الجوال (APK والمتصفح) من الخروج المفاجئ =====
+window._navViewStack = window._navViewStack || [];
+window._lastRootBackTs = 0;
+
+window.__handleAndroidBack = function () {
+  // 1) إغلاق نافذة التنبيه الصوتي المنبثقة إن كانت مفتوحة
+  const alertOv = document.getElementById('alert_ov');
+  if (alertOv) {
+    const closeBtn = document.getElementById('al_x');
+    if (closeBtn) closeBtn.click(); else alertOv.remove();
+    return 'handled';
+  }
+  // 2) إغلاق شريط التذكير العلوي المنبثق إن كان ظاهراً
+  const azkBanner = document.getElementById('azkar_headsup_banner');
+  if (azkBanner) {
+    azkBanner.remove();
+    return 'handled';
+  }
+  // 3) إغلاق أي نافذة حوار مفتوحة (مهمة، طلب، صندوق تنبيهات، إعدادات...)
+  if (dlg && dlg.open) {
+    if (dlg._dirty && !confirm('لديك تعديلات غير محفوظة. هل تريد إغلاق النافذة؟')) {
+      return 'handled';
+    }
+    dlg._dirty = false;
+    dlg.close();
+    return 'handled';
+  }
+  // 4) الرجوع إلى الشاشة الرئيسية إذا كان المستخدم في تبويب فرعي
+  if (S && S.me) {
+    const homeView = S.me.role === 'rep' ? 'rep' : (typeof firstView === 'function' ? firstView() : 'board');
+    if (window._navViewStack && window._navViewStack.length > 0) {
+      const prev = window._navViewStack.pop();
+      if (prev && prev !== S.view) {
+        S.view = prev;
+        if (typeof render === 'function') render();
+        return 'handled';
+      }
+    }
+    if (S.view && S.view !== homeView) {
+      S.view = homeView;
+      if (typeof render === 'function') render();
+      return 'handled';
+    }
+  }
+  return 'root';
+};
+
+(function initMobileBackGuard() {
+  try {
+    if (!history.state || !history.state.matjarkRoot) {
+      history.replaceState({ matjarkRoot: true }, '');
+      history.pushState({ matjarkGuard: true }, '');
+    }
+  } catch (e) {}
+
+  window.addEventListener('popstate', function () {
+    const res = window.__handleAndroidBack ? window.__handleAndroidBack() : 'root';
+    if (res === 'handled') {
+      try { history.pushState({ matjarkGuard: true }, ''); } catch (e) {}
+      return;
+    }
+    const now = Date.now();
+    if (now - (window._lastRootBackTs || 0) < 2200) {
+      // السماح بالخروج عند الضغط مرتين متتاليتين
+      return;
+    }
+    window._lastRootBackTs = now;
+    try { history.pushState({ matjarkGuard: true }, ''); } catch (e) {}
+    if (typeof toast === 'function') {
+      toast('اضغط زر الرجوع مرة أخرى للخروج من التطبيق');
+    }
+  });
+})();
+

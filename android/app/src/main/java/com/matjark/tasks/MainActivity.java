@@ -1,156 +1,129 @@
 package com.matjark.tasks;
 
 import android.Manifest;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.media.RingtoneManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String APP_URL = "https://matjark.vercel.app/";
-    public static final String CHANNEL_ID = "matjark_tasks_alerts";
-    public static final String CHANNEL_NAME = "إشعارات مدير المهام";
+    private static final int REQ_NOTIFICATIONS = 1001;
 
     private WebView webView;
     private SwipeRefreshLayout swipeRefresh;
-    private ValueCallback<Uri[]> fileUploadCallback;
+    private ValueCallback<Uri[]> filePathCallback;
+    private long lastBackPressTime = 0L;
 
-    private final ActivityResultLauncher<String> notificationPermissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(),
-            isGranted -> {}
-    );
-
-    private final ActivityResultLauncher<Intent> fileChooserLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (fileUploadCallback != null) {
-                    Uri[] results = null;
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        if (result.getData().getClipData() != null) {
-                            int count = result.getData().getClipData().getItemCount();
-                            results = new Uri[count];
-                            for (int i = 0; i < count; i++) {
-                                results[i] = result.getData().getClipData().getItemAt(i).getUri();
-                            }
-                        } else if (result.getData().getData() != null) {
-                            results = new Uri[]{result.getData().getData()};
-                        }
-                    }
-                    fileUploadCallback.onReceiveValue(results);
-                    fileUploadCallback = null;
+    private final ActivityResultLauncher<Intent> fileChooserLauncher =
+        registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (filePathCallback == null) return;
+            Uri[] results = null;
+            if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                String dataString = result.getData().getDataString();
+                if (dataString != null) {
+                    results = new Uri[]{Uri.parse(dataString)};
                 }
             }
-    );
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
+        });
 
+    @SuppressLint({"SetJavaScriptEnabled", "BatteryLife"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        getWindow().setStatusBarColor(Color.parseColor("#0b1426"));
         setContentView(R.layout.activity_main);
 
-        createNotificationChannel();
-        requestNotificationPermission();
+        TaskMonitorService.createChannelsStatic(this);
+        requestNotificationPermissionIfNeeded();
+        startBackgroundMonitorService();
+        requestBatteryOptimizationExemptionIfNeeded();
 
-        swipeRefresh = findViewById(R.id.swipe_refresh);
-        webView = findViewById(R.id.web_view);
+        swipeRefresh = findViewById(R.id.swipeRefresh);
+        webView = findViewById(R.id.webView);
 
-        configureWebView();
-
-        if (savedInstanceState == null) {
-            webView.loadUrl(APP_URL);
-        } else {
-            webView.restoreState(savedInstanceState);
-        }
-
+        swipeRefresh.setColorSchemeColors(Color.parseColor("#d4af6a"), Color.parseColor("#0b1426"));
         swipeRefresh.setOnRefreshListener(() -> webView.reload());
 
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack();
-                } else {
-                    finish();
-                }
+        // تعطيل السحب للتحديث إلا عندما تكون الصفحة في أعلى الشاشة تماماً لمنع تعارض التمرير
+        webView.getViewTreeObserver().addOnScrollChangedListener(() -> {
+            if (webView != null && swipeRefresh != null) {
+                swipeRefresh.setEnabled(webView.getScrollY() == 0);
             }
         });
-    }
 
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_HIGH
-            );
-            channel.setDescription("تنبيهات فورية للمهام المتأخرة والطلبات والرسائل");
-            channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0, 400, 150, 400, 150, 600});
-            channel.enableLights(true);
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
-        }
-    }
-
-    private void requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-            }
-        }
-    }
-
-    private void configureWebView() {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
-        settings.setLoadWithOverviewMode(true);
-        settings.setUseWideViewPort(true);
-        settings.setSupportZoom(false);
-        settings.setBuiltInZoomControls(false);
+        settings.setLoadsImagesAutomatically(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setSupportZoom(false);
+        settings.setUserAgentString(settings.getUserAgentString() + " MatjarkTasksAPK/2.0");
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        }
-
-        webView.addJavascriptInterface(new AndroidNotificationBridge(this), "AndroidApp");
+        webView.addJavascriptInterface(new AndroidNotificationBridge(), "AndroidApp");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 swipeRefresh.setRefreshing(false);
+                CookieManager.getInstance().flush();
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase() : "";
+                String host = uri.getHost() != null ? uri.getHost().toLowerCase() : "";
+
+                if ("whatsapp".equals(scheme) || "tel".equals(scheme) || "mailto".equals(scheme)
+                        || host.contains("wa.me") || host.contains("api.whatsapp.com")) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                    } catch (Exception ignored) {
+                    }
+                    return true;
+                }
+                return false;
             }
         });
 
@@ -161,84 +134,140 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
-                if (fileUploadCallback != null) {
-                    fileUploadCallback.onReceiveValue(null);
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
+                                             FileChooserParams fileChooserParams) {
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
                 }
-                fileUploadCallback = filePathCallback;
-
-                Intent intent = fileChooserParams.createIntent();
+                MainActivity.this.filePathCallback = filePathCallback;
                 try {
+                    Intent intent = fileChooserParams.createIntent();
                     fileChooserLauncher.launch(intent);
                 } catch (Exception e) {
-                    fileUploadCallback = null;
+                    MainActivity.this.filePathCallback = null;
                     return false;
                 }
                 return true;
             }
         });
+
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (webView == null) {
+                    moveTaskToBack(true);
+                    return;
+                }
+                webView.evaluateJavascript(
+                    "(function(){ try { return typeof window.__handleAndroidBack === 'function' ? window.__handleAndroidBack() : 'none'; } catch(e) { return 'none'; } })()",
+                    result -> {
+                        if (result != null && result.contains("handled")) {
+                            return;
+                        }
+                        if (webView.canGoBack()) {
+                            webView.goBack();
+                            return;
+                        }
+                        long now = System.currentTimeMillis();
+                        if (now - lastBackPressTime < 2200L) {
+                            moveTaskToBack(true);
+                        } else {
+                            lastBackPressTime = now;
+                            Toast.makeText(MainActivity.this, "اضغط زر الرجوع مرة أخرى للخروج من التطبيق", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                );
+            }
+        });
+
+        webView.loadUrl(APP_URL);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
+        startBackgroundMonitorService();
+    }
+
+    private void startBackgroundMonitorService() {
+        try {
+            Intent serviceIntent = new Intent(this, TaskMonitorService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQ_NOTIFICATIONS
+                );
+            }
+        }
+    }
+
+    @SuppressLint("BatteryLife")
+    private void requestBatteryOptimizationExemptionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                SharedPreferences prefs = getSharedPreferences(TaskMonitorService.PREFS_NAME, MODE_PRIVATE);
+                if (prefs.getBoolean("asked_battery_opt", false)) return;
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    prefs.edit().putBoolean("asked_battery_opt", true).apply();
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                }
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     public class AndroidNotificationBridge {
-        private final Context context;
-
-        public AndroidNotificationBridge(Context context) {
-            this.context = context;
-        }
-
-        @JavascriptInterface
-        public boolean isNativeApp() {
-            return true;
-        }
-
         @JavascriptInterface
         public void postNotification(String title, String body, String tag) {
+            new Handler(Looper.getMainLooper()).post(() ->
+                TaskMonitorService.fireHighPriorityAlert(MainActivity.this, title, body, tag)
+            );
+        }
+
+        @JavascriptInterface
+        public void syncAuth(String apiUrl, String apiKey, String accessToken, String refreshToken, String userEmail, String userName) {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                        return;
-                    }
-                }
-
-                Intent intent = new Intent(context, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                PendingIntent pendingIntent = PendingIntent.getActivity(
-                        context,
-                        0,
-                        intent,
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0
-                );
-
-                Uri defaultSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                        .setSmallIcon(R.mipmap.ic_launcher)
-                        .setContentTitle(title != null && !title.isEmpty() ? title : "مدير المهام")
-                        .setContentText(body != null ? body : "")
-                        .setStyle(new NotificationCompat.BigTextStyle().bigText(body != null ? body : ""))
-                        .setPriority(NotificationCompat.PRIORITY_HIGH)
-                        .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                        .setAutoCancel(true)
-                        .setSound(defaultSound)
-                        .setVibrate(new long[]{0, 400, 150, 400, 150, 600})
-                        .setContentIntent(pendingIntent);
-
-                int notificationId = (int) (System.currentTimeMillis() % 100000000);
-                NotificationManagerCompat.from(context).notify(tag != null && !tag.isEmpty() ? tag : "default", notificationId, builder.build());
-            } catch (Exception e) {
-                e.printStackTrace();
+                SharedPreferences prefs = getSharedPreferences(TaskMonitorService.PREFS_NAME, MODE_PRIVATE);
+                prefs.edit()
+                    .putString("api_url", apiUrl != null ? apiUrl : "")
+                    .putString("api_key", apiKey != null ? apiKey : "")
+                    .putString("access_token", accessToken != null ? accessToken : "")
+                    .putString("refresh_token", refreshToken != null ? refreshToken : "")
+                    .putString("user_email", userEmail != null ? userEmail : "")
+                    .putString("user_name", userName != null ? userName : "")
+                    .apply();
+                startBackgroundMonitorService();
+            } catch (Exception ignored) {
             }
         }
 
         @JavascriptInterface
-        public void showToast(String message) {
-            runOnUiThread(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show());
+        public void syncDigest(String digestJson) {
+            try {
+                SharedPreferences prefs = getSharedPreferences(TaskMonitorService.PREFS_NAME, MODE_PRIVATE);
+                prefs.edit().putString("overdue_digest_json", digestJson != null ? digestJson : "").apply();
+            } catch (Exception ignored) {
+            }
         }
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        webView.saveState(outState);
     }
 }

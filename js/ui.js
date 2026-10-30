@@ -217,7 +217,7 @@ function headerHtml() {
 }
 
 function apkInstallDialog() {
-  const apkUrl = '/team-tasks.apk';
+  const apkUrl = '/api/download-apk';
   const hasPrompt = !!window._deferredInstallPrompt;
   dlg.innerHTML =
     '<div style="text-align:center;padding:6px 0 14px">' +

@@ -21,6 +21,7 @@ async function init() {
     }
     
     S.allMembers = members; S.members = members.filter(m => m.role !== 'rep'); S.reps = members.filter(m => m.role === 'rep'); S.me = me; idbSet('cfg', { url: API, key: KEY, name: me.name }); idbSet('sbs', AUTH.s);
+    if (typeof syncNativeAndroidAuth === 'function') syncNativeAndroidAuth();
     if (me.role === 'rep') { S.view = 'rep'; return await repLoad(); }
     await load();
   } catch (err) { showErrorBox(err.message); }
@@ -85,7 +86,27 @@ async function load() {
   if (typeof plStartHeartbeat === 'function') plStartHeartbeat();
   if (typeof autoEnablePush === 'function') autoEnablePush(false);
   if (typeof startAzkarReminderEngine === 'function') startAzkarReminderEngine();
+  if (typeof syncNativeAndroidAuth === 'function') syncNativeAndroidAuth();
   inboxAfterLoad(); recurPing();
+}
+
+async function syncNativeAndroidAuth() {
+  try {
+    if (!window.AndroidApp || typeof window.AndroidApp.syncAuth !== 'function') return;
+    if (!S || !S.me || !S.me.email) return;
+    const accessToken = typeof tok === 'function' ? await tok() : (AUTH && AUTH.s && AUTH.s.access_token) || '';
+    const refreshToken = (AUTH && AUTH.s && AUTH.s.refresh_token) || '';
+    if (accessToken) {
+      window.AndroidApp.syncAuth(
+        typeof API !== 'undefined' ? API : '',
+        typeof KEY !== 'undefined' ? KEY : '',
+        accessToken,
+        refreshToken,
+        S.me.email || '',
+        S.me.name || ''
+      );
+    }
+  } catch (e) {}
 }
 
 function normRepPhoneClient(p) {
@@ -217,7 +238,19 @@ function render() {
   if (S.view === 'set') $app.insertAdjacentHTML('beforeend', '<p class="m" style="text-align:center;margin-top:20px">النسخة ' + VERSION + '</p>');
   bindHeader();
   if ($('fab')) $('fab').onclick = () => taskDialog(null);
-  document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => { if (b.dataset.nv === 'more') return moreDialog(); S.view = b.dataset.nv; render(); });
+  document.querySelectorAll('[data-nv]').forEach(b => b.onclick = () => {
+    if (b.dataset.nv === 'more') return moreDialog();
+    if (S.view && S.view !== b.dataset.nv) {
+      window._navViewStack = window._navViewStack || [];
+      if (window._navViewStack[window._navViewStack.length - 1] !== S.view) {
+        window._navViewStack.push(S.view);
+        if (window._navViewStack.length > 12) window._navViewStack.shift();
+      }
+      try { history.pushState({ matjarkTab: b.dataset.nv }, ''); } catch (e) {}
+    }
+    S.view = b.dataset.nv;
+    render();
+  });
   if (S.view === 'orders') bindOrders(); else if (S.view === 'erp') bindErp(); else if (S.view === 'pub' || S.view === 'pipe') bindPipe(); else if (S.view === 'kb') bindKb(); else if (S.view === 'board') bindBoard(); else if (S.view === 'props') bindProps(); else if (S.view === 'log') bindLog(); else if (S.view === 'dash') bindDash(); else bindSettings();
   if (typeof updateNet === 'function') updateNet();
 }

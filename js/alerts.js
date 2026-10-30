@@ -89,26 +89,40 @@ function postSystemNotification(title, body, opts = {}) {
       return true;
     } catch (e) {}
   }
-  // 2) إذا كان في متصفح يدعم Service Worker Notification
-  if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    navigator.serviceWorker.ready.then(reg => {
-      if (reg && reg.showNotification) {
-        reg.showNotification(title || 'مدير المهام', {
-          body: body || '',
-          icon: '/icon-192.png',
-          badge: '/badge-96.png',
-          vibrate: [500, 150, 500, 150, 800],
-          requireInteraction: true,
-          renotify: true,
-          silent: false,
-          tag: opts.tag || 'matjark_notification',
-          timestamp: Date.now(),
-          actions: opts.actions || [{ action: 'open', title: '📋 عرض المهام' }],
-          data: opts.data || { url: '/' }
+  // 2) إذا كان في متصفح يدعم إشعارات النظام
+  if (typeof Notification !== 'undefined') {
+    const doShow = () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+          if (reg && reg.showNotification) {
+            reg.showNotification(title || 'مدير المهام', {
+              body: body || '',
+              icon: '/icon-192.png',
+              badge: '/badge-96.png',
+              vibrate: [500, 150, 500, 150, 800],
+              requireInteraction: true,
+              renotify: true,
+              silent: false,
+              tag: opts.tag || 'matjark_notification',
+              timestamp: Date.now(),
+              actions: opts.actions || [{ action: 'open', title: '📋 عرض المهام' }],
+              data: opts.data || { url: '/' }
+            }).catch(() => {});
+          }
         }).catch(() => {});
+      } else {
+        try { new Notification(title || 'مدير المهام', { body: body || '', icon: '/icon-192.png' }); } catch (e) {}
       }
-    }).catch(() => {});
-    return true;
+    };
+
+    if (Notification.permission === 'granted') {
+      doShow();
+      return true;
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') doShow();
+      }).catch(() => {});
+    }
   }
   return false;
 }
@@ -320,6 +334,15 @@ async function syncOverdueDigestToSw() {
     firstTaskId: firstId,
     updatedAt: Date.now()
   };
+
+  try {
+    if (window.AndroidApp && typeof window.AndroidApp.syncDigest === 'function') {
+      window.AndroidApp.syncDigest(JSON.stringify(digest));
+    }
+    if (typeof syncNativeAndroidAuth === 'function') {
+      syncNativeAndroidAuth();
+    }
+  } catch (e) {}
 
   try {
     if (typeof idbGet === 'function' && typeof idbSet === 'function') {
