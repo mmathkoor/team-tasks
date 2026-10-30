@@ -1,4 +1,6 @@
 {
+  "outputDirectory": ".",
+  "cleanUrls": true,
   "crons": [
     {
       "path": "/api/recur",
@@ -55,12 +57,16 @@
       "destination": "/api/manifest"
     },
     {
+      "source": "/team-tasks.apk",
+      "destination": "/public/team-tasks.apk"
+    },
+    {
       "source": "/apk",
-      "destination": "/team-tasks.apk"
+      "destination": "/public/team-tasks.apk"
     },
     {
       "source": "/apk/download",
-      "destination": "/team-tasks.apk"
+      "destination": "/public/team-tasks.apk"
     }
   ]
 }

@@ -570,8 +570,8 @@ function alertSettingsHtml() {
     '<div id="azk_test_status" class="m" style="margin-top:6px;font-weight:700;color:var(--gold,#c9a24e)"></div>' +
     '<div style="margin-top:14px;padding:12px;border-radius:12px;background:rgba(22,163,74,.1);border:1.5px solid rgba(22,163,74,.4);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
       '<div>' +
-        '<b style="color:#16a34a;font-size:13.5px">🤖 الحل الجذري الشامل: تطبيق أندرويد المستقل (APK)</b>' +
-        '<div class="m" style="font-size:12px;margin-top:2px">تطبيق أندرويد مخصص يُبنى تلقائياً عبر GitHub Actions ويعمل في خلفية الجوال 24 ساعة بدون أي قيود للمتصفح.</div>' +
+        '<b style="color:#16a34a;font-size:13.5px">🤖 الحل الجذري الشامل: تطبيق أندرويد المستقل للجوال (APK)</b>' +
+        '<div class="m" style="font-size:12px;margin-top:2px">تطبيق أندرويد مخصص يعمل في خلفية الجوال 24 ساعة ويستقبل التنبيهات بدون أي قيود للمتصفح.</div>' +
       '</div>' +
       '<button type="button" class="p s" id="azk_open_apk_dlg" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700">📥 تثبيت تطبيق APK الآن</button>' +
     '</div>' +

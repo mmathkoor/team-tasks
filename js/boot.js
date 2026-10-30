@@ -34,8 +34,14 @@ window.forceAppUpdate = async function() {
   window.location.href = window.location.origin + '/?_v=' + Date.now();
 };
 
+window._deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  window._deferredInstallPrompt = e;
+});
+
 (function autoSyncVersion() {
-  const currentVer = '5.2.8';
+  const currentVer = '5.2.9';
 
   const savedVer = localStorage.getItem('last_seen_ver');
   if (savedVer && savedVer !== currentVer) {

@@ -555,7 +555,7 @@ function accountBlockHtml() {
   '<div class="card" style="margin-bottom:12px;background:rgba(34,197,94,.08);border:1.5px solid rgba(34,197,94,.4)">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
       '<div>' +
-        '<div style="font-weight:700;font-size:14px;color:#16a34a">🤖 تطبيق أندرويد المستقل (APK) من GitHub</div>' +
+        '<div style="font-weight:700;font-size:14px;color:#16a34a">🤖 تطبيق أندرويد المستقل للجوال (APK)</div>' +
         '<div class="m" style="font-size:12px;margin-top:2px">تثبيت التطبيق مباشرة على جوالك لتنبيهات نظام 24 ساعة دون أي قيود للمتصفح.</div>' +
       '</div>' +
       '<button type="button" class="s p" id="account_apk_btn" style="background:#16a34a;border-color:#16a34a;color:#fff;font-size:12.5px;font-weight:700">📥 تحميل APK المباشر</button>' +
