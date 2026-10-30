@@ -48,9 +48,16 @@ public class MainActivity extends AppCompatActivity {
             if (filePathCallback == null) return;
             Uri[] results = null;
             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                String dataString = result.getData().getDataString();
-                if (dataString != null) {
-                    results = new Uri[]{Uri.parse(dataString)};
+                if (result.getData().getClipData() != null) {
+                    int count = result.getData().getClipData().getItemCount();
+                    results = new Uri[count];
+                    for (int i = 0; i < count; i++) {
+                        results[i] = result.getData().getClipData().getItemAt(i).getUri();
+                    }
+                } else if (result.getData().getData() != null) {
+                    results = new Uri[]{result.getData().getData()};
+                } else if (result.getData().getDataString() != null) {
+                    results = new Uri[]{Uri.parse(result.getData().getDataString())};
                 }
             }
             filePathCallback.onReceiveValue(results);
@@ -70,8 +77,8 @@ public class MainActivity extends AppCompatActivity {
         startBackgroundMonitorService();
         requestBatteryOptimizationExemptionIfNeeded();
 
-        swipeRefresh = findViewById(R.id.swipeRefresh);
-        webView = findViewById(R.id.webView);
+        swipeRefresh = findViewById(R.id.swipe_refresh);
+        webView = findViewById(R.id.web_view);
 
         swipeRefresh.setColorSchemeColors(Color.parseColor("#d4af6a"), Color.parseColor("#0b1426"));
         swipeRefresh.setOnRefreshListener(() -> webView.reload());
