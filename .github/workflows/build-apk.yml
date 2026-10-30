@@ -5,7 +5,6 @@ on:
     branches: [ main ]
     paths-ignore:
       - 'team-tasks.apk'
-      - 'public/team-tasks.apk'
   workflow_dispatch:
 
 permissions:
@@ -84,11 +83,10 @@ jobs:
 
       - name: Prepare APK Asset
         run: |
-          mkdir -p dist-apk public
+          mkdir -p dist-apk
           find android/app/build/outputs/apk -name "*.apk" -exec cp {} dist-apk/team-tasks.apk \;
           cp dist-apk/team-tasks.apk dist-apk/app-release.apk
           cp dist-apk/team-tasks.apk ./team-tasks.apk
-          cp dist-apk/team-tasks.apk ./public/team-tasks.apk
           ls -lh dist-apk/
 
       - name: Auto-Commit Built APK to Repository for Instant Vercel Hosting
@@ -96,7 +94,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f team-tasks.apk public/team-tasks.apk
+          git add -f team-tasks.apk
           if ! git diff --staged --quiet; then
             git commit -m "chore(apk): تحديث تلقائي لملف التطبيق team-tasks.apk [skip ci]"
             git pull --rebase origin main || true
