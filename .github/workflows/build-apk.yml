@@ -38,22 +38,22 @@ jobs:
               -dname "CN=Matjark, OU=TeamTasks, O=Matjark, L=Sanaa, S=Sanaa, C=YE"
           fi
 
+      - name: Ensure AndroidX and Gradle Properties
+        run: |
+          mkdir -p android
+          echo "android.useAndroidX=true" > android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> android/gradle.properties
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.6'
 
       - name: Build Release APK
         working-directory: android
         run: |
-          if command -v gradle >/dev/null 2>&1; then
-            gradle assembleRelease --no-daemon --stacktrace
-          elif [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleRelease --no-daemon --stacktrace
-          else
-            echo "Installing gradle..."
-            sudo apt-get update && sudo apt-get install -y gradle
-            gradle assembleRelease --no-daemon --stacktrace
-          fi
+          gradle assembleRelease --no-daemon --stacktrace
 
       - name: Prepare APK Asset
         run: |
