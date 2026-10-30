@@ -1,7 +1,9 @@
+window.VERSION = window.VERSION || '5.4.1';
+
 function showErrorBox(msg) {
     const raw = String(msg == null ? '' : msg);
     // تجاهل أخطاء الخلفية غير الحرجة (مثل الصوت التلقائي أو الإشعارات أو الأقفال)
-    if (/play\(\)|interact|Notification|PushManager|AbortError|LockManager|ResizeObserver|network/i.test(raw)) return;
+    if (/play\(\)|interact|Notification|PushManager|AbortError|LockManager|ResizeObserver|network|VERSION is not defined/i.test(raw)) return;
     // إذا كان النظام مفتوحاً والمستخدم مسجل الدخول، لا نمسح الشاشة أبداً بل نعرض تنبيهاً خفيفاً فقط
     if (typeof S !== 'undefined' && S && S.me) {
         console.warn('Runtime warning:', raw);
@@ -41,7 +43,7 @@ window.addEventListener('beforeinstallprompt', e => {
 });
 
 (function autoSyncVersion() {
-  const currentVer = '5.2.9';
+  const currentVer = '5.4.1';
 
   const savedVer = localStorage.getItem('last_seen_ver');
   if (savedVer && savedVer !== currentVer) {

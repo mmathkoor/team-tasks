@@ -3,16 +3,14 @@ const fs = require('fs');
 const path = require('path');
 
 const GITHUB_RELEASE_APK = 'https://github.com/mmathkoor/team-tasks/releases/latest/download/team-tasks.apk';
-const GITHUB_RAW_PUBLIC_APK = 'https://raw.githubusercontent.com/mmathkoor/team-tasks/main/public/team-tasks.apk';
 const GITHUB_RAW_ROOT_APK = 'https://raw.githubusercontent.com/mmathkoor/team-tasks/main/team-tasks.apk';
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-  // 1) الفحص في المسارات المحلية أولاً (يعمل في السيرفر المحلي أو إذا تم تضمين الملف)
+  // 1) الفحص في المسارات المحلية أولاً
   const localCandidates = [
-    path.join(__dirname, '..', 'team-tasks.apk'),
-    path.join(__dirname, '..', 'public', 'team-tasks.apk')
+    path.join(__dirname, '..', 'team-tasks.apk')
   ];
 
   for (const fp of localCandidates) {
@@ -30,7 +28,6 @@ module.exports = async (req, res) => {
   // 2) الجلب المباشر (Server-Side Stream) لأحدث نسخة مبنية تلقائياً دون مغادرة موقعك نهائياً
   const remoteCandidates = [
     GITHUB_RELEASE_APK,
-    GITHUB_RAW_PUBLIC_APK,
     GITHUB_RAW_ROOT_APK
   ];
 

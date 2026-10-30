@@ -1,5 +1,5 @@
-// Build version: 5.4.0 (timestamp: 2026-10-30)
-const SW_BUILD_VERSION = '5.4.0';
+// Build version: 5.4.1 (timestamp: 2026-10-30)
+const SW_BUILD_VERSION = '5.4.1';
 
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
@@ -28,9 +28,22 @@ self.addEventListener('activate', e => e.waitUntil((async () => {
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return;
-  // sw.js و version.js دائماً بدون كاش
-  if (u.pathname === '/sw.js' || u.pathname === '/js/version.js') {
+  // sw.js و version.js دائماً بدون كاش مع بديل آمن عند انقطاع الشبكة
+  if (u.pathname === '/sw.js') {
     e.respondWith(fetch(e.request, { cache: 'no-store' }));
+    return;
+  }
+  if (u.pathname === '/js/version.js') {
+    e.respondWith((async () => {
+      try {
+        const r = await fetch(e.request, { cache: 'no-store' });
+        if (r && r.ok) return r;
+      } catch (err) {}
+      return new Response("const VERSION = '" + SW_BUILD_VERSION + "'; window.VERSION = VERSION;\n", {
+        status: 200,
+        headers: { 'Content-Type': 'application/javascript; charset=utf-8' }
+      });
+    })());
     return;
   }
   e.respondWith((async () => {
