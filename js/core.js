@@ -854,14 +854,41 @@ function applyCompanyScope() {
   S.expenses = (S.rawExpenses || []).filter(r => same(r.company_id || DEFAULT_COMPANY, co));
 }
 
-/* ===== صور الأصناف والشعارات (مخزن خاص + ضغط الصور) ===== */
 const IMG_BUCKET = 'order-images';
 async function imgSign(paths) {
-  paths = [...new Set((paths || []).filter(Boolean))]; const out = {}; if (!paths.length) return out;
+  paths = [...new Set((paths || []).filter(Boolean))];
+  const out = {};
+  if (!paths.length) return out;
   try {
-    const r = await fetch(API + '/storage/v1/object/sign/' + IMG_BUCKET, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 3600, paths }) });
-    const j = await r.json(); if (r.ok && Array.isArray(j)) j.forEach(x => { if (x.signedURL) out[x.path] = API + '/storage/v1' + x.signedURL; });
+    const r = await fetch(API + '/storage/v1/object/sign/' + IMG_BUCKET, {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 86400, paths })
+    });
+    const j = await r.json();
+    if (r.ok && Array.isArray(j)) {
+      j.forEach(x => {
+        const u = x.signedURL || x.signedUrl;
+        if (u) {
+          if (u.startsWith('http://') || u.startsWith('https://')) out[x.path] = u;
+          else if (u.startsWith('/storage/v1/')) out[x.path] = API + u;
+          else if (u.startsWith('/')) out[x.path] = API + '/storage/v1' + u;
+          else out[x.path] = API + '/storage/v1/' + u;
+        }
+      });
+    }
   } catch (e) {}
+
+  // ضمان عدم بقاء أي مسار صورة فارغاً: نضع الرابط المباشر حتى تظهر الصور للمستخدم فوراً
+  paths.forEach(p => {
+    if (!out[p]) {
+      if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:')) {
+        out[p] = p;
+      } else {
+        out[p] = API + '/storage/v1/object/public/' + IMG_BUCKET + '/' + p;
+      }
+    }
+  });
   return out;
 }
 async function imgUpload(path, blob) {

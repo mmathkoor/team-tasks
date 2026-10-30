@@ -1,5 +1,5 @@
-// Build version: 5.3.0 (timestamp: 2026-10-30)
-const SW_BUILD_VERSION = '5.3.0';
+// Build version: 5.3.1 (timestamp: 2026-10-30)
+const SW_BUILD_VERSION = '5.3.1';
 
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);

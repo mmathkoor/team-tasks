@@ -15,8 +15,22 @@ function rtStart() {
     RT.hb = setInterval(() => send('phoenix', 'heartbeat', {}), 25000);
     RT.tk = setInterval(async () => send('realtime:public', 'access_token', { access_token: await tok() }), 10 * 60 * 1000);
   };
-  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } if (m.event === 'postgres_changes') rtChanged();
-    else if (m.event === 'phx_reply' && m.topic === 'realtime:public' && m.payload && m.payload.status === 'error' && !RT.safe) { RT.safe = true; try { ws.close(); } catch (_) {} } };
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (m.event === 'postgres_changes') {
+      try {
+        const d = m.payload && m.payload.data;
+        if (d && d.table === 'notifications' && d.type === 'INSERT' && d.record) {
+          const r = d.record;
+          if (S.me && same(r.to_email, S.me.email) && typeof showAlert === 'function') {
+            showAlert({ title: r.title, body: r.body, task_id: r.task_id, order_id: r.order_id, nid: r.id });
+          }
+        }
+      } catch (err) {}
+      rtChanged();
+    }
+    else if (m.event === 'phx_reply' && m.topic === 'realtime:public' && m.payload && m.payload.status === 'error' && !RT.safe) { RT.safe = true; try { ws.close(); } catch (_) {} }
+  };
   ws.onclose = () => {
     clearInterval(RT.hb); clearInterval(RT.tk); RT.ws = null;
     clearTimeout(RT.rc); RT.rc = setTimeout(rtStart, Math.min(30000, 1500 * Math.pow(2, RT.retry++)));

@@ -76,17 +76,54 @@ function startRing() {
   tick(); ALERT.timer = setInterval(tick, 2600);
 }
 function closeAlertOs(a) {
-  // لا نغلق إشعار الجوال العلوي أبداً حتى يتمكن المستخدم من التفاعل معه من شريط إشعارات الجوال
   return;
 }
 function ackAlert(a) { if (!a) return; if (a.nid && typeof markRead === 'function') markRead([a.nid]); if (a.nids && typeof markRead === 'function') markRead(a.nids); }
-function showAlert(a) { ALERT.q.push(a); if (!ALERT.cur) nextAlert(); }
+
+// إرسال إشعار شريط الجوال العلوي (يدعم تطبيق Android APK المستقل عبر الجسر، والمتصفحات عبر Service Worker)
+function postSystemNotification(title, body, opts = {}) {
+  // 1) إذا كان داخل تطبيق أندرويد المستقل APK (يظهر في شريط الجوال فوراً 100% بنغمة واهتزاز)
+  if (typeof window.AndroidApp !== 'undefined' && window.AndroidApp && window.AndroidApp.postNotification) {
+    try {
+      window.AndroidApp.postNotification(title || 'مدير المهام', body || '', opts.tag || 'matjark_alert');
+      return true;
+    } catch (e) {}
+  }
+  // 2) إذا كان في متصفح يدعم Service Worker Notification
+  if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    navigator.serviceWorker.ready.then(reg => {
+      if (reg && reg.showNotification) {
+        reg.showNotification(title || 'مدير المهام', {
+          body: body || '',
+          icon: '/icon-192.png',
+          badge: '/badge-96.png',
+          vibrate: [500, 150, 500, 150, 800],
+          requireInteraction: true,
+          renotify: true,
+          silent: false,
+          tag: opts.tag || 'matjark_notification',
+          timestamp: Date.now(),
+          actions: opts.actions || [{ action: 'open', title: '📋 عرض المهام' }],
+          data: opts.data || { url: '/' }
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+    return true;
+  }
+  return false;
+}
+
+function showAlert(a) {
+  ALERT.q.push(a);
+  postSystemNotification(a.title || 'تنبيه جديد', a.body || '', { tag: 'alert_' + (a.nid || 'general') });
+  if (!ALERT.cur) nextAlert();
+}
 function nextAlert() {
   const a = ALERT.q.shift(); ALERT.cur = a || null;
   let ov = document.getElementById('alert_ov');
   if (!a) { stopRing(); if (ov) ov.remove(); return; }
   if (!ov) { ov = document.createElement('div'); ov.id = 'alert_ov'; ov.setAttribute('role', 'alertdialog'); ov.setAttribute('aria-modal', 'true'); document.body.appendChild(ov); }
-  const t = a.task_id && S.tasks.find(x => x.id === a.task_id);
+  const t = a.task_id && S.tasks && S.tasks.find(x => x.id === a.task_id);
   ov.innerHTML = '<div class="al-box"><div class="al-bell">🔔</div><h2>' + esc(a.title || 'تنبيه') + '</h2><p>' + esc(a.body || '') + '</p>' +
     (ALERT.q.length ? '<div class="al-more">+ ' + ALERT.q.length + ' تنبيهات أخرى بانتظارك</div>' : '') +
     '<div class="al-act">' + (a.summary ? '<button class="al-ok" id="al_inbox">فتح صندوق التنبيهات</button>' : '') + (t && eff(t) !== 'done' ? '<button class="al-ok" id="al_done">إنجاز ✓</button>' : '') + (t ? '<button id="al_open">عرض المهمة</button>' : '') + (a.order_id ? '<button class="al-ok" id="al_order">عرض الطلب</button>' : '') + '<button id="al_x">إغلاق</button></div></div>';
@@ -369,33 +406,20 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
     : 'تذكير بالمهام المستحقة';
 
   const fireNow = async () => {
-    // 1) إشعار نظام أندرويد الرسمي دائماً (في شريط إشعارات الهاتف مثل الصورة 2)
-    if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        await reg.showNotification(pTitle, {
-          body: pBody,
-          icon: '/icon-192.png',
-          badge: '/badge-96.png',
-          vibrate: [500, 150, 500, 150, 800],
-          requireInteraction: true,
-          renotify: true,
-          silent: false,
-          tag: 'azkar-overdue-remind',
-          timestamp: Date.now(),
-          actions: firstId
-            ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }]
-            : [{ action: 'open', title: '📋 عرض المهام' }],
-          data: { url: '/', task_id: firstId, task_title: sample[0] || '' }
-        });
-      } catch (e) {}
-    }
+    // 1) إشعار نظام أندرويد الرسمي دائماً (في شريط إشعارات الهاتف العلوي عبر الجسر أو Service Worker)
+    postSystemNotification(pTitle, pBody, {
+      tag: 'azkar-overdue-remind',
+      actions: firstId
+        ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }]
+        : [{ action: 'open', title: '📋 عرض المهام' }],
+      data: { url: '/', task_id: firstId, task_title: sample[0] || '' }
+    });
 
     // 2) نغمة واهتزاز وقراءة صوتية
     playBackgroundAzkarToneAndVoice(azkarVoiceSettingOn() ? voiceMsg : '');
 
-    // 3) إذا كان المستخدم داخل التطبيق، لا نغطي الشاشة ببانر مزعج إلا إذا كان مفعّلاً اختيارياً
-    if (!document.hidden && (modeOpt === 'inapp_banner' || localStorage.getItem('azkar_inapp_banner') === 'on')) {
+    // 3) إظهار النافذة والشريط المنبثق دائماً داخل التطبيق حتى يظهر للمستخدم مباشرة
+    if (!document.hidden) {
       showHeadsUpAzkarBanner({
         title: pTitle,
         subtitle,
@@ -404,8 +428,9 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
         lateCount: lateTasks.length,
         todayCount: todayTasks.length
       });
-    } else if (!document.hidden && typeof toast === 'function') {
-      toast('🔔 إشعار جديد في شريط إشعارات الجوال: ' + pTitle);
+      if (typeof toast === 'function') {
+        toast('🔔 ' + pTitle);
+      }
     }
 
     // 4) إرسال Web Push للخادم إذا كان وقت مجدول فعلي لجميع أجهزة الموظف

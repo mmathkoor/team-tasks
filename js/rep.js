@@ -21,7 +21,11 @@ async function repLoad() {
   inboxAfterLoad();
 }
 
-const repImgUrl = p => (p && (S.rimg || {})[p]) || '';
+const repImgUrl = p => {
+  if (!p) return '';
+  if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:')) return p;
+  return ((S.rimg || {})[p]) || (API + '/storage/v1/object/public/' + IMG_BUCKET + '/' + p);
+};
 const rOpen = () => (S.rorders || []).filter(o => o.status === 'preparing').sort((a, b) => {
   const ra = typeof orderCatMeta === 'function' ? orderCatMeta(a).rank : 5;
   const rb = typeof orderCatMeta === 'function' ? orderCatMeta(b).rank : 5;
