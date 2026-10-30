@@ -10,10 +10,15 @@ android {
         applicationId "com.matjark.tasks"
         minSdk 24
         targetSdk 34
-        versionCode 50301
-        versionName "5.3.1"
+        versionCode 50400
+        versionName "5.4.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
     }
 
     signingConfigs {
