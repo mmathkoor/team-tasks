@@ -66,7 +66,16 @@ jobs:
       - name: Build Release APK
         working-directory: android
         run: |
-          gradle assembleRelease --no-daemon --stacktrace
+          if command -v gradle >/dev/null 2>&1; then
+            gradle assembleRelease --no-daemon --stacktrace
+          elif [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          else
+            echo "Installing gradle..."
+            sudo apt-get update && sudo apt-get install -y gradle
+            gradle assembleRelease --no-daemon --stacktrace
+          fi
 
       - name: Prepare APK Asset
         run: |
@@ -80,10 +89,10 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         with:
           tag_name: latest
-          name: "📱 تطبيق أندرويد للجوال (APK)"
+          name: "ًں“± طھط·ط¨ظٹظ‚ ط£ظ†ط¯ط±ظˆظٹط¯ ظ„ظ„ط¬ظˆط§ظ„ (APK)"
           body: |
-            ### 🤖 تطبيق مهام الفريق والمتجر (APK)
-            أحدث نسخة جاهزة للتحميل والتثبيت المباشر على الهاتف.
+            ### ًں¤– طھط·ط¨ظٹظ‚ ظ…ظ‡ط§ظ… ط§ظ„ظپط±ظٹظ‚ ظˆط§ظ„ظ…طھط¬ط± (APK)
+            ط£ط­ط¯ط« ظ†ط³ط®ط© ط¬ط§ظ‡ط²ط© ظ„ظ„طھط­ظ…ظٹظ„ ظˆط§ظ„طھط«ط¨ظٹطھ ط§ظ„ظ…ط¨ط§ط´ط± ط¹ظ„ظ‰ ط§ظ„ظ‡ط§طھظپ.
           files: |
             dist-apk/team-tasks.apk
             dist-apk/app-release.apk
