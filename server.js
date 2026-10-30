@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -32,14 +33,17 @@ for (const route of apiRoutes) {
   });
 }
 
-// Direct /apk and /apk/download redirect to GitHub latest APK
-const apkHandler = require(path.join(__dirname, 'api', 'download-apk.js'));
-app.get(['/apk', '/apk/download'], async (req, res, next) => {
-  try {
-    await apkHandler(req, res);
-  } catch (err) {
-    next(err);
+// Direct /apk and /apk/download serve local APK file
+app.get(['/apk', '/apk/download'], (req, res) => {
+  const fp = path.join(__dirname, 'public', 'team-tasks.apk');
+  const fpRoot = path.join(__dirname, 'team-tasks.apk');
+  const target = fs.existsSync(fp) ? fp : (fs.existsSync(fpRoot) ? fpRoot : null);
+  if (target) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="team-tasks.apk"');
+    return fs.createReadStream(target).pipe(res);
   }
+  res.redirect('/team-tasks.apk');
 });
 
 // Vercel rewrite compatibility: /manifest.json -> /api/manifest
@@ -55,7 +59,11 @@ app.get('/manifest.json', async (req, res, next) => {
 // Serve static files from repository root with cache-control headers
 app.use(express.static(__dirname, {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('sw.js') || filePath.endsWith('index.html') || filePath.endsWith('version.js')) {
+    if (filePath.endsWith('.apk')) {
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', 'attachment; filename="team-tasks.apk"');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    } else if (filePath.endsWith('sw.js') || filePath.endsWith('index.html') || filePath.endsWith('version.js')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
