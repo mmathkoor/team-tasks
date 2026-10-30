@@ -1,5 +1,4 @@
 {
-  "outputDirectory": ".",
   "crons": [
     {
       "path": "/api/recur",
@@ -11,6 +10,23 @@
     }
   ],
   "headers": [
+    {
+      "source": "/team-tasks.apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"team-tasks.apk\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=43200"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
@@ -37,6 +53,14 @@
     {
       "source": "/manifest.json",
       "destination": "/api/manifest"
+    },
+    {
+      "source": "/apk",
+      "destination": "/team-tasks.apk"
+    },
+    {
+      "source": "/apk/download",
+      "destination": "/team-tasks.apk"
     }
   ]
 }
