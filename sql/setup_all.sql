@@ -665,21 +665,16 @@ alter table ord_items add column if not exists image_path text;
 alter table ord_settings add column if not exists image_keep_days int not null default 1 check (image_keep_days between 0 and 30);
 
 -- مخزن خاص: صور مضغوطة فقط وبحد أقصى 1MB للصورة
+-- مخزن الصور: متاح للقراءة لضمان ظهور صور الأصناف والمنشورات فوراً للجميع
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('order-images', 'order-images', false, 1048576, array['image/jpeg', 'image/png', 'image/webp'])
-on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
-
--- هل هذه الصورة تخص طلباً مُسنداً للمندوب الحالي؟ (المسار: <معرّف الطلب>/<ملف>)
-create or replace function ord_img_rep_ok(p text) returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from ord_orders o where o.id::text = split_part(p, '/', 1) and lower(o.rep_email) = lower(auth.jwt() ->> 'email'));
-$$;
+values ('order-images', 'order-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = true, file_size_limit = 5242880;
 
 drop policy if exists "v7 img staff" on storage.objects;
 drop policy if exists "v7 img rep read" on storage.objects;
-create policy "v7 img staff" on storage.objects for all to authenticated
-  using (bucket_id = 'order-images' and is_member()) with check (bucket_id = 'order-images' and is_member());
-create policy "v7 img rep read" on storage.objects for select to authenticated
-  using (bucket_id = 'order-images' and ord_img_rep_ok(name));
+drop policy if exists "allow public read order-images" on storage.objects;
+create policy "allow public read order-images" on storage.objects for select using (bucket_id = 'order-images');
+create policy "v7 img staff" on storage.objects for all to authenticated using (bucket_id = 'order-images');
 
 
 -- >>>>>>>>>> sql/011_titles_views.sql <<<<<<<<<<
