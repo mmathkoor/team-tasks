@@ -217,34 +217,62 @@ function headerHtml() {
 }
 
 function apkInstallDialog() {
-  const apkUrl = 'https://github.com/mmathkoor/team-tasks/releases/latest/download/team-tasks.apk';
-  const ghReleases = 'https://github.com/mmathkoor/team-tasks/releases';
+  const apkUrl = '/team-tasks.apk';
+  const hasPrompt = !!window._deferredInstallPrompt;
   dlg.innerHTML =
     '<div style="text-align:center;padding:6px 0 14px">' +
-      '<div style="width:58px;height:58px;border-radius:18px;background:rgba(34,197,94,.15);border:2px solid #22c55e;display:inline-flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px">🤖</div>' +
-      '<h2 style="font-size:18px;margin:0 0 4px;border:0;padding:0">تطبيق أندرويد المستقل (APK)</h2>' +
-      '<p class="m" style="margin:0;font-size:13px">الحل الجذري لتنبيهات الجوال والعمل دون قيود المتصفح</p>' +
+      '<div style="width:62px;height:62px;border-radius:20px;background:linear-gradient(135deg,rgba(34,197,94,.2),rgba(59,130,246,.2));border:2px solid #22c55e;display:inline-flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px">📲</div>' +
+      '<h2 style="font-size:18px;margin:0 0 4px;border:0;padding:0">تثبيت التطبيق على جوالك</h2>' +
+      '<p class="m" style="margin:0;font-size:13px">تثبيت مباشر وسريع بدون الدخول لأي موقع خارجي مع إشعارات 24 ساعة</p>' +
     '</div>' +
     '<div style="background:var(--col);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.7">' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="color:var(--ok)">✓ إشعارات نظام 24 ساعة:</b> تعمل في شريط الجوال العلوي كأي تطبيق مثبت.</div>' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="color:var(--ok)">✓ تثبيت مباشر بنقرة واحدة:</b> ملف APK أصلي يُبنى تلقائياً عبر GitHub Actions.</div>' +
-      '<div style="display:flex;align-items:center;gap:6px"><b style="color:var(--ok)">✓ أداء فائق وسرعة:</b> وصول سريع بنقرة من شاشة هاتفك الرئيسية.</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="color:var(--ok)">✓ تثبيت فوري بنقرة واحدة:</b> يظهر لك زر التثبيت الرسمي في هاتفك.</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="color:var(--ok)">✓ إشعارات نظام فورية 24 ساعة:</b> في شريط الجوال العلوي كأي تطبيق رسمي.</div>' +
+      '<div style="display:flex;align-items:center;gap:6px"><b style="color:var(--ok)">✓ أيقونة رسمية على شاشتك:</b> تشغيل فوري وسريع بدون شريط المتصفح.</div>' +
     '</div>' +
-    '<div style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">' +
-      '<a href="' + apkUrl + '" class="p" target="_blank" download style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:12px;background:#16a34a;border:1px solid #15803d;color:#fff;font-size:15px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px rgba(22,163,74,.3)">' +
-        '<span>📥 تحميل التطبيق الآن (team-tasks.apk)</span>' +
-      '</a>' +
-      '<a href="' + ghReleases + '" target="_blank" class="s" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:10px;text-decoration:none;font-size:12.5px;color:var(--mute)">' +
-        '<span>🐙 عرض التحديثات والإصدارات على GitHub ↗</span>' +
+    '<div style="margin-bottom:14px;display:flex;flex-direction:column;gap:10px">' +
+      '<button type="button" class="p" id="apk_instant_install_btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:12px;background:#16a34a;border:1px solid #15803d;color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(22,163,74,.35)">' +
+        '<span>📲 تثبيت فوري الآن (كأنك في قوقل بلاي)</span>' +
+      '</button>' +
+      '<a href="' + apkUrl + '" download="team-tasks.apk" class="s" id="apk_dl_now_btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border-radius:12px;text-decoration:none;font-size:13.5px;font-weight:600;color:var(--ink);border:1px solid var(--line);background:var(--card)">' +
+        '<span>📥 تحميل ملف التطبيق المباشر (team-tasks.apk)</span>' +
       '</a>' +
     '</div>' +
     '<div style="background:rgba(212,175,106,.1);border:1px dashed var(--gold,#c9a24e);border-radius:10px;padding:10px;font-size:12px;line-height:1.6;margin-bottom:14px">' +
-      '<b>💡 خطوات التثبيت على جوالك:</b><br>' +
-      '1. اضغط على زر التحميل الأخضر أعلاه لحفظ ملف <code>team-tasks.apk</code>.<br>' +
-      '2. افتح الملف المحمل واضغط «تثبيت / Install».<br>' +
-      '3. إذا طُلب منك السماح بتثبيت التطبيقات من هذا المتصفح، اختر «سماح / Allow» لمرة واحدة.' +
+      '<b>💡 طريقتان للتثبيت:</b><br>' +
+      '• <b>الزر الأخضر (تثبيت فوري):</b> يثبّت التطبيق مباشرة كأيقونة على شاشة جوالك دون الحاجة لتنزيل أي ملفات.<br>' +
+      '• <b>الزر الثاني (تحميل APK):</b> يُنزّل ملف التطبيق مباشرة إلى جهازك، بمجرد اكتمال التنزيل اضغط عليه لتثبيته.' +
     '</div>' +
     '<div style="display:flex;justify-content:flex-end"><button type="button" class="s" id="apk_dlg_close">إغلاق</button></div>';
   dlg.showModal();
+
+  if ($('apk_instant_install_btn')) {
+    $('apk_instant_install_btn').onclick = async () => {
+      if (window._deferredInstallPrompt) {
+        window._deferredInstallPrompt.prompt();
+        const choice = await window._deferredInstallPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
+        if (choice && choice.outcome === 'accepted') {
+          if (typeof toast === 'function') toast('✅ تم قبول التثبيت! جارٍ إضافة التطبيق لشاشة هاتفك...');
+          dlg.close();
+        }
+      } else {
+        // إذا كان المتصفح لا يدعم نافذة التثبيت في هذه اللحظة، يبدأ تنزيل ملف APK مباشرة
+        const a = document.createElement('a');
+        a.href = apkUrl;
+        a.download = 'team-tasks.apk';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        if (typeof toast === 'function') toast('📥 بدأ تنزيل ملف التطبيق (team-tasks.apk) على جوالك، افتحه لتثبيته!');
+      }
+    };
+  }
+
+  if ($('apk_dl_now_btn')) {
+    $('apk_dl_now_btn').onclick = () => {
+      if (typeof toast === 'function') toast('📥 بدأ تنزيل ملف التطبيق، اسحب شريط الإشعارات واضغط عليه بعد اكتماله لتثبيته');
+    };
+  }
+
   if ($('apk_dlg_close')) $('apk_dlg_close').onclick = () => dlg.close();
 }
