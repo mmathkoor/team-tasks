@@ -651,22 +651,39 @@ async function saveAdminTaskVisibility(cfg) {
   applyCompanyScope();
 }
 
-// ===== الإعداد العام التلقائي لمنبّه المهام المتأخرة لجميع الموظفين (مع جدولة أوقات وساعات محددة مثل المهام المتكررة) =====
+// ===== الإعداد العام التلقائي لمنبّه المهام الناقصة لجميع الموظفين (مع تحكم كامل بالتفاصيل والشاشة المنبثقة كالأذان) =====
 function normalizeAzkarTimes(arr) {
-  const list = Array.isArray(arr) ? arr : ['09:00', '20:00'];
+  const list = Array.isArray(arr) ? arr : ['09:00', '15:00', '21:00'];
   const clean = [...new Set(list.map(x => String(x || '').trim()).filter(x => /^\d{2}:\d{2}$/.test(x)))].sort();
-  return clean.length ? clean : ['09:00', '20:00'];
+  return clean.length ? clean : ['09:00', '15:00', '21:00'];
 }
 
 function getGlobalAzkarConfig() {
   const parseCfg = obj => ({
     enabledForAll: obj.enabledForAll !== false,
-    scheduleMode: obj.scheduleMode || 'scheduled', // 'scheduled' | 'once_daily' | 'interval'
-    frequency: obj.frequency || 'daily',           // 'daily' | 'workdays' | 'weekly'
+    lockForStaff: obj.lockForStaff === true,
+    scheduleMode: obj.scheduleMode || 'interval',     // 'interval' (افتراضي كل 6 ساعات) | 'scheduled' | 'once_daily'
+    frequency: obj.frequency || 'daily',              // 'daily' | 'workdays' | 'weekly'
     weekday: obj.weekday != null ? +obj.weekday : 0,
     times: normalizeAzkarTimes(obj.times),
-    intervalMin: +(obj.intervalMin || 120),
+    intervalMin: +(obj.intervalMin || 360),           // 360 دقيقة = 6 ساعات افتراضياً
+    taskScope: obj.taskScope || 'all_incomplete',     // 'all_incomplete' | 'late_and_today' | 'late_only'
+    priorityFilter: obj.priorityFilter || 'all',      // 'all' | 'important_urgent'
+    includeForAll: obj.includeForAll !== false,
+    includePendingOrders: obj.includePendingOrders === true,
+    maxPopupTasks: +(obj.maxPopupTasks || 12),
+    popupMode: obj.popupMode || 'full',               // 'full' (شاشة منبثقة كالأذان) | 'banner' | 'external_only'
+    externalPush: obj.externalPush !== false,
+    persistentNotif: obj.persistentNotif !== false,
+    popupOnOpen: obj.popupOnOpen !== false,
+    toneStyle: obj.toneStyle || 'adhan_chime',        // 'adhan_chime' | 'classic_bell' | 'urgent_alarm' | 'soft_beep' | 'silent'
+    toneVolume: obj.toneVolume != null ? +obj.toneVolume : 1.0,
+    ringDurationSec: obj.ringDurationSec != null ? +obj.ringDurationSec : 15,
+    vibrateEnabled: obj.vibrateEnabled !== false,
     voiceEnabled: obj.voiceEnabled === true,
+    quietHoursEnabled: obj.quietHoursEnabled === true,
+    quietStart: obj.quietStart || '23:00',
+    quietEnd: obj.quietEnd || '07:00',
     bannerEnabled: obj.bannerEnabled !== false
   });
   const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
@@ -687,12 +704,29 @@ async function saveGlobalAzkarConfig(cfg) {
   const prev = getGlobalAzkarConfig();
   const clean = {
     enabledForAll: cfg.enabledForAll !== undefined ? !!cfg.enabledForAll : prev.enabledForAll,
-    scheduleMode: cfg.scheduleMode || prev.scheduleMode || 'scheduled',
+    lockForStaff: cfg.lockForStaff !== undefined ? !!cfg.lockForStaff : prev.lockForStaff,
+    scheduleMode: cfg.scheduleMode || prev.scheduleMode || 'interval',
     frequency: cfg.frequency || prev.frequency || 'daily',
     weekday: cfg.weekday != null ? +cfg.weekday : prev.weekday,
     times: normalizeAzkarTimes(cfg.times || prev.times),
-    intervalMin: +(cfg.intervalMin || prev.intervalMin || 120),
+    intervalMin: +(cfg.intervalMin || prev.intervalMin || 360),
+    taskScope: cfg.taskScope || prev.taskScope || 'all_incomplete',
+    priorityFilter: cfg.priorityFilter || prev.priorityFilter || 'all',
+    includeForAll: cfg.includeForAll !== undefined ? !!cfg.includeForAll : prev.includeForAll,
+    includePendingOrders: cfg.includePendingOrders !== undefined ? !!cfg.includePendingOrders : prev.includePendingOrders,
+    maxPopupTasks: +(cfg.maxPopupTasks || prev.maxPopupTasks || 12),
+    popupMode: cfg.popupMode || prev.popupMode || 'full',
+    externalPush: cfg.externalPush !== undefined ? !!cfg.externalPush : prev.externalPush,
+    persistentNotif: cfg.persistentNotif !== undefined ? !!cfg.persistentNotif : prev.persistentNotif,
+    popupOnOpen: cfg.popupOnOpen !== undefined ? !!cfg.popupOnOpen : prev.popupOnOpen,
+    toneStyle: cfg.toneStyle || prev.toneStyle || 'adhan_chime',
+    toneVolume: cfg.toneVolume != null ? +cfg.toneVolume : prev.toneVolume,
+    ringDurationSec: cfg.ringDurationSec != null ? +cfg.ringDurationSec : prev.ringDurationSec,
+    vibrateEnabled: cfg.vibrateEnabled !== undefined ? !!cfg.vibrateEnabled : prev.vibrateEnabled,
     voiceEnabled: cfg.voiceEnabled !== undefined ? cfg.voiceEnabled === true : prev.voiceEnabled,
+    quietHoursEnabled: cfg.quietHoursEnabled !== undefined ? !!cfg.quietHoursEnabled : prev.quietHoursEnabled,
+    quietStart: cfg.quietStart || prev.quietStart || '23:00',
+    quietEnd: cfg.quietEnd || prev.quietEnd || '07:00',
     bannerEnabled: cfg.bannerEnabled !== undefined ? cfg.bannerEnabled !== false : prev.bannerEnabled,
     updatedAt: Date.now()
   };

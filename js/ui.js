@@ -157,6 +157,7 @@ function bindHeader() {
   if ($('net_status_pill')) $('net_status_pill').onclick = () => { if (navigator.onLine) { flushNow(); load(); } else toast('📡 أنت حالياً في وضع الأوفلاين — جميع تعديلاتك تُحفظ محلياً وتُزامَن تلقائياً فور عودة الإنترنت', false); };
   if ($('ver_badge_btn')) $('ver_badge_btn').onclick = () => { if (typeof forceAppUpdate === 'function') forceAppUpdate(); else location.reload(true); };
   if ($('apk_dl_btn')) $('apk_dl_btn').onclick = () => apkInstallDialog();
+  if ($('azkar_hdr_btn')) $('azkar_hdr_btn').onclick = () => { if (typeof showAdhanTasksPopup === 'function') showAdhanTasksPopup(); };
   $('thm').onclick = () => { const o = ['auto', 'light', 'dark'], n = o[(o.indexOf(curTheme()) + 1) % 3]; localStorage.setItem('theme', n); applyTheme(n); $('thm').textContent = THEME_I[n]; $('thm').title = 'المظهر: ' + THEME_L[n]; };
   $('bell').onclick = inboxDialog;
   if ($('co_sw_btn')) $('co_sw_btn').onclick = toggleCoPopover;
@@ -199,6 +200,7 @@ function headerHtml() {
   const netBadgeHtml = '<button type="button" id="net_status_pill" class="net-pill ' + (!isOn ? 'off' : qCnt > 0 ? 'sync' : 'on') + '" title="' + (!isOn ? 'وضع أوفلاين نشط' : 'متصل بالإنترنت') + '">' +
     (!isOn ? '📡 <span>أوفلاين' + (qCnt ? ' (' + qCnt + ')' : '') + '</span>' : qCnt > 0 ? '🔄 <span>مزامنة (' + qCnt + ')</span>' : '<i class="np-dot"></i> <span>متصل</span>') +
   '</button>';
+  const incCnt = typeof collectMyIncompleteTasks === 'function' ? collectMyIncompleteTasks().allIncomplete.length : 0;
   return '<div class="top">' +
     '<div class="brand">' +
       companyLogoHtml(curCo || 'متجرك', 42) +
@@ -208,6 +210,7 @@ function headerHtml() {
       netBadgeHtml +
       '<button id="apk_dl_btn" type="button" class="s apk-pill" title="تثبيت تطبيق أندرويد المستقل (APK) المباشر من GitHub">🤖 <span>تطبيق APK</span></button>' +
       '<button id="ver_badge_btn" class="s ver-pill" title="إصدار النظام v' + VERSION + ' - انقر للتحديث الفوري ومسح الكاش">v' + VERSION + ' ↻</button>' +
+      '<button id="azkar_hdr_btn" type="button" class="s iconbtn" title="شاشة المهام الناقصة المنبثقة (تذكير كل 6 ساعات)">🕌' + (incCnt > 0 ? '<span class="bn">' + incCnt + '</span>' : '') + '</button>' +
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +

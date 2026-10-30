@@ -274,18 +274,30 @@ public class TaskMonitorService extends Service {
 
             int lateCount = d.optInt("lateCount", 0);
             int todayCount = d.optInt("todayCount", 0);
-            if (lateCount <= 0 && todayCount <= 0) return;
+            int incompleteCount = d.optInt("incompleteCount", lateCount + todayCount);
+            if (incompleteCount <= 0 && lateCount <= 0 && todayCount <= 0) return;
 
             Calendar cal = Calendar.getInstance();
             String ymd = String.format(Locale.US, "%04d-%02d-%02d",
                     cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
             int nowMins = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE);
 
-            String mode = d.optString("scheduleMode", "scheduled");
+            if (d.optBoolean("quietHoursEnabled", false)) {
+                String[] qs = d.optString("quietStart", "23:00").split(":");
+                String[] qe = d.optString("quietEnd", "07:00").split(":");
+                if (qs.length == 2 && qe.length == 2) {
+                    int sM = Integer.parseInt(qs[0]) * 60 + Integer.parseInt(qs[1]);
+                    int eM = Integer.parseInt(qe[0]) * 60 + Integer.parseInt(qe[1]);
+                    boolean inQuiet = (sM < eM) ? (nowMins >= sM && nowMins < eM) : (nowMins >= sM || nowMins < eM);
+                    if (inQuiet) return;
+                }
+            }
+
+            String mode = d.optString("scheduleMode", "interval");
             String dueSlot = null;
 
             if ("interval".equals(mode)) {
-                int intervalMin = Math.max(15, d.optInt("intervalMin", 120));
+                int intervalMin = Math.max(15, d.optInt("intervalMin", 360));
                 long intervalMs = intervalMin * 60L * 1000L;
                 long lastFired = prefs.getLong("native_last_interval_ts", 0L);
                 if (System.currentTimeMillis() - lastFired >= intervalMs) {
@@ -299,7 +311,7 @@ public class TaskMonitorService extends Service {
                         String[] parts = tStr.split(":");
                         if (parts.length != 2) continue;
                         int slotMins = Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
-                        if (nowMins >= slotMins && nowMins <= slotMins + 20) {
+                        if (nowMins >= slotMins && nowMins <= slotMins + 25) {
                             String candidate = ymd + "_" + tStr;
                             if (!prefs.getBoolean("slot_" + candidate, false)) {
                                 dueSlot = candidate;
@@ -318,8 +330,8 @@ public class TaskMonitorService extends Service {
                 .apply();
 
             String title = lateCount > 0
-                ? ("🚨 تذكير: لديك " + lateCount + " مهام متأخرة")
-                : ("🔥 تذكير: لديك " + todayCount + " مهام مستحقة اليوم");
+                ? ("🕌 تذكير: لديك " + incompleteCount + " مهام ناقصة (" + lateCount + " متأخرة)")
+                : ("🕌 تذكير دوري: لديك " + incompleteCount + " مهام غير منجزة");
 
             StringBuilder body = new StringBuilder();
             JSONArray titles = d.optJSONArray("titles");
@@ -329,7 +341,7 @@ public class TaskMonitorService extends Service {
                     body.append("• ").append(titles.optString(i));
                 }
             } else {
-                body.append("افتح التطبيق لمراجعة وإنجاز مهامك المستحقة.");
+                body.append("اضغط لفتح شاشة المهام الناقصة المنبثقة ومراجعة مهامك.");
             }
 
             fireHighPriorityAlert(this, title, body.toString(), "azkar_slot_" + dueSlot);
@@ -348,6 +360,7 @@ public class TaskMonitorService extends Service {
             createChannelsStatic(context);
             Intent intent = new Intent(context, MainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra("open_azkar_popup", true);
             int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 piFlags |= PendingIntent.FLAG_IMMUTABLE;
@@ -362,12 +375,13 @@ public class TaskMonitorService extends Service {
                 .setContentText(body != null ? body : "")
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body != null ? body : ""))
                 .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setSound(soundUri)
-                .setVibrate(new long[]{0, 350, 150, 350})
+                .setVibrate(new long[]{0, 450, 150, 450, 150, 700})
                 .setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setFullScreenIntent(pendingIntent, true)
                 .setContentIntent(pendingIntent);
 
             NotificationManagerCompat.from(context).notify(notifId, builder.build());

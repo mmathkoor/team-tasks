@@ -187,7 +187,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        webView.loadUrl(APP_URL);
+        if (getIntent() != null && getIntent().getBooleanExtra("open_azkar_popup", false)) {
+            webView.loadUrl(APP_URL + "?azkar_popup=1");
+        } else {
+            webView.loadUrl(APP_URL);
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra("open_azkar_popup", false) && webView != null) {
+            webView.evaluateJavascript(
+                "(function(){ try { if (typeof window.showAdhanTasksPopup === 'function') window.showAdhanTasksPopup({fromExternalNotification:true}); else localStorage.setItem('azkar_pending_popup','1'); } catch(e){} })()",
+                null
+            );
+        }
     }
 
     @Override

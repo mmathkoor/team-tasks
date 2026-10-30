@@ -470,20 +470,35 @@ function notifyBlockHtml() {
     return '<option value="' + esc(m.email) + '">👤 ' + esc(m.name) + (tags ? ' (' + esc(tags) + ')' : '') + '</option>';
   }).join('');
   const allLabel = admCo ? ('👥 كل موظفي «' + admCo + '» (' + listMembers.length + ')') : ('🌐 الكل (جميع المتاجر والأعضاء: ' + allStaff.length + ')');
-  const remindLabel = admCo ? ('إرسال تذكير شامل لموظفي «' + admCo + '» 🔔') : 'إرسال تذكير شامل لجميع المتاجر 🔔';
+  const remindLabel = admCo ? ('🔔 إرسال تذكير فوري بمهام «' + admCo + '» الناقصة') : '🔔 إرسال تذكير فوري بالمهام الناقصة لجميع المتاجر';
 
-  return '<div class="row" style="margin-bottom:14px;gap:8px">' +
-      '<button class="p" id="admin_remind" style="flex:1 1 220px;background:var(--soon);border-color:var(--soon);color:#fff">' + esc(remindLabel) + '</button>' +
-      '<button class="p" id="admin_wa_batch" type="button" style="flex:1 1 220px;background:#15803d;border-color:#15803d;color:#fff">📲 تذكير الموظفين بالمهام المتأخرة (واتساب)</button>' +
-    '</div>' +
-    '<div style="background:var(--col);padding:12px;border-radius:12px;margin-bottom:14px">' +
-      '<h3 style="font-size:14px;margin:0 0 8px;color:var(--acc)">إرسال إشعار مخصص لموظف أو متجر أو إدارة:</h3>' +
-      '<div class="row" style="margin-bottom:8px"><select id="ping_to"><option value="__all">' + esc(allLabel) + '</option>' + optCos + optDeps + optMembers + '</select></div>' +
-      '<div class="row" style="margin-bottom:8px"><input id="ping_msg" placeholder="اكتب رسالة التنبيه (اختياري)..."></div>' +
-      '<div class="row" style="margin-bottom:12px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين تذكير بالمهام غير المنجزة (لكل شخص مهامه في متجره)</label></div>' +
-      '<div class="row"><button class="p s" id="send_ping">إرسال الإشعار الآن 🔔</button></div>' +
-    '</div>' +
-    alertSettingsHtml();
+  return alertSettingsHtml() +
+    '<div class="card" style="margin-bottom:14px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+        '<div>' +
+          '<h3 style="margin:0;font-size:15.5px">📣 مركز الإرسال الإداري الفوري وتذكيرات واتساب</h3>' +
+          '<div class="m" style="font-size:12px;margin-top:2px">إرسال تنبيه خارجي فوري أو رسائل واتساب جماعية لموظفي المتجر أو قسم محدد أو موظف بعينه</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="row" style="margin-bottom:14px;gap:8px;flex-wrap:wrap">' +
+        '<button class="p" id="admin_remind" type="button" style="flex:1 1 220px;background:var(--soon);border-color:var(--soon);color:#fff;font-weight:700">' + esc(remindLabel) + '</button>' +
+        '<button class="p" id="admin_wa_batch" type="button" style="flex:1 1 220px;background:#15803d;border-color:#15803d;color:#fff;font-weight:700">📲 تذكير الموظفين بالمهام الناقصة (واتساب)</button>' +
+      '</div>' +
+      '<div style="background:var(--col);padding:12px;border-radius:12px;border:1px solid var(--line)">' +
+        '<h4 style="font-size:13.5px;margin:0 0 8px;color:var(--acc)">✉️ إرسال إشعار مخصص لموظف أو متجر أو إدارة:</h4>' +
+        '<div class="row" style="margin-bottom:8px"><select id="ping_to"><option value="__all">' + esc(allLabel) + '</option>' + optCos + optDeps + optMembers + '</select></div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' +
+          '<span class="m" style="font-size:11.5px;align-self:center">⚡ قوالب سريعة:</span>' +
+          '<button type="button" class="s" data-ping-tpl="الرجاء مراجعة وإنجاز المهام الناقصة المسندة لكم اليوم." style="font-size:11px;padding:3px 8px">📋 إنجاز المهام الناقصة</button>' +
+          '<button type="button" class="s" data-ping-tpl="تذكير هام: يرجى تحديث حالات الطلبات والمهام قبل نهاية الدوام." style="font-size:11px;padding:3px 8px">⏰ تحديث قبل نهاية الدوام</button>' +
+          '<button type="button" class="s" data-ping-tpl="يرجى الحضور للاجتماع السريع ومراجعة أولويات العمل." style="font-size:11px;padding:3px 8px">🤝 اجتماع سريع</button>' +
+        '</div>' +
+        '<div class="row" style="margin-bottom:8px"><input id="ping_msg" placeholder="اكتب رسالة التنبيه الخاصة بك هنا..."></div>' +
+        '<div class="row" style="margin-bottom:12px;justify-content:flex-start;gap:8px;"><input type="checkbox" id="ping_tasks" style="width:auto;margin:0" checked> <label for="ping_tasks" style="font-size:13px;cursor:pointer">تضمين قائمة المهام الناقصة غير المنجزة تلقائياً مع الرسالة</label></div>' +
+        '<div class="row"><button class="p s" id="send_ping" type="button">🚀 إرسال الإشعار الفوري الآن 🔔</button></div>' +
+        '<div id="ping_send_result" class="m" style="margin-top:8px;font-weight:700;color:var(--ok)"></div>' +
+      '</div>' +
+    '</div>';
 }
 
 function toolsBlockHtml() {
@@ -848,15 +863,26 @@ function bindSettings() {
     render();
   });
 
+  document.querySelectorAll('[data-ping-tpl]').forEach(btn => {
+    btn.onclick = () => {
+      if ($('ping_msg')) {
+        $('ping_msg').value = btn.getAttribute('data-ping-tpl') || '';
+        $('ping_msg').focus();
+      }
+    };
+  });
+
   if ($('admin_remind')) {
     $('admin_remind').onclick = async () => {
         const admCo = (!isSuperAdmin() ? parseMemberMeta(S.me).company : (S.setAdmCo || '')) || '';
         const origTxt = $('admin_remind').textContent;
-        $('admin_remind').textContent = 'جاري إرسال التذكيرات...';
+        $('admin_remind').textContent = '⏳ جاري إرسال التذكيرات...';
         try {
             const url = '/api/remind' + (admCo ? '?company=' + encodeURIComponent(admCo) : '');
             const rr = await apiGet(url);
-            alert(rr.ok ? ('تم إرسال تذكير شامل ' + (admCo ? 'لموظفي «' + admCo + '»' : 'لجميع أعضاء الفريق') + ' بنجاح! ✅') : 'تعذّر الإرسال (' + rr.status + ')');
+            const msg = rr.ok ? ('تم إرسال تذكير شامل ' + (admCo ? 'لموظفي «' + admCo + '»' : 'لجميع أعضاء الفريق') + ' بنجاح! ✅') : 'تعذّر الإرسال (' + rr.status + ')';
+            if (typeof toast === 'function') toast(msg, rr.ok);
+            if ($('ping_send_result')) $('ping_send_result').textContent = msg;
         } catch(e) {}
         if ($('admin_remind')) $('admin_remind').textContent = origTxt;
     };
@@ -869,50 +895,64 @@ function bindSettings() {
           const includeTasks = $('ping_tasks').checked;
           const admCo = (!isSuperAdmin() ? parseMemberMeta(S.me).company : (S.setAdmCo || '')) || '';
           const allStaff = (S.rawMembers || S.allMembers || S.members || []).filter(m => m.role !== 'rep');
+          const resBox = $('ping_send_result');
 
-          if (!to) return alert('الرجاء اختيار المستلم أولاً.');
-          if (!msg && !includeTasks) return alert('يجب كتابة رسالة أو اختيار تضمين المهام.');
+          if (!to) { if (typeof toast === 'function') toast('الرجاء اختيار المستلم أولاً', false); return; }
+          if (!msg && !includeTasks) { if (typeof toast === 'function') toast('يجب كتابة رسالة أو اختيار تضمين المهام', false); return; }
           
-          $('send_ping').disabled = true; $('send_ping').textContent = '...';
+          $('send_ping').disabled = true; $('send_ping').textContent = '⏳ جاري الإرسال...';
           
           try {
               if (to.startsWith('__co:')) {
                   const targetCo = to.slice(5);
                   const targets = allStaff.filter(m => same(parseMemberMeta(m).company, targetCo));
-                  if (!targets.length) { alert('لا يوجد موظفون مسجلون في متجر «' + targetCo + '» حالياً.'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; return; }
+                  if (!targets.length) { if (typeof toast === 'function') toast('لا يوجد موظفون مسجلون في متجر «' + targetCo + '» حالياً.', false); $('send_ping').disabled = false; $('send_ping').textContent = '🚀 إرسال الإشعار الفوري الآن 🔔'; return; }
                   await Promise.all(targets.map(m => apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري (' + targetCo + ') 🔔', body: msg, assignee_email: m.email, for_all: false, is_custom: true, include_tasks: includeTasks }))));
-                  alert('تم إرسال الإشعار إلى ' + targets.length + ' موظف في متجر «' + targetCo + '» ✅');
+                  const okMsg = '✅ تم إرسال الإشعار إلى ' + targets.length + ' موظف في متجر «' + targetCo + '»';
+                  if (typeof toast === 'function') toast(okMsg);
+                  if (resBox) resBox.textContent = okMsg;
                   $('ping_msg').value = '';
               } else if (to.startsWith('__dep:')) {
                   const dep = to.slice(6);
                   const targets = allStaff.filter(m => same(parseMemberMeta(m).department, dep) && (!admCo || same(parseMemberMeta(m).company, admCo)));
-                  if (!targets.length) { alert('لا يوجد موظفون في هذا القسم حالياً.'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; return; }
+                  if (!targets.length) { if (typeof toast === 'function') toast('لا يوجد موظفون في هذا القسم حالياً.', false); $('send_ping').disabled = false; $('send_ping').textContent = '🚀 إرسال الإشعار الفوري الآن 🔔'; return; }
                   await Promise.all(targets.map(m => apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري (' + dep + ') 🔔', body: msg, assignee_email: m.email, for_all: false, is_custom: true, include_tasks: includeTasks }))));
-                  alert('تم إرسال الإشعار إلى ' + targets.length + ' موظف في «' + dep + '» ✅');
+                  const okMsg = '✅ تم إرسال الإشعار إلى ' + targets.length + ' موظف في «' + dep + '»';
+                  if (typeof toast === 'function') toast(okMsg);
+                  if (resBox) resBox.textContent = okMsg;
                   $('ping_msg').value = '';
               } else if (to === '__all' && admCo) {
                   const targets = allStaff.filter(m => same(parseMemberMeta(m).company, admCo));
-                  if (!targets.length) { alert('لا يوجد موظفون في متجر «' + admCo + '».'); $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; return; }
+                  if (!targets.length) { if (typeof toast === 'function') toast('لا يوجد موظفون في متجر «' + admCo + '».', false); $('send_ping').disabled = false; $('send_ping').textContent = '🚀 إرسال الإشعار الفوري الآن 🔔'; return; }
                   await Promise.all(targets.map(m => apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري (' + admCo + ') 🔔', body: msg, assignee_email: m.email, for_all: false, is_custom: true, include_tasks: includeTasks }))));
-                  alert('تم إرسال الإشعار إلى جميع موظفي «' + admCo + '» (' + targets.length + ' موظف) ✅');
+                  const okMsg = '✅ تم إرسال الإشعار إلى جميع موظفي «' + admCo + '» (' + targets.length + ' موظف)';
+                  if (typeof toast === 'function') toast(okMsg);
+                  if (resBox) resBox.textContent = okMsg;
                   $('ping_msg').value = '';
               } else {
                   const all = to === '__all';
                   const rr = await apiPost('/api/notify', JSON.stringify({ title: 'تنبيه إداري 🔔', body: msg, assignee_email: all ? undefined : to, for_all: all, is_custom: true, include_tasks: includeTasks }));
                   const j = await rr.json().catch(() => ({}));
-                  alert(rr.ok ? 'تم الإرسال ✅ وحُفظ في صندوق ' + (j.stored || 0) + ' عضو، ووصل إشعار الجوال إلى ' + (j.sent || 0) + ' جهاز.\nمن لم يصله إشعار الجوال سيرى التنبيه فور فتحه التطبيق.' : 'تعذّر الإرسال (' + (j.error || rr.status) + ')');
+                  const okMsg = rr.ok ? ('✅ تم الإرسال وحُفظ في صندوق ' + (j.stored || 0) + ' عضو، ووصل إشعار الجوال إلى ' + (j.sent || 0) + ' جهاز.') : ('تعذّر الإرسال (' + (j.error || rr.status) + ')');
+                  if (typeof toast === 'function') toast(okMsg, rr.ok);
+                  if (resBox) resBox.textContent = okMsg;
                   if (rr.ok) $('ping_msg').value = '';
               }
           } catch(e) {}
-          if ($('send_ping')) { $('send_ping').disabled = false; $('send_ping').textContent = 'إرسال الإشعار الآن 🔔'; }
+          if ($('send_ping')) { $('send_ping').disabled = false; $('send_ping').textContent = '🚀 إرسال الإشعار الفوري الآن 🔔'; }
       };
   }
 
   if ($('test_push')) {
     $('test_push').onclick = async () => {
-      if (!('serviceWorker' in navigator)) return alert('المتصفح لا يدعم الإشعارات.');
+      if (typeof triggerAzkarCheckNow === 'function') {
+        if (typeof toast === 'function') toast('📲 سيصلك الإشعار خلال 3 ثوانٍ مع شاشة المهام الناقصة...');
+        triggerAzkarCheckNow(true, 3000, 'full');
+        return;
+      }
+      if (!('serviceWorker' in navigator)) return;
       const reg = await navigator.serviceWorker.ready;
-      alert('سيصلك الإشعار خلال 3 ثوانٍ.. اخرج من التطبيق الآن للشاشة الرئيسية لترى الإشعار.');
+      if (typeof toast === 'function') toast('سيصلك الإشعار خلال 3 ثوانٍ..');
       setTimeout(() => { reg.showNotification('🔔 تذكير تجريبي', { body: 'النظام يعمل بنجاح تام.', icon: '/icon-192.png' }); }, 3000);
     };
   }

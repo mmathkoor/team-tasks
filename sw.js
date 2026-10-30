@@ -1,5 +1,5 @@
-// Build version: 5.4.1 (timestamp: 2026-10-30)
-const SW_BUILD_VERSION = '5.4.1';
+// Build version: 5.5.0 (timestamp: 2026-10-30)
+const SW_BUILD_VERSION = '5.5.0';
 
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
@@ -28,7 +28,6 @@ self.addEventListener('activate', e => e.waitUntil((async () => {
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/')) return;
-  // sw.js و version.js دائماً بدون كاش مع بديل آمن عند انقطاع الشبكة
   if (u.pathname === '/sw.js') {
     e.respondWith(fetch(e.request, { cache: 'no-store' }));
     return;
@@ -90,8 +89,22 @@ async function flush() {
   if (done.size < q.length) throw new Error('retry');
 }
 
+function isSwQuietHours(digest) {
+  if (!digest || !digest.quietHoursEnabled) return false;
+  const now = new Date();
+  const curMins = now.getHours() * 60 + now.getMinutes();
+  const sParts = String(digest.quietStart || '23:00').split(':');
+  const eParts = String(digest.quietEnd || '07:00').split(':');
+  const startM = (+sParts[0] || 0) * 60 + (+sParts[1] || 0);
+  const endM = (+eParts[0] || 0) * 60 + (+eParts[1] || 0);
+  if (startM === endM) return false;
+  if (startM < endM) return curMins >= startM && curMins < endM;
+  return curMins >= startM || curMins < endM;
+}
+
 function isSwScheduleDueNow(digest) {
-  const mode = digest.scheduleMode || 'scheduled';
+  if (isSwQuietHours(digest)) return null;
+  const mode = digest.scheduleMode || 'interval';
   const now = new Date();
   const ymdStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const firedSlots = digest.firedSlots && typeof digest.firedSlots === 'object' ? digest.firedSlots : {};
@@ -102,7 +115,7 @@ function isSwScheduleDueNow(digest) {
     return k;
   }
   if (mode === 'interval') {
-    const intervalMs = Math.max(15, Number(digest.intervalMin) || 120) * 60 * 1000;
+    const intervalMs = Math.max(15, Number(digest.intervalMin) || 360) * 60 * 1000;
     const lastAt = Number(digest.lastShownAt) || 0;
     if (Date.now() - lastAt >= intervalMs - 15000) return 'int_' + Math.floor(Date.now() / intervalMs);
     return null;
@@ -114,7 +127,7 @@ function isSwScheduleDueNow(digest) {
   if (freq === 'weekly' && day !== Number(digest.weekday || 0)) return null;
 
   const nowMins = now.getHours() * 60 + now.getMinutes();
-  const times = Array.isArray(digest.times) && digest.times.length ? digest.times : ['09:00', '20:00'];
+  const times = Array.isArray(digest.times) && digest.times.length ? digest.times : ['09:00', '15:00', '21:00'];
   for (const tStr of times) {
     const parts = String(tStr || '').split(':');
     if (parts.length !== 2) continue;
@@ -127,7 +140,7 @@ function isSwScheduleDueNow(digest) {
   return null;
 }
 
-// ===== منبّه المهام المتأخرة الخارجي على شاشة الجوال =====
+// ===== منبّه المهام الناقصة الخارجي على شاشة الجوال =====
 async function showOverdueAzkarNotification(forceTest, delayMs) {
   if (delayMs && delayMs > 0) {
     await new Promise(r => setTimeout(r, delayMs));
@@ -137,10 +150,11 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
 
   const lateCount = Number(digest.lateCount) || 0;
   const todayCount = Number(digest.todayCount) || 0;
+  const incompleteCount = Number(digest.incompleteCount != null ? digest.incompleteCount : (lateCount + todayCount)) || 0;
   const sampleTitles = Array.isArray(digest.titles) ? digest.titles : [];
   const firstTaskId = digest.firstTaskId || null;
 
-  if (!forceTest && lateCount === 0 && todayCount === 0) return;
+  if (!forceTest && incompleteCount === 0 && lateCount === 0 && todayCount === 0) return;
 
   let slotKey = 'test_' + Date.now();
   if (!forceTest) {
@@ -148,16 +162,17 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
     if (!slotKey) return;
   }
 
-  let title = '🚨 تذكير بالمهام المتأخرة (' + lateCount + ' متأخرة)';
+  let title = '🕌 تذكير بالمهام الناقصة (' + (incompleteCount || lateCount) + ' مهام)';
   let body = '';
   if (lateCount > 0) {
-    body = 'لديك ' + lateCount + ' مهام متأخرة' + (todayCount > 0 ? ' و ' + todayCount + ' مستحقة اليوم' : '') + ':\n• ' + sampleTitles.slice(0, 3).join('\n• ');
-  } else if (todayCount > 0) {
-    title = '🔥 تذكير بمهام اليوم (' + todayCount + ' مهمة)';
-    body = 'لديك ' + todayCount + ' مهام مستحقة اليوم:\n• ' + sampleTitles.slice(0, 3).join('\n• ');
+    title = '🕌 تذكير: لديك ' + incompleteCount + ' مهام ناقصة (' + lateCount + ' متأخرة)';
+    body = '• ' + sampleTitles.slice(0, 4).join('\n• ');
+  } else if (incompleteCount > 0) {
+    title = '🕌 تذكير دوري: لديك ' + incompleteCount + ' مهام غير منجزة';
+    body = '• ' + sampleTitles.slice(0, 4).join('\n• ');
   } else {
-    title = '🔔 إشعار خارجي من مدير المهام';
-    body = 'يعمل هذا الإشعار من خارج التطبيق لتذكيرك بالمهام في الأوقات المحددة!';
+    title = '🕌 تذكير المهام الناقصة (بأسلوب الأذان)';
+    body = 'اضغط لفتح شاشة المهام الناقصة المنبثقة ومراجعة مهامك!';
   }
 
   digest.lastShownAt = Date.now();
@@ -175,10 +190,12 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
     silent: false,
     tag: 'azkar-overdue-remind',
     timestamp: Date.now(),
-    actions: firstTaskId
-      ? [{ action: 'done', title: '✅ تم الإنجاز' }, { action: 'open', title: '📋 فتح المهام' }]
-      : [{ action: 'open', title: '📋 عرض المهام' }],
-    data: { url: '/', task_id: firstTaskId, task_title: sampleTitles[0] || '' }
+    actions: [
+      { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+      ...(firstTaskId ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
+      { action: 'snooze', title: '⏰ غفوة ساعة' }
+    ],
+    data: { url: '/?azkar_popup=1', open_azkar_popup: true, task_id: firstTaskId, task_title: sampleTitles[0] || '' }
   });
 }
 
@@ -212,12 +229,17 @@ self.addEventListener('push', e => {
     ? 'azkar-overdue-remind'
     : (d.task_id ? 'task-' + d.task_id + '-' + Math.floor(Date.now() / 1000) : 'msg-' + Date.now());
   e.waitUntil((async () => {
+    const actions = d.actions && d.actions.length ? d.actions : (isAzkar ? [
+      { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+      ...(d.task_id ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
+      { action: 'snooze', title: '⏰ غفوة ساعة' }
+    ] : []);
     await self.registration.showNotification(d.title, {
       body: d.body, icon: d.icon || '/icon-192.png', badge: '/badge-96.png',
       vibrate: [500, 150, 500, 150, 800, 200, 800], requireInteraction: true, silent: false, tag, renotify: true, timestamp: Date.now(),
-      actions: d.actions || [], data: { url: '/', task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
+      actions,
+      data: { url: isAzkar ? '/?azkar_popup=1' : '/', open_azkar_popup: isAzkar, task_id: d.task_id, task_title: d.task_title, for_all: d.for_all }
     });
-    // لتذكيرات المهام المجدولة (is_azkar_remind) نترك الإشعار في شريط الجوال الخارجي ولا نفتح النافذة المنبثقة القديمة التي تمسحه
     if (!isAzkar) {
       const l = await clients.matchAll({ type: 'window', includeUncontrolled: true });
       l.forEach(c => {
@@ -249,5 +271,19 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const d = e.notification.data || {};
   if (e.action === 'done' && d.task_id) return e.waitUntil(markDone(d));
-  e.waitUntil(clients.matchAll({ type: 'window' }).then(l => l.length ? l[0].focus() : clients.openWindow(d.url || '/')));
+  if (e.action === 'snooze') {
+    return e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => {
+      l.forEach(c => c.postMessage({ type: 'SNOOZE_AZKAR', minutes: 60 }));
+    }));
+  }
+  const wantPopup = e.action === 'open_popup' || d.open_azkar_popup;
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async l => {
+    if (l.length) {
+      const client = l[0];
+      await client.focus();
+      if (wantPopup) client.postMessage({ type: 'OPEN_AZKAR_POPUP' });
+      return;
+    }
+    return clients.openWindow(wantPopup ? '/?azkar_popup=1' : (d.url || '/'));
+  }));
 });
