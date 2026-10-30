@@ -1,5 +1,7 @@
 package com.matjark.tasks;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -9,6 +11,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -19,6 +23,7 @@ import android.os.SystemClock;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -39,6 +44,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+@SuppressLint({"MissingPermission", "WakelockTimeout"})
 public class TaskMonitorService extends Service {
     public static final String PREFS_NAME = "matjark_native_prefs";
     public static final String MONITOR_CHANNEL_ID = "matjark_bg_monitor";
@@ -80,7 +86,7 @@ public class TaskMonitorService extends Service {
             PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, openIntent, piFlags);
 
             Notification notification = new NotificationCompat.Builder(this, MONITOR_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("مدير المهام متصل")
                 .setContentText("متابعة فورية للإشعارات والمهام في الخلفية")
                 .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -90,7 +96,11 @@ public class TaskMonitorService extends Service {
                 .setContentIntent(pendingIntent)
                 .build();
 
-            startForeground(FOREGROUND_ID, notification);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(FOREGROUND_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(FOREGROUND_ID, notification);
+            }
         } catch (Exception ignored) {
         }
     }
@@ -327,8 +337,14 @@ public class TaskMonitorService extends Service {
         }
     }
 
+    @SuppressLint("MissingPermission")
     public static void fireHighPriorityAlert(Context context, String title, String body, String tag) {
         try {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
             createChannelsStatic(context);
             Intent intent = new Intent(context, MainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -341,7 +357,7 @@ public class TaskMonitorService extends Service {
 
             Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, ALERT_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title != null && !title.isEmpty() ? title : "مدير المهام")
                 .setContentText(body != null ? body : "")
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body != null ? body : ""))
