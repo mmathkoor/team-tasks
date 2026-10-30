@@ -45,6 +45,19 @@ jobs:
           echo "android.enableJetifier=true" >> android/gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> android/gradle.properties
 
+      - name: Ensure App Icons
+        run: |
+          for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+            mkdir -p "android/app/src/main/res/$dir"
+            if [ -f icon-192.png ]; then
+              cp icon-192.png "android/app/src/main/res/$dir/ic_launcher.png"
+              cp icon-192.png "android/app/src/main/res/$dir/ic_launcher_round.png"
+            elif [ -f icon-512.png ]; then
+              cp icon-512.png "android/app/src/main/res/$dir/ic_launcher.png"
+              cp icon-512.png "android/app/src/main/res/$dir/ic_launcher_round.png"
+            fi
+          done
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
