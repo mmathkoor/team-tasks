@@ -95,11 +95,11 @@ function orgSettingsHtml() {
       '<div class="co-cards-grid">' + coCards + '</div>' +
       '<div class="row" style="margin-top:12px"><input id="co_in" placeholder="اسم شركة جديدة (مثال: شركة الأفق للتجارة)"><button class="p s" id="co_add" type="button">＋ إضافة شركة جديدة وتخصيصها</button></div>' +
       '</div><hr style="border:0;border-top:1px solid var(--line);margin:16px 0">' : '') +
-    '<div class="org-sec"><div class="bar" style="margin-bottom:8px"><b>🏛️ الإدارات والأقسام (' + deps.length + ')</b>' +
+    '<div class="org-sec"><div class="bar" style="margin-bottom:8px"><b>🗂️ الإدارات والأقسام (' + deps.length + ')</b>' +
       (!deps.length ? '<button class="s" id="dep_seed" type="button" style="font-size:12px">⚡ إضافة أقسام افتراضية</button>' : '') + '</div>' +
       (deps.length ? '<div class="org-tags">' + deps.map(d => {
         const cnt = (S.members || []).filter(m => same(parseMemberMeta(m).department, d)).length;
-        return '<div class="org-tag"><span>🏛️ <b>' + esc(d) + '</b> <small>(' + cnt + ' موظف)</small></span><button class="s dng" data-deprm="' + esc(d) + '" title="حذف القسم">✕</button></div>';
+        return '<div class="org-tag"><span>🗂️ <b>' + esc(d) + '</b> <small>(' + cnt + ' موظف)</small></span><button class="s dng" data-deprm="' + esc(d) + '" title="حذف القسم">✕</button></div>';
       }).join('') + '</div>' : '<div class="m" style="margin-bottom:8px">لم تُضف إدارات/أقسام بعد. أضف أقسامك لتتمكن من إسناد المهام لقسم كامل.</div>') +
       '<div class="row" style="margin-top:8px"><input id="dep_in" placeholder="اسم الإدارة أو القسم (مثال: إدارة المبيعات، قسم التسويق، المحاسبة)"><button class="p s" id="dep_add" type="button">＋ إضافة إدارة / قسم</button></div></div></div>';
 }
@@ -142,7 +142,7 @@ function companyConfigDialog(coName) {
     '<label style="margin-top:10px">العنوان التفصيلي للشركة / الفرع<input id="cp_addr" value="' + esc(p.address) + '" placeholder="مثال: صنعاء - شارع حدة"></label>' +
     '<div class="row" style="margin-top:10px">' +
       '<label>🎨 القالب الافتراضي للفواتير<select id="cp_inv_tpl">' +
-        '<option value="navy"' + ((p.invoiceTemplate || 'navy') === 'navy' ? ' selected' : '') + '>🏛️ الكحلي الرسمي (إبداع)</option>' +
+        '<option value="navy"' + ((p.invoiceTemplate || 'navy') === 'navy' ? ' selected' : '') + '>📘 الكحلي الرسمي (إبداع)</option>' +
         '<option value="orange"' + (p.invoiceTemplate === 'orange' ? ' selected' : '') + '>🧡 البرتقالي العصري (مبيعات)</option>' +
         '<option value="yellow"' + (p.invoiceTemplate === 'yellow' ? ' selected' : '') + '>💛 الأصفر والأسود الهندسي</option>' +
         '<option value="royal"' + (p.invoiceTemplate === 'royal' ? ' selected' : '') + '>👑 الملكي الذهبي الفاخر</option>' +
@@ -151,8 +151,8 @@ function companyConfigDialog(coName) {
     '</div>' +
     '<label style="margin-top:10px">شروط وقواعد الاستبدال والاسترجاع (تظهر في الفاتورة)<textarea id="cp_terms" rows="2">' + esc(p.terms || '') + '</textarea></label>' +
     '<div class="row" style="margin-top:10px">' +
-      '<label>اللون الأساسي للهوية<input id="cp_color" type="color" value="' + esc(p.color || '#0b1426') + '" style="height:40px;padding:4px"></label>' +
-      '<label>اللون الذهبي / المميز<input id="cp_accent" type="color" value="' + esc(p.accent || '#d4af6a') + '" style="height:40px;padding:4px"></label>' +
+      '<label>اللون الأساسي للهوية<input id="cp_color" type="color" value="' + esc(p.color || '#2563eb') + '" style="height:40px;padding:4px"></label>' +
+      '<label>اللون المميز / الثانوي<input id="cp_accent" type="color" value="' + esc(p.accent || '#3b82f6') + '" style="height:40px;padding:4px"></label>' +
     '</div>' +
     '<div class="row dact" style="margin-top:16px">' +
       '<button class="s" id="cp_cx" type="button">إلغاء</button>' +
@@ -378,7 +378,7 @@ function staffBlockHtml() {
       const selectedCo = isMeSuper ? (String(m.company || (m.telegram_chat_id && m.telegram_chat_id.startsWith('{') ? (JSON.parse(m.telegram_chat_id).co || '') : '') || '').trim()) : (meta.company || 'متجرك');
       const coOpts = allowedCos.map(c => '<option value="' + esc(c) + '"' + (same(selectedCo, c) ? ' selected' : '') + '>' + (c ? '🏢 ' + esc(c) : '👑 كل الشركات (المدير العام فقط)') + '</option>').join('');
       const depSet = new Set(deps); if (meta.department) depSet.add(meta.department);
-      const depOpts = '<option value="">-- بدون إدارة/قسم --</option>' + [...depSet].map(d => '<option value="' + esc(d) + '"' + (same(meta.department, d) ? ' selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
+      const depOpts = '<option value="">-- بدون إدارة/قسم --</option>' + [...depSet].map(d => '<option value="' + esc(d) + '"' + (same(meta.department, d) ? ' selected' : '') + '>🗂️ ' + esc(d) + '</option>').join('');
       const ordScopeBadge = m.role === 'admin' ? '' : (p.ordersScope === 'own' ? '<span class="chip late" style="font-size:11px" title="لا يرى إلا طلباته الشخصية">🔒 طلباته فقط</span>' : '<span class="chip ok" style="font-size:11px" title="يرى كل طلبات الشركة">🌐 كل الطلبات</span>');
       const isEditOpen = !!S.openMemberEdits[m.email];
       return '<div class="mem-row" style="background:var(--col);padding:10px 12px;border-radius:12px;margin-bottom:8px;border:1px solid var(--line)">' +
@@ -388,7 +388,7 @@ function staffBlockHtml() {
             (m.title ? '<span class="chip" style="font-size:11px">💼 ' + esc(m.title) + '</span>' : '') +
             '<span class="chip' + (m.role === 'rep' ? ' pr-chip important' : m.role === 'admin' ? ' all' : '') + '" style="font-size:11px">' + ({ admin: '👑 مدير', rep: '🛵 مندوب', member: 'عضو' }[m.role] || 'عضو') + '</span>' +
             (selectedCo ? '<span class="chip" style="font-size:11px">🏢 ' + esc(selectedCo) + '</span>' : '<span class="chip all" style="font-size:11px">🌐 كل الشركات</span>') +
-            (meta.department ? '<span class="chip" style="font-size:11px">🏛️ ' + esc(meta.department) + '</span>' : '') +
+            (meta.department ? '<span class="chip" style="font-size:11px">🗂️ ' + esc(meta.department) + '</span>' : '') +
             (meta.phone ? '<span class="chip ok" dir="ltr" style="font-size:11px">📱 ' + esc(meta.phone) + '</span>' : '') +
             ordScopeBadge +
           '</div>' +
@@ -415,7 +415,7 @@ function staffBlockHtml() {
 
   const defNewCo = admCo || activeCompanyFilter() || 'متجرك';
   const newCoOpts = (myCo ? [myCo] : cos).map(c => '<option value="' + esc(c) + '"' + (same(defNewCo, c) ? ' selected' : '') + '>🏢 ' + esc(c) + '</option>').join('');
-  const newDepOpts = '<option value="">-- الإدارة / القسم (اختياري) --</option>' + deps.map(d => '<option value="' + esc(d) + '">🏛️ ' + esc(d) + '</option>').join('');
+  const newDepOpts = '<option value="">-- الإدارة / القسم (اختياري) --</option>' + deps.map(d => '<option value="' + esc(d) + '">🗂️ ' + esc(d) + '</option>').join('');
 
   const scopeBar = isSuperAdmin() ? (
     '<div class="store-scope-bar" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
@@ -463,10 +463,10 @@ function notifyBlockHtml() {
     const cnt = allStaff.filter(m => same(parseMemberMeta(m).company, c)).length;
     return '<option value="__co:' + esc(c) + '">🏢 كل موظفي متجر: ' + esc(c) + ' (' + cnt + ')</option>';
   }).join('') : '';
-  const optDeps = deps.map(d => '<option value="__dep:' + esc(d) + '">🏛️ قسم: ' + esc(d) + (admCo ? ' (' + esc(admCo) + ')' : '') + '</option>').join('');
+  const optDeps = deps.map(d => '<option value="__dep:' + esc(d) + '">🗂️ قسم: ' + esc(d) + (admCo ? ' (' + esc(admCo) + ')' : '') + '</option>').join('');
   const optMembers = listMembers.map(m => {
     const meta = parseMemberMeta(m);
-    const tags = [meta.company ? '🏢 ' + meta.company : '', meta.department ? '🏛️ ' + meta.department : ''].filter(Boolean).join(' · ');
+    const tags = [meta.company ? '🏢 ' + meta.company : '', meta.department ? '🗂️ ' + meta.department : ''].filter(Boolean).join(' · ');
     return '<option value="' + esc(m.email) + '">👤 ' + esc(m.name) + (tags ? ' (' + esc(tags) + ')' : '') + '</option>';
   }).join('');
   const allLabel = admCo ? ('👥 كل موظفي «' + admCo + '» (' + listMembers.length + ')') : ('🌐 الكل (جميع المتاجر والأعضاء: ' + allStaff.length + ')');
@@ -541,6 +541,30 @@ function adminTaskVisibilityCardHtml() {
   '</div>';
 }
 
+function bioSettingsHtml() {
+  const hasBio = typeof bioHasRegistered === 'function' && bioHasRegistered();
+  const info = typeof bioInfo === 'function' ? bioInfo() : null;
+  const sup = typeof bioSupported === 'function' && bioSupported();
+  return '<div class="card" style="margin-bottom:12px">' +
+    '<h3>👆 تسجيل الدخول السريع بالبصمة / الوجه (WebAuthn) + حفظ الجلسة</h3>' +
+    '<p class="m" style="margin-bottom:10px;font-size:12.5px">فعّل بصمة الإصبع أو التعرف على الوجه على هذا الجهاز للدخول الفوري بنقرة واحدة، مع حفظ الجلسة تلقائياً حتى لا يُطلب منك تسجيل الدخول في كل مرة.</p>' +
+    (hasBio
+      ? '<div class="bar" style="background:var(--oksoft);padding:10px 12px;border-radius:10px;margin-bottom:10px">' +
+          '<span>✅ البصمة مفعّلة لحساب: <b>' + esc((info && (info.name || info.email)) || (S.me && S.me.name) || '') + '</b></span>' +
+          '<span class="chip ok">نشطة</span>' +
+        '</div>' +
+        '<div class="row" style="gap:8px">' +
+          '<button class="s p" id="bio_test" type="button">👆 تجربة البصمة الآن</button>' +
+          '<button class="s dng" id="bio_rm" type="button">إلغاء البصمة من هذا الجهاز</button>' +
+        '</div>'
+      : '<div class="row">' +
+          '<button class="p s" id="bio_en" type="button"' + (!sup ? ' disabled' : '') + '>👆 تفعيل الدخول بالبصمة على هذا الجهاز</button>' +
+          (!sup ? '<span class="m">هذا المتصفح لا يدعم WebAuthn</span>' : '') +
+        '</div>'
+    ) +
+  '</div>';
+}
+
 function accountBlockHtml() {
   const me = S.me || {};
   const meta = parseMemberMeta(me);
@@ -551,6 +575,7 @@ function accountBlockHtml() {
       '<div class="m" style="font-size:12px;margin-top:3px" dir="ltr">' + esc(me.email || '') + (meta.phone ? ' · 📱 ' + esc(meta.phone) : '') + '</div>' +
     '</div>' +
   '</div>' +
+  bioSettingsHtml() +
   adminTaskVisibilityCardHtml() +
   '<div class="card" style="margin-bottom:12px"><h3>🔑 تغيير كلمة المرور الخاصة بحسابي</h3><div class="row" style="margin-top:8px"><input id="np" type="password" dir="ltr" placeholder="6 أحرف على الأقل"><button class="s" id="svp">حفظ التغيير</button></div></div>' +
   '<div class="card" style="margin-bottom:12px;border-color:var(--oksoft)">' +
@@ -784,6 +809,39 @@ function bindSettings() {
   if ($('account_apk_btn')) {
     $('account_apk_btn').onclick = () => {
       if (typeof apkInstallDialog === 'function') apkInstallDialog();
+    };
+  }
+
+  if ($('bio_en')) {
+    $('bio_en').onclick = async () => {
+      try {
+        $('bio_en').disabled = true;
+        $('bio_en').textContent = 'تحقّق من البصمة على جهازك...';
+        await bioRegister();
+        if (typeof toast === 'function') toast('تم تفعيل الدخول بالبصمة على هذا الجهاز بنجاح! ✓');
+        render();
+      } catch (err) {
+        $('bio_en').disabled = false;
+        $('bio_en').textContent = '👆 تفعيل الدخول بالبصمة على هذا الجهاز';
+        alert(err.message || 'تعذّر تفعيل البصمة');
+      }
+    };
+  }
+  if ($('bio_test')) {
+    $('bio_test').onclick = async () => {
+      try {
+        const res = await bioVerifyAndLogin();
+        if (res.ok) toast('تم التحقق من البصمة بنجاح ✓');
+        else alert(res.error);
+      } catch (err) { alert(err.message); }
+    };
+  }
+  if ($('bio_rm')) {
+    $('bio_rm').onclick = () => {
+      if (confirm('إلغاء الدخول بالبصمة من هذا الجهاز؟')) {
+        bioRemove();
+        render();
+      }
     };
   }
 
@@ -1072,7 +1130,7 @@ function bindSettings() {
     if (pw.length < 6) return alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
     b.disabled = true;
     try {
-      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'member_password', email: em, password: pw }));
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'member_password', email: em, password: pw, _caller_email: S.me && S.me.email }));
       const j = await rr.json().catch(() => ({}));
       b.disabled = false;
       if (!rr.ok) return alert(j.error || 'تعذّر تعيين كلمة المرور');
@@ -1114,34 +1172,84 @@ function bindSettings() {
     $('addm').disabled = true;
     $('addm').textContent = 'جارٍ إنشاء الحساب...';
 
+    const finalPw = pw.length >= 6 ? pw : (typeof genPw === 'function' ? genPw() : Math.random().toString(36).slice(-8));
+    const normPh = ph ? normPhone(ph) : '';
+    const finalEmail = e ? e.toLowerCase() : (normPh + '@staff.local');
+    const tgMeta = encodeMemberMeta(co || 'متجرك', dep || '', normPh);
+
     try {
       const rr = await apiPost('/api/rep-admin', JSON.stringify({
         action: 'create_member',
         name: n,
         phone: ph,
         email: e,
-        password: pw,
+        password: finalPw,
         company: co || 'متجرك',
         department: dep || '',
         title: title || '',
-        role: role
+        role: role,
+        _caller_email: S.me && S.me.email
       }));
       const j = await rr.json().catch(() => ({}));
+
+      if (rr.ok) {
+        $('addm').disabled = false;
+        $('addm').textContent = '➕ إنشاء حساب الموظف';
+        if ($('nn')) $('nn').value = '';
+        if ($('nph')) $('nph').value = '';
+        if ($('ne')) $('ne').value = '';
+        if ($('npw')) $('npw').value = '';
+        if ($('ntitle')) $('ntitle').value = '';
+        await load();
+        memberCredsDialog(j);
+        return;
+      }
+
+      // مسار احتياطي مباشر عبر Supabase إذا تعذّر المسار الخلفي
+      try {
+        await fetch(API + '/auth/v1/signup', {
+          method: 'POST',
+          headers: { apikey: KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: finalEmail, password: finalPw, data: { name: n } })
+        });
+      } catch (e2) {}
+
+      let row = {
+        email: finalEmail,
+        name: n,
+        role: role,
+        phone: normPh || null,
+        title: title || null,
+        company: co || 'متجرك',
+        department: dep || null,
+        telegram_chat_id: tgMeta
+      };
+      let { error } = await sb.from('members').upsert(row, { onConflict: 'email' });
+      if (error && /(company|department|phone|title)/i.test(error.message)) {
+        row = { email: finalEmail, name: n, role: role, telegram_chat_id: tgMeta };
+        ({ error } = await sb.from('members').upsert(row, { onConflict: 'email' }));
+      }
       $('addm').disabled = false;
       $('addm').textContent = '➕ إنشاء حساب الموظف';
+      if (error) return alert(j.error || ('تعذّر إنشاء الحساب: ' + error.message));
 
-      if (!rr.ok) return alert(j.error || ('تعذّر إنشاء الحساب (' + rr.status + ')'));
-
-      // تفريغ الحقول بعد النجاح
       if ($('nn')) $('nn').value = '';
       if ($('nph')) $('nph').value = '';
       if ($('ne')) $('ne').value = '';
       if ($('npw')) $('npw').value = '';
       if ($('ntitle')) $('ntitle').value = '';
-
       await load();
-      memberCredsDialog(j);
-    } catch (e) {
+      memberCredsDialog({
+        email: finalEmail,
+        phone: normPh,
+        loginIdentifier: normPh || finalEmail,
+        password: finalPw,
+        name: n,
+        company: co || 'متجرك',
+        department: dep || '',
+        role: role
+      });
+    } catch (err) {
       $('addm').disabled = false;
       $('addm').textContent = '➕ إنشاء حساب الموظف';
       alert('تعذّر الاتصال بخادم الحسابات');
@@ -1162,7 +1270,7 @@ function memberCredsDialog(res) {
     '🌐 رابط النظام: ' + location.origin,
     '👤 اسم الدخول / رقم الجوال: ' + loginId,
     '🔑 كلمة المرور: ' + res.password,
-    (res.department ? '🏛️ الإدارة: ' + res.department : ''),
+    (res.department ? '🗂️ الإدارة: ' + res.department : ''),
     '📋 الصلاحية: ' + roleName,
     '',
     '(يمكنك الدخول مباشرة برقم جوالك ' + (localPh || loginId) + ' أو بريدك مع كلمة المرور أعلاه، ثم تفعيل الإشعارات فور الدخول).'
@@ -1175,10 +1283,10 @@ function memberCredsDialog(res) {
   '</div>' +
   '<div class="card" style="background:var(--col);border:1px solid var(--line);margin-bottom:14px;padding:12px 14px">' +
     '<div class="bar" style="margin-bottom:6px"><b>👤 ' + esc(res.name) + '</b> <span class="chip ok">' + esc(roleName) + '</span></div>' +
-    '<div style="font-size:13px;color:var(--mute);margin-bottom:8px">🏢 المتجر: <b>' + esc(storeTitle) + '</b>' + (res.department ? ' · 🏛️ ' + esc(res.department) : '') + '</div>' +
+    '<div style="font-size:13px;color:var(--mute);margin-bottom:8px">🏢 المتجر: <b>' + esc(storeTitle) + '</b>' + (res.department ? ' · 🗂️ ' + esc(res.department) : '') + '</div>' +
     '<div style="background:var(--bg);padding:10px 12px;border-radius:10px;border:1px solid var(--line)">' +
       '<div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px"><span>اسم المستخدم للدخول:</span><b dir="ltr">' + esc(loginId) + '</b></div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>كلمة المرور:</span><b dir="ltr" style="font-size:15px;color:var(--gold);background:var(--card);padding:2px 8px;border-radius:6px;border:1px solid var(--line)">' + esc(res.password) + '</b></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>كلمة المرور:</span><b dir="ltr" style="font-size:15px;color:var(--acc);background:var(--card);padding:2px 8px;border-radius:6px;border:1px solid var(--line)">' + esc(res.password) + '</b></div>' +
     '</div>' +
   '</div>' +
   '<div style="font-size:12.5px;font-weight:700;margin-bottom:6px">📲 نص الرسالة الترحيبية الجاهزة للموظف:</div>' +

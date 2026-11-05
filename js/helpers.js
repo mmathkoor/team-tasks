@@ -451,7 +451,7 @@ async function generateInvoicePdfBlob(data) {
   return jpegBytesToPdfBlob(jpegBytes, W, H);
 }
 
-// مشاركة أو إرسال ملف الفاتورة PDF مباشرة للعميل بضغطة زر واحدة
+// تحميل ملف الفاتورة PDF تلقائياً ثم فتح محادثة واتساب للعميل مباشرة
 async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl) {
   const origTxt = btnEl ? btnEl.innerHTML : '';
   if (btnEl) {
@@ -461,22 +461,9 @@ async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl) {
   try {
     const pdfBlob = await generateInvoicePdfBlob(invoiceData);
     const fileName = 'فاتورة-' + (invoiceData.orderNo || 'طلب') + '.pdf';
-    const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
     const caption = '🧾 فاتورة مبيعات #' + (invoiceData.orderNo || '') + ' — ' + (invoiceData.storeName || '') + '\n👤 العميل: ' + (invoiceData.customerName || '') + '\n💰 الإجمالي: ' + Number(invoiceData.total || 0).toLocaleString('en-US') + ' ' + (invoiceData.currency || 'ر.ي');
 
-    // 1) الإرسال المباشر للملف عبر نظام المشاركة الأصلي (واتساب / تيليجرام / إلخ) بدون حفظ مسبق
-    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-      await navigator.share({
-        files: [pdfFile],
-        title: 'فاتورة #' + (invoiceData.orderNo || ''),
-        text: caption
-      });
-      if (typeof toast === 'function') toast('تم فتح مشاركة ملف الفاتورة PDF مباشرة ✓');
-      if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = origTxt; }
-      return;
-    }
-
-    // 2) في متصفحات سطح المكتب التي لا تدعم مشاركة الملفات المباشرة: تنزيل تلقائي لملف الـ PDF مع فتح محادثة العميل في واتساب مباشرة
+    // 1) تنزيل ملف الـ PDF تلقائياً إلى جهاز المستخدم
     const url = URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
     a.href = url;
@@ -484,18 +471,21 @@ async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl) {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
+    setTimeout(() => URL.revokeObjectURL(url), 25000);
 
+    // 2) فتح محادثة واتساب للعميل مباشرة لإرفاق ملف الـ PDF الذي تم تنزيله
     if (customerPhone) {
       const ph = typeof waPhone === 'function' ? waPhone(customerPhone) : String(customerPhone).replace(/\D/g, '');
-      window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(caption + '\n📎 (مرفق لكم ملف الفاتورة الرسمي PDF)'), '_blank');
-      if (typeof toast === 'function') toast('تم تجهيز ملف الفاتورة PDF وفتح محادثة العميل لإرفاقه ✓');
+      setTimeout(() => {
+        window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(caption + '\n📎 (مرفق لكم ملف الفاتورة الرسمي PDF: ' + fileName + ')'), '_blank');
+      }, 350);
+      if (typeof toast === 'function') toast('تم تحميل ملف PDF (' + fileName + ') وفتح محادثة العميل في واتساب ✓');
     } else {
-      if (typeof toast === 'function') toast('تم تحميل ملف الفاتورة PDF جاهزاً للإرسال ✓');
+      if (typeof toast === 'function') toast('تم تحميل ملف الفاتورة PDF (' + fileName + ') بنجاح ✓');
     }
   } catch (err) {
     if (err && err.name !== 'AbortError') {
-      alert('تعذّر مشاركة ملف الـ PDF: ' + (err.message || err));
+      alert('تعذّر تجهيز ملف الـ PDF: ' + (err.message || err));
     }
   }
   if (btnEl) {
@@ -503,3 +493,4 @@ async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl) {
     btnEl.innerHTML = origTxt;
   }
 }
+

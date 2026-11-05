@@ -1,4 +1,6 @@
 {
+  "framework": null,
+  "buildCommand": "",
   "outputDirectory": ".",
   "cleanUrls": true,
   "crons": [
@@ -63,6 +65,11 @@
     {
       "source": "/apk/download",
       "destination": "/api/download-apk"
+    },
+    {
+      "source": "/i/:c",
+      "destination": "/api/i?c=:c"
     }
   ]
 }
+

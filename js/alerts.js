@@ -1,4 +1,4 @@
-// ===== نافذة التنبيه المنبثقة + شاشة المهام الناقصة المنبثقة (بأسلوب تطبيق الأذان) + محرك الإشعارات الشامل =====
+// ===== نافذة التنبيه المنبثقة + شاشة المهام الناقصة المنبثقة الدورية + محرك الإشعارات الشامل =====
 const ALERT = { q: [], cur: null, ctx: null, timer: null, keepAliveAudio: null, adhanRingTimer: null };
 const alertSoundOn = () => localStorage.getItem('alert_sound') !== 'off';
 const azkarVoiceOn = () => localStorage.getItem('azkar_voice_on') === 'on';
@@ -197,7 +197,7 @@ function postSystemNotification(title, body, opts = {}) {
               tag: opts.tag || 'matjark_notification',
               timestamp: Date.now(),
               actions: opts.actions || [
-                { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+                { action: 'open_popup', title: '⏰ شاشة المهام الناقصة' },
                 { action: 'snooze', title: '⏰ غفوة ساعة' }
               ],
               data: Object.assign({ url: '/?azkar_popup=1', open_azkar_popup: true }, opts.data || {})
@@ -550,26 +550,26 @@ function showAdhanTasksPopup(opts = {}) {
       }
       @keyframes azkFadeIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
       @keyframes azkPulseGlow {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 106, 0.55), 0 22px 60px rgba(0,0,0,0.65); }
-        50% { box-shadow: 0 0 0 12px rgba(212, 175, 106, 0), 0 22px 60px rgba(0,0,0,0.65); }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45), 0 22px 60px rgba(0,0,0,0.55); }
+        50% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0), 0 22px 60px rgba(0,0,0,0.55); }
       }
       .azk-adhan-card {
         width: 100%; max-width: 560px; max-height: 92vh;
-        background: linear-gradient(165deg, #0b1528 0%, #132544 55%, #0d1b33 100%);
-        color: #f8fafc; border: 2px solid #d4af6a; border-radius: 24px;
+        background: linear-gradient(165deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
+        color: #f8fafc; border: 1.5px solid #3b82f6; border-radius: 22px;
         display: flex; flex-direction: column; overflow: hidden;
         animation: azkPulseGlow 2.8s infinite;
       }
       .azk-adhan-top {
-        background: radial-gradient(circle at top center, rgba(212,175,106,0.28) 0%, rgba(11,21,40,0.1) 70%);
-        padding: 18px 18px 14px; border-bottom: 1px solid rgba(212,175,106,0.3);
+        background: radial-gradient(circle at top center, rgba(59,130,246,0.22) 0%, rgba(15,23,42,0.1) 70%);
+        padding: 18px 18px 14px; border-bottom: 1px solid rgba(148,163,184,0.2);
         text-align: center; position: relative;
       }
       .azk-adhan-dome {
-        width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 20px;
-        background: linear-gradient(135deg, rgba(212,175,106,0.28), rgba(212,175,106,0.08));
-        border: 1.5px solid #d4af6a; display: flex; align-items: center; justify-content: center;
-        font-size: 32px; box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+        width: 60px; height: 60px; margin: 0 auto 8px; border-radius: 18px;
+        background: linear-gradient(135deg, rgba(37,99,235,0.28), rgba(59,130,246,0.1));
+        border: 1.5px solid #3b82f6; display: flex; align-items: center; justify-content: center;
+        font-size: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);
       }
       .azk-adhan-stats {
         display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px;
@@ -657,8 +657,8 @@ function showAdhanTasksPopup(opts = {}) {
             '<button type="button" id="azk_pop_close_top" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#cbd5e1;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>' +
           '</div>' +
         '</div>' +
-        '<div class="azk-adhan-dome">🕌</div>' +
-        '<div style="font-size:12px;color:#f6e3a8;font-weight:700;letter-spacing:.3px">⏰ حان وقت متابعة المهام الناقصة · ' + esc(timeAr) + '</div>' +
+        '<div class="azk-adhan-dome">⏰</div>' +
+        '<div style="font-size:12px;color:#93c5fd;font-weight:700;letter-spacing:.3px">⏰ حان وقت متابعة المهام الناقصة · ' + esc(timeAr) + '</div>' +
         '<h2 style="margin:4px 0 4px;font-size:19px;color:#fff">تذكير المهام غير المنجزة — ' + esc(userName) + '</h2>' +
         '<div style="font-size:12.5px;color:#cbd5e1">راجع مهامك الناقصة وأنجزها مباشرة من هذه الشاشة أو انتقل للوحة العمل</div>' +
         '<div class="azk-adhan-stats">' +
@@ -675,14 +675,14 @@ function showAdhanTasksPopup(opts = {}) {
             '<span>📋 إجمالي الناقصة</span>' +
           '</div>' +
         '</div>' +
-        (ordCnt > 0 ? '<div style="margin-top:8px;padding:5px 10px;border-radius:10px;background:rgba(212,175,106,.16);color:#f6e3a8;font-size:12px;font-weight:700">🛒 لديك أيضاً (' + ordCnt + ') طلبات معلقة قيد المتابعة</div>' : '') +
+        (ordCnt > 0 ? '<div style="margin-top:8px;padding:5px 10px;border-radius:10px;background:rgba(59,130,246,.16);color:#93c5fd;font-size:12px;font-weight:700">🛒 لديك أيضاً (' + ordCnt + ') طلبات معلقة قيد المتابعة</div>' : '') +
       '</div>' +
       '<div class="azk-adhan-body" id="azk_pop_list">' +
         renderTasksListHtml() +
       '</div>' +
       '<div class="azk-adhan-foot">' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<button type="button" id="azk_pop_board" style="flex:2 1 180px;padding:10px 14px;border-radius:12px;border:1px solid #d4af6a;background:linear-gradient(135deg,#d4af6a,#b58938);color:#0b1426;font:800 13.5px Tajawal;cursor:pointer">📋 فتح لوحة جميع المهام الناقصة</button>' +
+          '<button type="button" id="azk_pop_board" style="flex:2 1 180px;padding:10px 14px;border-radius:12px;border:1px solid #2563eb;background:#2563eb;color:#ffffff;font:800 13.5px Tajawal;cursor:pointer">📋 فتح لوحة جميع المهام الناقصة</button>' +
           '<button type="button" id="azk_pop_settings" style="flex:1 1 120px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#e2e8f0;font:700 12.5px Tajawal;cursor:pointer">⚙️ إعدادات التنبيه</button>' +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between">' +
@@ -798,7 +798,7 @@ function showHeadsUpAzkarBanner(opts) {
   el.innerHTML =
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
       '<div style="display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1">' +
-        '<div style="width:38px;height:38px;border-radius:11px;background:rgba(212,175,106,.2);border:1px solid rgba(212,175,106,.45);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🕌</div>' +
+        '<div style="width:38px;height:38px;border-radius:11px;background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.45);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⏰</div>' +
         '<div style="min-width:0;flex:1">' +
           '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
             '<b style="font-size:14px;color:#fff">' + esc(opts.title || '⏰ تذكير بالمهام الناقصة') + '</b>' +
@@ -811,7 +811,7 @@ function showHeadsUpAzkarBanner(opts) {
       '<button type="button" id="azk_bn_x" style="background:transparent;border:0;color:#94a3b8;font-size:18px;padding:0 4px;cursor:pointer;line-height:1">✕</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12);flex-wrap:wrap">' +
-      '<button type="button" id="azk_bn_full" style="flex:1;padding:6px 10px;border-radius:9px;border:1px solid #d4af6a;background:rgba(212,175,106,.22);color:#f6e3a8;font:700 12px Tajawal;cursor:pointer">🕌 فتح الشاشة المنبثقة للمهام</button>' +
+      '<button type="button" id="azk_bn_full" style="flex:1;padding:6px 10px;border-radius:9px;border:1px solid #3b82f6;background:rgba(59,130,246,.22);color:#93c5fd;font:700 12px Tajawal;cursor:pointer">⏰ فتح الشاشة المنبثقة للمهام</button>' +
       (t && (typeof eff === 'function' ? eff(t) !== 'done' : t.status !== 'done')
         ? '<button type="button" id="azk_bn_done" style="flex:1;padding:6px 10px;border-radius:9px;border:0;background:#16a34a;color:#fff;font:700 12px Tajawal;cursor:pointer">✅ إنجاز الأولى</button>'
         : '') +
@@ -911,7 +911,7 @@ async function sendExternalRemindPush(title, body, firstTaskId, isTest = false, 
         self: !teamSlot,
         test: !!isTest,
         team_slot: teamSlot || undefined,
-        title: title || '🕌 تذكير بالمهام الناقصة',
+        title: title || '⏰ تذكير بالمهام الناقصة',
         body: body || 'لديك مهام غير منجزة تحتاج متابعة في النظام',
         task_id: firstTaskId || undefined
       })
@@ -946,10 +946,10 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
   }
 
   const pTitle = lateTasks.length > 0
-    ? ('🕌 تذكير: لديك ' + targetTasks.length + ' مهام ناقصة (' + lateTasks.length + ' متأخرة)')
+    ? ('⏰ تذكير: لديك ' + targetTasks.length + ' مهام ناقصة (' + lateTasks.length + ' متأخرة)')
     : targetTasks.length > 0
-      ? ('🕌 تذكير دوري: لديك ' + targetTasks.length + ' مهام غير منجزة')
-      : '🕌 تذكير المهام الناقصة (بأسلوب الأذان)';
+      ? ('⏰ تذكير دوري: لديك ' + targetTasks.length + ' مهام غير منجزة')
+      : '⏰ تذكير المهام الناقصة الدوري';
 
   const subtitle = targetTasks.length > 0
     ? ('يا ' + ((S.me && S.me.name) || '') + '، هذه قائمة بمهامك الناقصة بانتظار الإنجاز:')
@@ -970,7 +970,7 @@ async function triggerAzkarCheckNow(forceTest, delayMs = 0, modeOpt = 'auto') {
         tag: 'azkar-overdue-remind',
         forceExternal: !!forceTest,
         actions: [
-          { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+          { action: 'open_popup', title: '⏰ شاشة المهام الناقصة' },
           ...(firstId ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
           { action: 'snooze', title: '⏰ غفوة ساعة' }
         ],
@@ -1142,7 +1142,7 @@ function alertSettingsHtml() {
     [120, 'كل ساعتين (2 س)'],
     [180, 'كل 3 ساعات'],
     [240, 'كل 4 ساعات'],
-    [360, 'كل 6 ساعات ⭐ (الافتراضي كالأذان)'],
+    [360, 'كل 6 ساعات ⭐ (الافتراضي)'],
     [480, 'كل 8 ساعات'],
     [720, 'كل 12 ساعة (مرتين يومياً)'],
     [1440, 'كل 24 ساعة (يومياً)']
@@ -1155,7 +1155,7 @@ function alertSettingsHtml() {
   }).join('');
 
   const timesBadgesHtml = times.map(t =>
-    '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;font-size:13px;background:var(--card);border:1px solid var(--gold,#c9a24e)">' +
+    '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;font-size:13px;background:var(--card);border:1px solid var(--acc)">' +
       '⏰ <b>' + esc(formatTimeArabic12h(t)) + '</b> <small class="m">(' + esc(t) + ')</small>' +
       (times.length > 1 && !locked ? '<button type="button" class="s dng" data-rm-azktime="' + esc(t) + '" style="padding:1px 6px;font-size:11px;border-radius:6px" title="حذف هذا الوقت">✕</button>' : '') +
     '</span>'
@@ -1171,12 +1171,12 @@ function alertSettingsHtml() {
 
   return (
     // 1) بطاقة لوحة الحالة الحية وأزرار المعاينة الفورية
-    '<div class="card" style="margin-bottom:14px;border:2px solid var(--gold,#c9a24e);background:linear-gradient(145deg,var(--card),var(--col))">' +
+    '<div class="card" style="margin-bottom:14px;border:1.5px solid var(--acc);background:linear-gradient(145deg,var(--card),var(--col))">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
         '<div style="display:flex;align-items:center;gap:10px">' +
-          '<div style="width:44px;height:44px;border-radius:14px;background:rgba(212,175,106,.18);border:1.5px solid var(--gold,#c9a24e);display:flex;align-items:center;justify-content:center;font-size:24px">🕌</div>' +
+          '<div style="width:44px;height:44px;border-radius:14px;background:var(--accsoft);border:1.5px solid var(--acc);display:flex;align-items:center;justify-content:center;font-size:24px">⏰</div>' +
           '<div>' +
-            '<h2 style="margin:0;font-size:16.5px">مركز التحكم الشامل بمنبّه المهام الناقصة (بأسلوب تطبيق الأذان)</h2>' +
+            '<h2 style="margin:0;font-size:16.5px">مركز التحكم الشامل بمنبّه المهام الناقصة الدوري</h2>' +
             '<div class="m" style="font-size:12px;margin-top:2px">تنبيهات دورية (كل 6 ساعات أو حسب اختيارك) مع شاشة منبثقة شاملة للمهام الناقصة وإشعار خارجي للهاتف</div>' +
           '</div>' +
         '</div>' +
@@ -1190,7 +1190,7 @@ function alertSettingsHtml() {
         '</div>' +
         '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px">' +
           '<div class="m" style="font-size:11.5px">⏳ موعد التذكير القادم</div>' +
-          '<b id="azk_eta_lbl" style="font-size:13px;color:var(--gold,#c9a24e)">' + esc(getNextReminderEtaText()) + '</b>' +
+          '<b id="azk_eta_lbl" style="font-size:13px;color:var(--acc)">' + esc(getNextReminderEtaText()) + '</b>' +
         '</div>' +
         '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px">' +
           '<div class="m" style="font-size:11.5px">📋 مهامك الناقصة الآن</div>' +
@@ -1199,21 +1199,21 @@ function alertSettingsHtml() {
       '</div>' +
 
       '<div class="row" style="gap:8px;flex-wrap:wrap">' +
-        '<button type="button" class="p s" id="azk_preview_popup" style="flex:1 1 200px;background:linear-gradient(135deg,#d4af6a,#b58938);border-color:#d4af6a;color:#0b1426;font-weight:800">🕌 معاينة الشاشة المنبثقة (زي الأذان) الآن</button>' +
-        '<button type="button" class="p s" id="azk_test_now" style="flex:1 1 190px">📲 إرسال إشعار خارجي للهاتف فوراً</button>' +
+        '<button type="button" class="p s" id="azk_preview_popup" style="flex:1 1 200px;font-weight:700">⏰ معاينة شاشة المهام الناقصة المنبثقة الآن</button>' +
+        '<button type="button" class="p s" id="azk_test_now" style="flex:1 1 190px;background:#16a34a;border-color:#16a34a;color:#fff">📲 إرسال إشعار خارجي للهاتف فوراً</button>' +
         '<button type="button" class="s" id="azk_test_ext" style="flex:1 1 190px">⏳ تجربة من خارج التلفون (بعد 6 ثوانٍ)</button>' +
       '</div>' +
-      '<div id="azk_test_status" class="m" style="margin-top:8px;font-weight:700;color:var(--gold,#c9a24e)"></div>' +
+      '<div id="azk_test_status" class="m" style="margin-top:8px;font-weight:700;color:var(--acc)"></div>' +
     '</div>' +
 
     // 2) بطاقة التحكم التفصيلي الكامل بالجدولة والشاشة المنبثقة والصوت والفلترة
     '<div class="card" style="margin-bottom:14px">' +
       '<h3>⚙️ التحكم الكامل بتفاصيل التنبيهات الدورية والشاشة المنبثقة</h3>' +
-      (locked ? '<div style="background:rgba(212,175,106,.15);border:1px solid var(--gold);padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:12.5px">🔒 <b>تم ضبط وتثبيت هذه الإعدادات مركزياً من قِبل الإدارة لجميع الموظفين.</b> يمكنك معاينة الشاشة المنبثقة أو تجربة الصوت من الأزرار أعلاه.</div>' : '') +
+      (locked ? '<div style="background:var(--accsoft);border:1px solid var(--acc);padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:12.5px">🔒 <b>تم ضبط وتثبيت هذه الإعدادات مركزياً من قِبل الإدارة لجميع الموظفين.</b> يمكنك معاينة الشاشة المنبثقة أو تجربة الصوت من الأزرار أعلاه.</div>' : '') +
 
       (adm ? (
-        '<div style="background:rgba(212,175,106,.1);border:1.5px solid var(--gold,#c9a24e);padding:10px 12px;border-radius:12px;margin-bottom:12px">' +
-          '<div style="font-weight:700;font-size:13.5px;margin-bottom:6px;color:var(--gold,#c9a24e)">👑 صلاحيات التحكم الإداري الشامل (للمدير):</div>' +
+        '<div style="background:var(--accsoft);border:1.5px solid var(--acc);padding:10px 12px;border-radius:12px;margin-bottom:12px">' +
+          '<div style="font-weight:700;font-size:13.5px;margin-bottom:6px;color:var(--acc)">👑 صلاحيات التحكم الإداري الشامل (للمدير):</div>' +
           '<div class="row" style="gap:14px;flex-wrap:wrap">' +
             '<label class="chk"><input type="checkbox" id="azk_global_all" ' + (gCfg.enabledForAll ? 'checked' : '') + '> <b>تعميم هذه الإعدادات تلقائياً على جميع الموظفين في كل المتاجر</b></label>' +
             '<label class="chk"><input type="checkbox" id="azk_lock_staff" ' + (gCfg.lockForStaff ? 'checked' : '') + '> <b>🔒 إلزام الموظفين ومنع إيقاف المنبّه من أجهزتهم</b></label>' +
@@ -1232,7 +1232,7 @@ function alertSettingsHtml() {
           '<label style="flex:1 1 240px"><b>1️⃣ نظام توقيت وتكرار التنبيه:</b>' +
             '<select id="azk_mode" style="margin-top:4px"' + disAttr + '>' +
               '<option value="interval"' + (mode === 'interval' ? ' selected' : '') + '>🔁 تكرار دوري بالساعات (الافتراضي: كل 6 ساعات)</option>' +
-              '<option value="scheduled"' + (mode === 'scheduled' ? ' selected' : '') + '>🕘 في ساعات وأوقات ثابتة باليوم (مثل مواقيت الأذان)</option>' +
+              '<option value="scheduled"' + (mode === 'scheduled' ? ' selected' : '') + '>🕘 في ساعات وأوقات ثابتة باليوم</option>' +
               '<option value="once_daily"' + (mode === 'once_daily' ? ' selected' : '') + '>🌅 مرة واحدة فقط كل يوم</option>' +
             '</select>' +
           '</label>' +
@@ -1281,7 +1281,7 @@ function alertSettingsHtml() {
         '<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
           '<label style="flex:1 1 240px">طريقة العرض عند حلول الموعد:' +
             '<select id="azk_popup_mode" style="margin-top:4px"' + disAttr + '>' +
-              '<option value="full"' + (popMode === 'full' ? ' selected' : '') + '>🕌 شاشة منبثقة شاملة بالمهام الناقصة (زي تطبيق الأذان — موصى به)</option>' +
+              '<option value="full"' + (popMode === 'full' ? ' selected' : '') + '>⏰ شاشة منبثقة شاملة بالمهام الناقصة (موصى به)</option>' +
               '<option value="banner"' + (popMode === 'banner' ? ' selected' : '') + '>📌 شريط إشعار علوي مختصر مع زر فتح الشاشة</option>' +
               '<option value="external_only"' + (popMode === 'external_only' ? ' selected' : '') + '>📲 إشعار خارجي في شريط الهاتف فقط (تفتح الشاشة عند النقر عليه)</option>' +
             '</select>' +
@@ -1335,7 +1335,7 @@ function alertSettingsHtml() {
         '<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
           '<label style="flex:1 1 200px">🎵 نوع نغمة المنبّه:' +
             '<select id="azk_tone_style" style="margin-top:4px"' + disAttr + '>' +
-              '<option value="adhan_chime"' + (toneStyle === 'adhan_chime' ? ' selected' : '') + '>🕌 نغمة تذكير روحانية هادئة (بأسلوب الأذان)</option>' +
+              '<option value="adhan_chime"' + (toneStyle === 'adhan_chime' ? ' selected' : '') + '>🎵 نغمة تذكير متدرجة وهادئة</option>' +
               '<option value="classic_bell"' + (toneStyle === 'classic_bell' ? ' selected' : '') + '>🔔 جرس تنبيه كلاسيكي واضح</option>' +
               '<option value="urgent_alarm"' + (toneStyle === 'urgent_alarm' ? ' selected' : '') + '>🚨 رنين منبّه قوي للمهام</option>' +
               '<option value="soft_beep"' + (toneStyle === 'soft_beep' ? ' selected' : '') + '>✨ نبضة خفيفة قصيرة</option>' +
@@ -1379,7 +1379,7 @@ function alertSettingsHtml() {
 
       '<div style="margin-top:12px;padding:12px;border-radius:12px;background:rgba(22,163,74,.1);border:1.5px solid rgba(22,163,74,.4);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
         '<div>' +
-          '<b style="color:#16a34a;font-size:13.5px">🤖 تطبيق أندرويد المستقل للجوال (APK) — يعمل كمنبّه الأذان 24 ساعة</b>' +
+          '<b style="color:#16a34a;font-size:13.5px">🤖 تطبيق أندرويد المستقل للجوال (APK) — تنبيهات نظام فورية 24 ساعة</b>' +
           '<div class="m" style="font-size:12px;margin-top:2px">يعمل في خلفية الهاتف ويفتح شاشة المهام الناقصة المنبثقة حتى لو كان التطبيق مغلقاً تماماً.</div>' +
         '</div>' +
         '<button type="button" class="p s" id="azk_open_apk_dlg" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700">📥 تثبيت تطبيق APK الآن</button>' +

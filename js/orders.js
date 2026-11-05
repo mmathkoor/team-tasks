@@ -46,7 +46,7 @@ function orderMsg(o, imgMap) {
   const cur = bcurr(o), stName = bn(o), map = imgMap || {};
   const catKey = orderCatOf(o), catM = orderCatMeta(o);
   const L = oItems(o.id).map(i => {
-    const u = i.image_path ? (map[i.image_path] || '') : '';
+    const u = i.image_path ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, i.image_path) : '') || map[i.image_path] || '') : '';
     return '▫️ *' + i.name + '* × ' + (+i.qty) +
       (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') +
       (u ? '\n    📷 صورة المنتج: ' + u : '');
@@ -71,7 +71,7 @@ const bphone = o => bProf(o).phone || (S.ordSet && S.ordSet.store_phone) || BRAN
 const baddr = o => bProf(o).address || (S.ordSet && S.ordSet.store_address) || BRAND.address;
 const bcurr = o => bProf(o).currency || BRAND.currency || 'ر.ي';
 const INV_TEMPLATES = {
-  navy: { id: 'navy', label: '🏛️ الكحلي الرسمي (إبداع)', accent: '#1e2f4d' },
+  navy: { id: 'navy', label: '📘 الكحلي الرسمي (إبداع)', accent: '#1e2f4d' },
   orange: { id: 'orange', label: '🧡 البرتقالي العصري (مبيعات)', accent: '#f28b30' },
   yellow: { id: 'yellow', label: '💛 الأصفر والأسود الهندسي', accent: '#facc15' },
   royal: { id: 'royal', label: '👑 الملكي الذهبي الفاخر', accent: '#c9a24e' }
@@ -915,15 +915,35 @@ function orderDialog(o) {
   $('o_fee').oninput = $('o_dc').oninput = calc;
   $('o_st').onchange = syncSt;
   $('o_rep').onchange = () => { if ($('o_rep').value && $('o_st').value === 'new') $('o_st').value = 'preparing'; };
-  $('o_ph').onchange = () => {   // عميل سابق: تعبئة تلقائية + مديونيته
-    const d = digits($('o_ph').value); if (d.length < 6) { $('o_info').textContent = ''; return; }
-    const prev = (S.orders || []).filter(r => digits(r.phone) === d && (!edit || r.id !== o.id)), live = prev.filter(r => r.status !== 'cancelled');
-    if (!prev.length) { $('o_info').textContent = ''; return; }
+  const autoFillCustomer = byField => {   // عميل سابق: تعبئة تلقائية ثنائية الاتجاه (بالرقم أو بالاسم) + مديونيته
+    const phRaw = $('o_ph').value.trim(), d = digits(phRaw), nmVal = $('o_nm').value.trim();
+    let prev = [];
+    if (byField === 'phone' || (d.length >= 6 && !byField)) {
+      if (d.length >= 6) prev = (S.orders || []).filter(r => { const rd = digits(r.phone); return rd && (rd === d || rd.endsWith(d) || d.endsWith(rd)) && (!edit || r.id !== o.id); });
+    }
+    if (!prev.length && nmVal.length >= 2 && (byField === 'name' || !byField)) {
+      const nl = nmVal.toLowerCase();
+      prev = (S.orders || []).filter(r => String(r.customer_name || '').trim().toLowerCase() === nl && (!edit || r.id !== o.id));
+    }
+    if (!prev.length) { if (d.length < 6 && nmVal.length < 2) $('o_info').textContent = ''; return; }
+    const live = prev.filter(r => r.status !== 'cancelled');
     const last = prev[0], debt = live.reduce((a, r) => a + Math.max(0, +r.balance), 0);
-    if (!$('o_nm').value.trim()) $('o_nm').value = last.customer_name; if (!$('o_ad').value.trim()) $('o_ad').value = last.address || '';
-    $('o_info').innerHTML = '👤 عميل سابق: <b>' + live.length + '</b> طلبات' + (debt > 0 ? ' · <span style="color:var(--late)">عليه مديونية ' + money(debt) + ' ' + esc(cur) + '</span>' : ' · لا مديونية ✓');
+    if (byField === 'phone' && !$('o_nm').value.trim() && last.customer_name) $('o_nm').value = last.customer_name;
+    if (byField === 'name' && !$('o_ph').value.trim() && last.phone) $('o_ph').value = last.phone;
+    if (!$('o_ad').value.trim() && last.address) $('o_ad').value = last.address;
+    if (!$('o_ch').value && last.channel) $('o_ch').value = last.channel;
+    if (!edit && !$('o_fee').value && +last.delivery_fee > 0) { $('o_fee').value = +last.delivery_fee; calc(); }
+    if (!edit && !$('o_rep').value && last.rep_email && (S.reps || []).some(r => same(r.email, last.rep_email))) {
+      $('o_rep').value = last.rep_email;
+      if ($('o_st').value === 'new') $('o_st').value = 'preparing';
+    }
+    $('o_info').innerHTML = '👤 عميل سابق (' + esc(last.customer_name) + '): <b>' + live.length + '</b> طلبات' + (debt > 0 ? ' · <span style="color:var(--late)">عليه مديونية ' + money(debt) + ' ' + esc(cur) + '</span>' : ' · لا مديونية ✓');
   };
-  if (edit) { $('o_ph').onchange(); }
+  $('o_ph').oninput = () => { if (digits($('o_ph').value).length >= 7) autoFillCustomer('phone'); };
+  $('o_ph').onchange = () => autoFillCustomer('phone');
+  $('o_nm').oninput = () => autoFillCustomer('name');
+  $('o_nm').onchange = () => autoFillCustomer('name');
+  if (edit) { autoFillCustomer(); }
   const drawPays = () => {
     const P = oPays(o.id), bal = +(oOf(o.id) || o).balance;
     $('o_pays').innerHTML = '<h3 class="oh">💰 الدفعات</h3>' + (P.length ? P.map(p => '<div class="bar pr-r"><span>' + money(p.amount) + ' ' + esc(cur) + ' <span class="m">· ' + esc(p.method || '') + ' · ' + esc(p.paid_on) + (p.note ? ' · ' + esc(p.note) : '') + '</span></span>' + (isAdmin() || same(p.created_by, S.me.email) ? '<button class="s" data-dp="' + p.id + '" aria-label="حذف الدفعة">✕</button>' : '') + '</div>').join('') : '<div class="m">لا توجد دفعات.</div>') +

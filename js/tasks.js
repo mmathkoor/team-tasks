@@ -234,7 +234,7 @@ function buildTaskWaSingleMsg(t, tone = 'auto') {
     '📌 *المهمة:* ' + t.title,
     '🔄 *المرحلة الحالية:* ' + m.stageName + m.pgTxt + m.ckTxt + m.wfStep,
     pr ? '⚡ *الأولوية:* ' + pr : '',
-    mt ? '🏛️ *المشروع / الاجتماع:* ' + mt.title : '',
+    mt ? '📁 *المشروع / الاجتماع:* ' + mt.title : '',
     t.due_on ? ('📅 *تاريخ الاستحقاق:* ' + t.due_on + (m.isLate ? ' (🚨 متأخرة منذ ' + m.lateDays + ' يوم)' : m.remDays === 0 ? ' (🔥 اليوم)' : m.remDays === 1 ? ' (⏱️ غداً)' : '')) : '',
     '━━━━━━━━━━━━━━',
     actionLine
@@ -513,7 +513,7 @@ function card(t) {
     : '<span class="chip" style="font-weight:700;font-size:11.5px">👤 على: ' + esc(nm(t.assignee_email)) + '</span>';
 
   const asDep = !t.for_all && t.assignee_email && typeof memberDept === 'function' ? memberDept(t.assignee_email) : '';
-  let metaDep = asDep ? '<span class="chip">🏛️ ' + esc(asDep) + '</span>' : '';
+  let metaDep = asDep ? '<span class="chip">🗂️ ' + esc(asDep) + '</span>' : '';
   let metaD = d ? '<span class="chip ' + d.c + '" style="font-size:11px">' + esc(d.t) + '</span>' : '';
   let metaMt = mt ? '<span class="chip">📌 ' + esc(mt.title) + '</span>' : '';
 
@@ -680,7 +680,7 @@ function boardView() {
   const activeCnt = activeTaskFiltersCount();
 
   let mtOpts = '<option value="">📁 كل المشاريع/الاجتماعات</option>' + S.meetings.map(m => '<option value="' + m.id + '" ' + (S.meeting === m.id ? 'selected' : '') + '>' + esc(m.title) + '</option>').join('');
-  let depOpts = '<option value="">🏛️ كل الإدارات والأقسام</option>' + deps.map(d => '<option value="' + esc(d) + '" ' + (same(S.dept, d) ? 'selected' : '') + '>🏛️ ' + esc(d) + '</option>').join('');
+  let depOpts = '<option value="">🗂️ كل الإدارات والأقسام</option>' + deps.map(d => '<option value="' + esc(d) + '" ' + (same(S.dept, d) ? 'selected' : '') + '>🗂️ ' + esc(d) + '</option>').join('');
   let empOpts = '<option value="">👤 كل الموظفين</option>' +
     '<option value="_all_team"' + (tf.emp === '_all_team' ? ' selected' : '') + '>👥 مهام جماعية (الفريق)</option>' +
     '<option value="_unassigned"' + (tf.emp === '_unassigned' ? ' selected' : '') + '>⏳ غير مسندة</option>' +
@@ -974,13 +974,13 @@ function taskDialog(t, pre = {}) {
 
   const empCheckboxes = S.members.map(m => {
     const dep = typeof memberDept === 'function' ? memberDept(m.email) : '';
-    const sub = [dep ? '🏛️ ' + dep : '', m.title || ''].filter(Boolean).join(' · ');
+    const sub = [dep ? '🗂️ ' + dep : '', m.title || ''].filter(Boolean).join(' · ');
     const isChecked = asVal === '__all' || same(m.email, asVal);
     return '<label class="emp-chk"><input type="checkbox" class="f_emp_cb" value="' + esc(m.email) + '" data-dep="' + esc(dep) + '"' + (isChecked ? ' checked' : '') + '><div><b>' + esc(m.name) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div></label>';
   }).join('');
 
-  const depQuickBtns = deps.length ? '<div class="dep-picks"><span class="m" style="font-size:12px">🏛️ تحديد قسم كامل:</span>' +
-    deps.map(d => '<button type="button" class="s dep-btn" data-dep-pick="' + esc(d) + '">🏛️ ' + esc(d) + '</button>').join('') + '</div>' : '';
+  const depQuickBtns = deps.length ? '<div class="dep-picks"><span class="m" style="font-size:12px">🗂️ تحديد قسم كامل:</span>' +
+    deps.map(d => '<button type="button" class="s dep-btn" data-dep-pick="' + esc(d) + '">🗂️ ' + esc(d) + '</button>').join('') + '</div>' : '';
 
   const cleanTaskNotes = String(x.notes || '').replace(/\[شركة:\s*[^\]]+\]\n?/g, '').trim();
 

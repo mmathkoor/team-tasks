@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
       if (!targetSubs.length) {
         return res.status(200).json({ success: true, sent: 0, message: 'لا يوجد اشتراك إشعارات مسجّل لهذا الجهاز بعد' });
       }
-      const title = q.title || (isTest ? '🕌 تذكير المهام الناقصة (بأسلوب الأذان)' : '🕌 تذكير بالمهام الناقصة');
+      const title = q.title || (isTest ? '⏰ تذكير المهام الناقصة الدوري' : '⏰ تذكير بالمهام الناقصة');
       const body = q.body || (isTest ? 'وصلك هذا الإشعار بنجاح وأنت خارج التطبيق على شاشة الجوال!' : 'لديك مهام غير منجزة بانتظار المتابعة');
       const payload = JSON.stringify({
         title,
@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
         task_title: q.task_title || undefined,
         is_azkar_remind: true,
         actions: [
-          { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+          { action: 'open_popup', title: '⏰ شاشة المهام الناقصة' },
           ...(q.task_id ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
           { action: 'snooze', title: '⏰ غفوة ساعة' }
         ]
@@ -126,8 +126,8 @@ module.exports = async (req, res) => {
       const sample = allInc.slice(0, 4);
       const firstTask = sample[0];
       const title = info.late.length > 0
-        ? ('🕌 تذكير: لديك ' + allInc.length + ' مهام ناقصة (' + info.late.length + ' متأخرة)')
-        : ('🕌 تذكير دوري: لديك ' + allInc.length + ' مهام غير منجزة');
+        ? ('⏰ تذكير: لديك ' + allInc.length + ' مهام ناقصة (' + info.late.length + ' متأخرة)')
+        : ('⏰ تذكير دوري: لديك ' + allInc.length + ' مهام غير منجزة');
       const body = '• ' + sample.map(t => t.title).join('\n• ');
       const payload = JSON.stringify({
         title,
@@ -138,7 +138,7 @@ module.exports = async (req, res) => {
         for_all: firstTask ? !!firstTask.for_all : false,
         is_azkar_remind: true,
         actions: [
-          { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+          { action: 'open_popup', title: '⏰ شاشة المهام الناقصة' },
           ...(firstTask ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
           { action: 'snooze', title: '⏰ غفوة ساعة' }
         ]

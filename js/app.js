@@ -1,12 +1,23 @@
 async function init() {
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    let { data: { session } } = await sb.auth.getSession();
+    if ((!session || !session.user || !session.user.email) && typeof idbGet === 'function') {
+      const idbSess = await idbGet('sbs');
+      if (idbSess && idbSess.access_token) {
+        saveS(idbSess);
+        session = idbSess;
+      }
+    }
+    if ((!session || !session.user || !session.user.email) && typeof silentReauth === 'function') {
+      const reSess = await silentReauth();
+      if (reSess && reSess.access_token) session = reSess;
+    }
     if (!session || !session.user || !session.user.email) {
-      saveS(null);
       return loginView();
     }
     const email = session.user.email;
-    idbSet('sbs', session); idbSet('cfg', { url: API, key: KEY, name: (S.me && S.me.name) || email });
+    saveS(session);
+    idbSet('cfg', { url: API, key: KEY, name: (S.me && S.me.name) || email });
     
     try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.email === email) { Object.assign(S, c.s); render(); } } catch (e) {}
 
@@ -15,8 +26,8 @@ async function init() {
     
     const me = members.find(m => same(m.email, email));
     if (!members.length || !me) { 
-        saveS(null); 
-        $app.innerHTML = '<div class="card" id="login">حسابك غير مرتبط بالفريق.<br><br><button class="p" onclick="location.reload()">رجوع</button></div>'; 
+        if (S.me && same(S.me.email, email)) { render(); return; }
+        $app.innerHTML = '<div class="card" id="login">حسابك غير مرتبط بالفريق.<br><br><button class="p" onclick="logout()">تسجيل خروج</button></div>'; 
         return; 
     }
     
@@ -119,14 +130,26 @@ function normRepPhoneClient(p) {
 }
 
 function loginView() {
-  $app.innerHTML = '<div class="card" id="login"><h1><svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#0b1426"/><circle cx="32" cy="32" r="21" fill="none" stroke="#d4af6a" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><br>مدير المهام</h1><p class="m">سجّل الدخول برقم الجوال أو البريد الإلكتروني أو اسم المستخدم مع كلمة المرور</p>' +
-  '<div class="row"><input id="em" type="text" autocomplete="username" placeholder="رقم الجوال (77...) أو البريد الإلكتروني أو الاسم" dir="ltr" style="width:100%"></div>' +
-  '<div class="row" style="margin-top:12px;position:relative">' +
-    '<input id="pw" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr" style="width:100%;padding-right:44px;padding-left:12px">' +
-    '<button type="button" id="pw_tog" title="إظهار/إخفاء كلمة المرور" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;padding:4px 8px;font-size:16px;cursor:pointer;color:var(--mute)">👁</button>' +
-  '</div>' +
-  '<button class="p" id="go" style="width:100%;margin-top:16px;padding:12px">تسجيل الدخول</button>' +
-  '<p class="m" id="msg" style="margin-top:12px;color:var(--late);font-size:13px;line-height:1.5"></p></div>';
+  const savedC = typeof loadCreds === 'function' ? loadCreds() : null;
+  const hasBio = typeof bioHasRegistered === 'function' && bioHasRegistered();
+  const bInfo = typeof bioInfo === 'function' ? bioInfo() : null;
+
+  $app.innerHTML = '<div class="card" id="login">' +
+    '<div style="display:flex;justify-content:center;margin-bottom:10px"><svg width="48" height="48" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="#2563eb"/><circle cx="32" cy="32" r="20" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="3"/><path d="M21 33l8 8 15-17" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+    '<h1>مدير المهام</h1><p class="m">سجّل الدخول برقم الجوال أو البريد الإلكتروني أو اسم المستخدم</p>' +
+    '<div class="row"><input id="em" type="text" autocomplete="username" placeholder="رقم الجوال (77...) أو البريد الإلكتروني أو الاسم" dir="ltr" value="' + esc((savedC && savedC.id) || '') + '" style="width:100%"></div>' +
+    '<div class="row" style="margin-top:12px;position:relative">' +
+      '<input id="pw" type="password" autocomplete="current-password" placeholder="كلمة المرور" dir="ltr" value="' + esc((savedC && savedC.pw) || '') + '" style="width:100%;padding-right:44px;padding-left:12px">' +
+      '<button type="button" id="pw_tog" title="إظهار/إخفاء كلمة المرور" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;padding:4px 8px;font-size:16px;cursor:pointer;color:var(--mute)">👁</button>' +
+    '</div>' +
+    '<label class="chk" style="margin:12px 0 4px;font-size:13px;justify-content:flex-start"><input type="checkbox" id="rem_me" checked> حفظ تسجيل الدخول تلقائياً على هذا الجهاز</label>' +
+    '<button class="p" id="go" style="width:100%;margin-top:10px;padding:12px">تسجيل الدخول</button>' +
+    (typeof bioSupported === 'function' && bioSupported() ? (
+      '<button type="button" class="s" id="bio_go" style="width:100%;margin-top:10px;padding:11px;border-color:var(--acc);color:var(--acc);font-weight:700">' +
+        '👆 ' + (hasBio ? ('الدخول السريع بالبصمة' + (bInfo && bInfo.name ? ' (' + esc(bInfo.name) + ')' : '')) : 'تسجيل الدخول بالبصمة / الوجه') +
+      '</button>'
+    ) : '') +
+    '<p class="m" id="msg" style="margin-top:12px;color:var(--late);font-size:13px;line-height:1.5"></p></div>';
 
   if ($('pw_tog')) {
     $('pw_tog').onclick = () => {
@@ -139,13 +162,13 @@ function loginView() {
   const doLogin = async () => {
     $('msg').textContent = 'جارٍ الدخول...'; $('msg').style.color = 'inherit';
     const id = $('em').value.trim(), pw = $('pw').value.trim();
+    const remember = !$('rem_me') || $('rem_me').checked;
     if (!id || !pw) {
       $('msg').textContent = 'الرجاء إدخال البريد / رقم الجوال وكلمة المرور';
       $('msg').style.color = 'var(--late)';
       return;
     }
 
-    // تنبيه لطيف عند وجود خطأ إملائي شائع في النطاق (مثل .ocm بدل .com)
     if (/@.*\.(ocm|con|cpm|vom|cm)$/i.test(id)) {
       $('msg').textContent = '⚠️ يبدو أن هناك خطأ في كتابة نهاية البريد (كتبت ' + id.split('@')[1] + ' بدلاً من com). تحقّق من الإملاء أو جرّب الدخول برقم الجوال مباشرة.';
       $('msg').style.color = 'var(--soon)';
@@ -154,17 +177,16 @@ function loginView() {
     let error = null;
     let loggedIn = false;
 
-    // 1) محاولة الدخول المباشر إذا كان المدخل بريداً إلكترونياً
     if (id.includes('@')) {
       const res = await sb.auth.signInWithPassword({ email: id, password: pw });
       if (!res.error) {
+        if (remember && typeof saveCreds === 'function') saveCreds(id, pw, id);
         loggedIn = true;
         return;
       } else {
         error = res.error;
       }
     } else {
-      // تجربة الكاش المحلي للمناديب والموظفين للدخول السريع
       const normP = normRepPhoneClient(id);
       const rawD = id.replace(/\D/g, '');
       let cachedDir = [];
@@ -181,11 +203,14 @@ function loginView() {
 
       for (const candEmail of directCandidates) {
         const res = await sb.auth.signInWithPassword({ email: candEmail, password: pw });
-        if (!res.error) { loggedIn = true; break; }
+        if (!res.error) {
+          if (remember && typeof saveCreds === 'function') saveCreds(id, pw, candEmail);
+          loggedIn = true;
+          break;
+        }
       }
     }
 
-    // 2) إذا لم ينجح الدخول المباشر، نستعين بخادم المصادقة الذكي /api/rep-login للتحقق بالاسم أو رقم الجوال أو البريد
     if (!loggedIn) {
       try {
         const r = await fetch('/api/rep-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: id, password: pw }) });
@@ -194,6 +219,7 @@ function loginView() {
         if (r.ok && sess) {
           sess.expires_at = sess.expires_at || Math.floor(Date.now() / 1000) + (sess.expires_in || 3600);
           saveS(sess);
+          if (remember && typeof saveCreds === 'function') saveCreds(id, pw, j.email || (sess.user && sess.user.email) || id);
           init();
           loggedIn = true;
           error = null;
@@ -216,8 +242,32 @@ function loginView() {
   };
   $('go').onclick = doLogin;
   $('pw').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+  if ($('bio_go')) {
+    $('bio_go').onclick = async () => {
+      if (!hasBio) {
+        $('msg').textContent = '💡 سجّل دخولك أولاً بكلمة المرور ثم فعّل البصمة من (الإعدادات ← الدخول بالبصمة) لتتمكن من الدخول الفوري بالبصمة دائماً.';
+        $('msg').style.color = 'var(--acc)';
+        return;
+      }
+      try {
+        $('msg').textContent = '👆 جارٍ التحقق من البصمة...';
+        $('msg').style.color = 'inherit';
+        await bioVerifyAndLogin();
+        await init();
+      } catch (e) {
+        $('msg').textContent = e.message || 'تعذّر الدخول بالبصمة';
+        $('msg').style.color = 'var(--late)';
+      }
+    };
+  }
 }
-const logout = async () => { await sb.auth.signOut(); localStorage.clear(); location.reload(); };
+const logout = async () => {
+  await sb.auth.signOut();
+  if (typeof clearS === 'function') clearS();
+  if (typeof clearCreds === 'function') clearCreds();
+  try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+  location.reload();
+};
 
 function render() {
   if (S.me && S.me.role === 'rep') return repRender();

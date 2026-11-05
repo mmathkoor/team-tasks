@@ -62,7 +62,8 @@ function repMsg(o) {
     '',
     '📋 *قائمة التجهيز:*'
   ].concat((o.items || []).map(i => {
-    const u = repImgUrl(i.image || i.image_path);
+    const rawPath = i.image || i.image_path;
+    const u = rawPath ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath) : '') || repImgUrl(rawPath)) : '';
     return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') + (u ? '\n    📷 صورة المنتج: ' + u : '');
   }))
   .concat(cn ? ['', '⚠️ *ملاحظات هامة:* ' + cn] : [])

@@ -1,5 +1,5 @@
-// Build version: 5.5.0 (timestamp: 2026-10-30)
-const SW_BUILD_VERSION = '5.5.0';
+// Build version: 6.0.0 (timestamp: 2026-11-05)
+const SW_BUILD_VERSION = '6.0.0';
 
 try { importScripts('/js/version.js'); } catch (e) {}
 const C = 'tasks-' + (typeof VERSION !== 'undefined' ? VERSION : SW_BUILD_VERSION);
@@ -162,16 +162,16 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
     if (!slotKey) return;
   }
 
-  let title = '🕌 تذكير بالمهام الناقصة (' + (incompleteCount || lateCount) + ' مهام)';
+  let title = '⏰ تذكير بالمهام الناقصة (' + (incompleteCount || lateCount) + ' مهام)';
   let body = '';
   if (lateCount > 0) {
-    title = '🕌 تذكير: لديك ' + incompleteCount + ' مهام ناقصة (' + lateCount + ' متأخرة)';
+    title = '⏰ تذكير: لديك ' + incompleteCount + ' مهام ناقصة (' + lateCount + ' متأخرة)';
     body = '• ' + sampleTitles.slice(0, 4).join('\n• ');
   } else if (incompleteCount > 0) {
-    title = '🕌 تذكير دوري: لديك ' + incompleteCount + ' مهام غير منجزة';
+    title = '⏰ تذكير دوري: لديك ' + incompleteCount + ' مهام غير منجزة';
     body = '• ' + sampleTitles.slice(0, 4).join('\n• ');
   } else {
-    title = '🕌 تذكير المهام الناقصة (بأسلوب الأذان)';
+    title = '⏰ تذكير المهام الناقصة الدوري';
     body = 'اضغط لفتح شاشة المهام الناقصة المنبثقة ومراجعة مهامك!';
   }
 
@@ -191,7 +191,7 @@ async function showOverdueAzkarNotification(forceTest, delayMs) {
     tag: 'azkar-overdue-remind',
     timestamp: Date.now(),
     actions: [
-      { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+      { action: 'open_popup', title: '⏰ شاشة المهام الناقصة' },
       ...(firstTaskId ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
       { action: 'snooze', title: '⏰ غفوة ساعة' }
     ],
@@ -230,7 +230,7 @@ self.addEventListener('push', e => {
     : (d.task_id ? 'task-' + d.task_id + '-' + Math.floor(Date.now() / 1000) : 'msg-' + Date.now());
   e.waitUntil((async () => {
     const actions = d.actions && d.actions.length ? d.actions : (isAzkar ? [
-      { action: 'open_popup', title: '🕌 شاشة المهام الناقصة' },
+      { action: 'open_popup', title: '⏰ شاشة المهام الناقصة' },
       ...(d.task_id ? [{ action: 'done', title: '✅ إنجاز الأولى' }] : []),
       { action: 'snooze', title: '⏰ غفوة ساعة' }
     ] : []);

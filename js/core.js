@@ -1,18 +1,76 @@
 const norm = s => String(s ?? '').trim().toLowerCase();
 let AUTH = { s: null };
-try { AUTH.s = JSON.parse(localStorage.getItem('sbs') || 'null'); } catch(e){}
-const saveS = s => { AUTH.s = s; s ? localStorage.setItem('sbs', JSON.stringify(s)) : localStorage.removeItem('sbs'); idbSet('sbs', s || null); };
+try { AUTH.s = JSON.parse(localStorage.getItem('sbs') || localStorage.getItem('sbs_backup') || 'null'); } catch(e){}
+const saveS = s => {
+  AUTH.s = s;
+  if (s) {
+    const raw = JSON.stringify(s);
+    try { localStorage.setItem('sbs', raw); localStorage.setItem('sbs_backup', raw); } catch (e) {}
+    if (typeof idbSet === 'function') idbSet('sbs', s);
+  }
+};
+const clearS = () => {
+  AUTH.s = null;
+  try { localStorage.removeItem('sbs'); localStorage.removeItem('sbs_backup'); } catch (e) {}
+  if (typeof idbSet === 'function') idbSet('sbs', null);
+};
 
+const CREDS_KEY = 'tt_saved_creds_v1';
+function saveCreds(identifier, password, email) {
+  try {
+    if (!identifier || !password) return;
+    localStorage.setItem(CREDS_KEY, btoa(unescape(encodeURIComponent(JSON.stringify({ id: identifier, pw: password, em: email || identifier, t: Date.now() })))));
+  } catch (e) {}
+}
+function loadCreds() {
+  try {
+    const raw = localStorage.getItem(CREDS_KEY);
+    if (!raw) return null;
+    return JSON.parse(decodeURIComponent(escape(atob(raw))));
+  } catch (e) { return null; }
+}
+function clearCreds() {
+  try { localStorage.removeItem(CREDS_KEY); } catch (e) {}
+}
+
+async function silentReauth() {
+  const c = loadCreds();
+  if (!c || !c.id || !c.pw) return null;
+  try {
+    if (String(c.id).includes('@')) {
+      const r = await fetch(API + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: c.id.trim(), password: c.pw.trim() }) });
+      const j = await r.json();
+      if (r.ok && j && j.access_token) { j.expires_at = Math.floor(Date.now() / 1000) + (j.expires_in || 3600); saveS(j); return j; }
+    }
+    const r2 = await fetch('/api/rep-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: c.id, password: c.pw }) });
+    const j2 = await r2.json().catch(() => ({}));
+    const sess = (j2 && j2.session && j2.session.access_token) ? j2.session : (j2 && j2.access_token ? j2 : null);
+    if (r2.ok && sess) { sess.expires_at = Math.floor(Date.now() / 1000) + (sess.expires_in || 3600); saveS(sess); return sess; }
+  } catch (e) {}
+  return null;
+}
 
 async function tok() {
-  const s = AUTH.s;
-  if (!s) return KEY;
-  if (s.expires_at && s.expires_at - 60 > Date.now() / 1000) return s.access_token;
+  let s = AUTH.s;
+  if (!s && typeof idbGet === 'function') {
+    try { s = await idbGet('sbs'); if (s && s.access_token) saveS(s); } catch (e) {}
+  }
+  if (!s) {
+    s = await silentReauth();
+    if (!s) return KEY;
+  }
+  if (s.expires_at && s.expires_at - 90 > Date.now() / 1000) return s.access_token;
   try {
     const r = await fetch(API + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
     const j = await r.json();
-    if (!r.ok) { saveS(null); return KEY; }
-    j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; saveS(j); return j.access_token;
+    if (r.ok && j && j.access_token) {
+      j.expires_at = Math.floor(Date.now() / 1000) + (j.expires_in || 3600);
+      saveS(j);
+      return j.access_token;
+    }
+    const re = await silentReauth();
+    if (re && re.access_token) return re.access_token;
+    return s.access_token || KEY;
   } catch (e) { return s?.access_token || KEY; }
 }
 
@@ -979,3 +1037,109 @@ async function fetchAll(table, ord, max = 10000) {
   }
   return { data: out, error: null };
 }
+
+// ===== الدخول بالبصمة / الوجه (WebAuthn Biometric Authentication) =====
+const BIO_KEY = 'tt_bio_auth_v1';
+function bioSupported() {
+  return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && navigator.credentials.get);
+}
+function bioHasRegistered() {
+  try {
+    const d = JSON.parse(localStorage.getItem(BIO_KEY) || 'null');
+    return !!(d && d.credId && d.email);
+  } catch (e) { return false; }
+}
+function bioInfo() {
+  try { return JSON.parse(localStorage.getItem(BIO_KEY) || 'null'); } catch (e) { return null; }
+}
+function bufToB64u(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64uToBuf(b64u) {
+  const b64 = String(b64u || '').replace(/-/g, '+').replace(/_/g, '/');
+  const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+  const bin = atob(b64 + pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+async function bioRegister() {
+  if (!bioSupported()) throw new Error('جهازك أو متصفحك لا يدعم البصمة (WebAuthn)');
+  if (!S.me || !S.me.email) throw new Error('سجّل الدخول أولاً لتفعيل البصمة');
+  const challenge = new Uint8Array(32);
+  crypto.getRandomValues(challenge);
+  const userId = new TextEncoder().encode(S.me.email);
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: (typeof appName === 'function' ? appName() : 'مدير المهام') },
+      user: { id: userId, name: S.me.email, displayName: S.me.name || S.me.email },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { userVerification: 'required' },
+      timeout: 60000
+    }
+  });
+  if (!cred || !cred.rawId) throw new Error('لم يكتمل تسجيل البصمة');
+  const payload = {
+    credId: bufToB64u(cred.rawId),
+    email: S.me.email,
+    name: S.me.name || S.me.email,
+    session: AUTH.s,
+    creds: loadCreds(),
+    at: new Date().toISOString()
+  };
+  localStorage.setItem(BIO_KEY, JSON.stringify(payload));
+  await idbSet(BIO_KEY, payload);
+  return true;
+}
+async function bioVerifyAndLogin() {
+  let info = bioInfo();
+  if (!info && typeof idbGet === 'function') info = await idbGet(BIO_KEY);
+  if (!info || !info.credId) throw new Error('لم يتم تفعيل البصمة على هذا الجهاز بعد');
+  const challenge = new Uint8Array(32);
+  crypto.getRandomValues(challenge);
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      allowCredentials: [{ type: 'public-key', id: b64uToBuf(info.credId) }],
+      userVerification: 'required',
+      timeout: 60000
+    }
+  });
+  if (!assertion) throw new Error('فشل التحقق من البصمة');
+  if (info.creds && info.creds.id && info.creds.pw) {
+    saveCreds(info.creds.id, info.creds.pw, info.email);
+  }
+  if (info.session && info.session.refresh_token) {
+    saveS(info.session);
+    const t = await tok();
+    if (t && t !== KEY) return true;
+  }
+  const re = await silentReauth();
+  if (re && re.access_token) return true;
+  if (info.session) { saveS(info.session); return true; }
+  throw new Error('انتهت صلاحية الجلسة المحفوظة، يرجى إدخال كلمة المرور مرة واحدة لتجديد البصمة');
+}
+function bioRemove() {
+  try { localStorage.removeItem(BIO_KEY); } catch (e) {}
+  if (typeof idbSet === 'function') idbSet(BIO_KEY, null);
+}
+
+// اختصار رابط صورة الصنف لإرساله للمندوب
+function shortImgUrl(itemId, imagePath) {
+  if (!imagePath) return '';
+  const origin = location.origin;
+  if (itemId && String(itemId).length >= 8) {
+    return origin + '/i/' + String(itemId).slice(0, 8);
+  }
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(imagePath))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return origin + '/i/' + b64;
+  } catch (e) {
+    return '';
+  }
+}
+

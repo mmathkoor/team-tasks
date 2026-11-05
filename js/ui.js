@@ -171,11 +171,11 @@ function greetingText() {
 function companyLogoHtml(coName, size = 42) {
   const p = typeof getCompanyProfile === 'function' ? getCompanyProfile(coName) : {};
   if (p && p.logo) {
-    return '<img src="' + esc(p.logo) + '" alt="' + esc(p.displayName || coName || '') + '" class="co-logo-img" style="width:' + size + 'px;height:' + size + 'px;object-fit:cover;border-radius:12px;border:1.5px solid ' + esc(p.accent || '#d4af6a') + ';background:#fff;flex:none">';
+    return '<img src="' + esc(p.logo) + '" alt="' + esc(p.displayName || coName || '') + '" class="co-logo-img" style="width:' + size + 'px;height:' + size + 'px;object-fit:cover;border-radius:12px;border:1.5px solid ' + esc(p.accent || '#2563eb') + ';background:#fff;flex:none">';
   }
-  const bg = (p && p.color) || '#0b1426';
-  const ac = (p && p.accent) || '#d4af6a';
-  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="' + esc(bg) + '"/><circle cx="32" cy="32" r="21" fill="none" stroke="' + esc(ac) + '" stroke-width="3.5"/><path d="M21 33l8 8 15-17" fill="none" stroke="#f3d78a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const bg = (p && p.color && p.color !== '#0b1426') ? p.color : '#2563eb';
+  const ac = (p && p.accent && p.accent !== '#d4af6a') ? p.accent : '#ffffff';
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true" style="flex:none"><rect width="64" height="64" rx="16" fill="' + esc(bg) + '"/><circle cx="32" cy="32" r="21" fill="none" stroke="' + esc(ac) + '" stroke-width="3" stroke-opacity="0.35"/><path d="M21 33l8 8 15-17" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 function headerHtml() {
   let d = '';
@@ -210,7 +210,7 @@ function headerHtml() {
       netBadgeHtml +
       '<button id="apk_dl_btn" type="button" class="s apk-pill" title="تثبيت تطبيق أندرويد المستقل (APK) المباشر من GitHub">🤖 <span>تطبيق APK</span></button>' +
       '<button id="ver_badge_btn" class="s ver-pill" title="إصدار النظام v' + VERSION + ' - انقر للتحديث الفوري ومسح الكاش">v' + VERSION + ' ↻</button>' +
-      '<button id="azkar_hdr_btn" type="button" class="s iconbtn" title="شاشة المهام الناقصة المنبثقة (تذكير كل 6 ساعات)">🕌' + (incCnt > 0 ? '<span class="bn">' + incCnt + '</span>' : '') + '</button>' +
+      '<button id="azkar_hdr_btn" type="button" class="s iconbtn" title="شاشة المهام الناقصة المنبثقة (تذكير كل 6 ساعات)">⏰' + (incCnt > 0 ? '<span class="bn">' + incCnt + '</span>' : '') + '</button>' +
       '<button id="thm" class="s iconbtn" aria-label="المظهر" title="المظهر: ' + THEME_L[curTheme()] + '">' + THEME_I[curTheme()] + '</button>' +
       '<button id="bell" class="s iconbtn" aria-label="صندوق التنبيهات" title="التنبيهات">🔔<span class="bn" hidden></span></button>' +
       '<button id="rf" class="s iconbtn" aria-label="تحديث البيانات" title="تحديث">↻</button>' +

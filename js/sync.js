@@ -9,8 +9,14 @@ async function enqueue(it) {
   it.i = Date.now() + '' + Math.random();
   await idbSet('q', ((await idbGet('q')) || []).concat(it)); updateNet(); if (navigator.onLine) setTimeout(flushNow, 1200); requestFlush();
 }
-async function apiPost(path, body) { return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await tok() }, body }); }
-async function apiGet(path) { return fetch(path, { headers: { Authorization: 'Bearer ' + await tok() } }); }
+async function apiPost(path, body) {
+  const em = (typeof S !== 'undefined' && S.me && S.me.email) || (typeof AUTH !== 'undefined' && AUTH.s && AUTH.s.user && AUTH.s.user.email) || '';
+  return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await tok(), 'X-User-Email': em }, body });
+}
+async function apiGet(path) {
+  const em = (typeof S !== 'undefined' && S.me && S.me.email) || (typeof AUTH !== 'undefined' && AUTH.s && AUTH.s.user && AUTH.s.user.email) || '';
+  return fetch(path, { headers: { Authorization: 'Bearer ' + await tok(), 'X-User-Email': em } });
+}
 async function flushNow() {
   const go = async () => {
     const q = (await idbGet('q')) || []; if (!q.length) return;

@@ -1,7 +1,8 @@
 // ===== إعدادات الطلبات للمدير: المندوبون (بالجوال) + هوية المتجر + سعر الشراء + مدة حفظ الصور =====
 const genPw = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; const a = new Uint32Array(10); crypto.getRandomValues(a); a.forEach(x => { s += c[x % c.length]; }); return s; };
 async function repApi(body) {
-  try { const r = await apiPost('/api/rep-admin', JSON.stringify(body)); const j = await r.json().catch(() => ({})); return r.ok ? { ok: true, j } : { ok: false, error: j.error || ('خطأ ' + r.status) }; }
+  const payload = Object.assign({ _caller_email: S.me && S.me.email }, body || {});
+  try { const r = await apiPost('/api/rep-admin', JSON.stringify(payload)); const j = await r.json().catch(() => ({})); return r.ok ? { ok: true, j } : { ok: false, error: j.error || ('خطأ ' + r.status) }; }
   catch (e) { return { ok: false, error: 'تعذّر الاتصال' }; }
 }
 function repsCardHtml() {
@@ -93,7 +94,7 @@ function ordSettingsOnlyHtml() {
     '</div>' +
     '<div class="row" style="margin-top:8px">' +
       '<label style="flex:1 1 180px">🎨 تصميم وقالب الفاتورة المعتمد<select id="os_inv_tpl">' +
-        '<option value="navy"' + ((p.invoiceTemplate || 'navy') === 'navy' ? ' selected' : '') + '>🏛️ الكحلي الرسمي (إبداع)</option>' +
+        '<option value="navy"' + ((p.invoiceTemplate || 'navy') === 'navy' ? ' selected' : '') + '>📘 الكحلي الرسمي (إبداع)</option>' +
         '<option value="orange"' + (p.invoiceTemplate === 'orange' ? ' selected' : '') + '>🧡 البرتقالي العصري (مبيعات)</option>' +
         '<option value="yellow"' + (p.invoiceTemplate === 'yellow' ? ' selected' : '') + '>💛 الأصفر والأسود الهندسي</option>' +
         '<option value="royal"' + (p.invoiceTemplate === 'royal' ? ' selected' : '') + '>👑 الملكي الذهبي الفاخر</option>' +
