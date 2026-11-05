@@ -1,8 +1,8 @@
 // ===== التحديث اللحظي (Supabase Realtime عبر WebSocket بدون مكتبات) =====
 const RT = { ws: null, ref: 0, hb: null, tk: null, retry: 0, timer: null, rc: null, dirty: false };
-const RT_BASE = ['tasks', 'task_done', 'proposals', 'votes', 'members', 'notifications'];
-const RT_ORD = ['ord_orders', 'ord_items', 'ord_payments', 'ord_settings'];
-const rtTables = () => (S.me && S.me.role === 'rep') ? ['notifications'] : RT.safe ? RT_BASE : RT_BASE.concat(RT_ORD);
+const RT_BASE = ['tasks', 'task_done', 'proposals', 'votes', 'meetings', 'members', 'notifications'];
+const RT_ORD = ['ord_orders', 'ord_items', 'ord_payments'];
+const rtTables = () => (S.me && S.me.role === 'rep') ? ['notifications'] : RT.safe ? RT_BASE.slice(0, 6) : RT_BASE.concat(RT_ORD);
 function rtStart() {
   if (RT.ws || !S.me || !AUTH.s || !navigator.onLine) return;
   let ws;
@@ -15,22 +15,8 @@ function rtStart() {
     RT.hb = setInterval(() => send('phoenix', 'heartbeat', {}), 25000);
     RT.tk = setInterval(async () => send('realtime:public', 'access_token', { access_token: await tok() }), 10 * 60 * 1000);
   };
-  ws.onmessage = e => {
-    let m; try { m = JSON.parse(e.data); } catch (_) { return; }
-    if (m.event === 'postgres_changes') {
-      try {
-        const d = m.payload && m.payload.data;
-        if (d && d.table === 'notifications' && d.type === 'INSERT' && d.record) {
-          const r = d.record;
-          if (S.me && same(r.to_email, S.me.email) && typeof showAlert === 'function') {
-            showAlert({ title: r.title, body: r.body, task_id: r.task_id, order_id: r.order_id, nid: r.id });
-          }
-        }
-      } catch (err) {}
-      rtChanged();
-    }
-    else if (m.event === 'phx_reply' && m.topic === 'realtime:public' && m.payload && m.payload.status === 'error' && !RT.safe) { RT.safe = true; try { ws.close(); } catch (_) {} }
-  };
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } if (m.event === 'postgres_changes') rtChanged();
+    else if (m.event === 'phx_reply' && m.topic === 'realtime:public' && m.payload && m.payload.status === 'error' && !RT.safe) { RT.safe = true; try { ws.close(); } catch (_) {} } };
   ws.onclose = () => {
     clearInterval(RT.hb); clearInterval(RT.tk); RT.ws = null;
     clearTimeout(RT.rc); RT.rc = setTimeout(rtStart, Math.min(30000, 1500 * Math.pow(2, RT.retry++)));
@@ -40,10 +26,30 @@ function rtStart() {
 function rtChanged() {
   clearTimeout(RT.timer);
   RT.timer = setTimeout(() => {
-    if (document.hidden || (typeof dlg !== 'undefined' && dlg.open) || document.querySelector('.tk.drag')) { RT.dirty = true; return; }
+    if (document.hidden || (typeof dlg !== 'undefined' && dlg.open) || document.querySelector('.tk.drag')) {
+      RT.dirty = true;
+      // حتى لو كانت نافذة مفتوحة، نحدّث صندوق التنبيهات فوراً ليصل الرنين والإشعار
+      sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(40).then(nt => {
+        if (!nt.error && nt.data) { S.notes = nt.data; if (typeof inboxAfterLoad === 'function') inboxAfterLoad(); }
+      }).catch(() => {});
+      return;
+    }
     load();
-  }, 500);
+  }, 400);
 }
+// فحص دوري خفيف للتنبيهات كل 20 ثانية لضمان وصولها حتى لو انقطع WebSocket مؤقتاً على بيانات الجوال
+setInterval(() => {
+  if (!S.me || !navigator.onLine) return;
+  sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(25).then(nt => {
+    if (!nt.error && nt.data) {
+      const prevUnread = (S.notes || []).filter(x => !x.read_at).length;
+      S.notes = nt.data;
+      const curUnread = S.notes.filter(x => !x.read_at).length;
+      if (typeof inboxAfterLoad === 'function') inboxAfterLoad();
+      if (curUnread > prevUnread && !document.hidden && (!dlg || !dlg.open)) load();
+    }
+  }).catch(() => {});
+}, 20000);
 dlg.addEventListener('close', () => { if (RT.dirty) { RT.dirty = false; load(); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rtStart(); });
 window.addEventListener('online', () => { RT.retry = 0; rtStart(); });
