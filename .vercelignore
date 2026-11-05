@@ -1,0 +1,7 @@
+public/
+.aistudio/
+server.js
+tests/
+node_modules/
+.env
+.env.local
