@@ -35,42 +35,15 @@ function inboxDialog() {
   });
   dlg.showModal();
 }
-function fireOsNotification(title, body, tag) {
-  try {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(title, {
-          body: body || '',
-          icon: '/icon-192.png',
-          badge: '/badge-96.png',
-          vibrate: [400, 150, 400, 150, 800],
-          tag: tag || ('nt-' + Date.now()),
-          renotify: true
-        }).catch(() => {});
-      }).catch(() => {});
-    } else {
-      new Notification(title, { body: body || '', icon: '/icon-192.png' });
-    }
-  } catch (e) {}
-}
-// يُستدعى بعد كل تحميل: أي تنبيه غير مقروء لم نعرضه بعد يظهر كإشعار نظام رسمي + نافذة منبثقة صوتية معاً
+// يُستدعى بعد كل تحميل: أي تنبيه غير مقروء لم نعرضه بعد يظهر كنافذة منبثقة (للتنبيهات الفائتة)
 function inboxAfterLoad() {
   updateBell();
   if (typeof showAlert !== 'function') return;
   const fresh = unreadNotes().filter(n => !INBOX.alerted.has(n.id) && Date.now() - new Date(n.created_at) < 48 * 3600e3);
   if (!fresh.length) return;
   fresh.forEach(n => INBOX.alerted.add(n.id));
-  if (fresh.length === 1) {
-    const n = fresh[0];
-    fireOsNotification(n.title || '🔔 تنبيه جديد', n.body || '', 'nid-' + n.id);
-    showAlert({ title: n.title, body: n.body, task_id: n.task_id, order_id: n.order_id, nid: n.id });
-  } else {
-    const sumTitle = '🔔 لديك ' + fresh.length + ' تنبيهات جديدة';
-    const sumBody = fresh.slice(0, 4).map(n => '• ' + n.title).join('\n') + (fresh.length > 4 ? '\n…' : '');
-    fireOsNotification(sumTitle, sumBody, 'nid-batch-' + fresh[0].id);
-    showAlert({ title: sumTitle, body: sumBody, nids: fresh.map(n => n.id), summary: true });
-  }
+  if (fresh.length === 1) { const n = fresh[0]; showAlert({ title: n.title, body: n.body, task_id: n.task_id, order_id: n.order_id, nid: n.id }); }
+  else showAlert({ title: '🔔 لديك ' + fresh.length + ' تنبيهات جديدة', body: fresh.slice(0, 4).map(n => '• ' + n.title).join('\n') + (fresh.length > 4 ? '\n…' : ''), nids: fresh.map(n => n.id), summary: true });
 }
 // توليد المهام المتكررة المستحقة عند فتح التطبيق (مرة يومياً لكل جهاز) دون الاعتماد على الجدولة وحدها
 function recurPing() {

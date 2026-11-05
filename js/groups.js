@@ -18,12 +18,18 @@ function askDone(t, cb) {
   dlg.showModal(); $('dn_t').focus();
 }
 
-// بنود القائمة الفرعية تظهر على البطاقة ويُشطب البند بضغطة بدون فتح المهمة
+// بنود القائمة الفرعية تظهر على البطاقة مع فترتها الزمنية وحالة التأخير ويُشطب البند بضغطة بدون فتح المهمة
 const itemsOf = id => (S.items || []).filter(x => x.task_id === id);
 function ckRows(t) {
   if (t.for_all || eff(t) === 'done') return '';
   const L = itemsOf(t.id); if (!L.length) return '';
-  return '<div class="ckrows">' + L.slice(0, 5).map(x => '<label class="ckrow"><input type="checkbox" data-ci="' + x.id + '"' + (x.done ? ' checked' : '') + '><span' + (x.done ? ' class="dn"' : '') + '>' + esc(x.text) + '</span></label>').join('') +
+  return '<div class="ckrows">' + L.slice(0, 5).map(x => {
+    const m = typeof parseSubtaskMeta === 'function' ? parseSubtaskMeta(x) : { cleanText: x.text, badgeHtml: '' };
+    return '<label class="ckrow" style="justify-content:space-between;flex-wrap:wrap">' +
+      '<span style="display:flex;align-items:center;gap:8px;min-width:0"><input type="checkbox" data-ci="' + x.id + '"' + (x.done ? ' checked' : '') + '><span' + (x.done ? ' class="dn"' : '') + '>' + esc(m.cleanText) + '</span></span>' +
+      (m.badgeHtml || '') +
+    '</label>';
+  }).join('') +
     (L.length > 5 ? '<div class="m" style="padding:2px 4px">+' + (L.length - 5) + ' بنود أخرى…</div>' : '') + '</div>';
 }
 async function ckToggle(id, done) {

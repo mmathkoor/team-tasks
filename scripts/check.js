@@ -1,7 +1,6 @@
 // فحص سريع قبل أي رفع:  node scripts/check.js
 // 1) صياغة كل ملفات js/ و api/ و lib/   2) تكرار أسماء عامة بين الملفات (يكسر التطبيق)   3) سلامة index.html وملف الإعدادات
 const fs = require('fs'), path = require('path'), root = path.resolve(__dirname, '..');
-try { fs.rmSync(path.join(root, 'public'), { recursive: true, force: true }); } catch (e) {}
 let bad = 0; const fail = m => { bad++; console.log('✗ ' + m); };
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 for (const dir of ['js', 'api', 'lib']) for (const f of fs.readdirSync(path.join(root, dir)).filter(x => x.endsWith('.js'))) {

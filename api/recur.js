@@ -20,16 +20,29 @@ module.exports = async (req, res) => {
       (r.frequency === 'monthly' && Math.min(r.day_of_month || 1, lastDay) === dom) ||
       (r.frequency === 'month_end' && dom === lastDay)));
     if (!due.length) return res.status(200).json({ created: 0 });
-    const { data: members } = await supabase.from('members').select('email').neq('role', 'rep');
+    const { data: members } = await supabase.from('members').select('email,company,telegram_chat_id').neq('role', 'rep');
+    const getMemCo = m => {
+      let c = m.company || '';
+      if (!c && m.telegram_chat_id && String(m.telegram_chat_id).trim().startsWith('{')) {
+        try { c = JSON.parse(m.telegram_chat_id).co || ''; } catch (e) {}
+      }
+      return String(c || 'متجرك').trim();
+    };
     const made = [];
     for (const r of due) {
       // حجز القاعدة لهذا اليوم بشكل ذري كي لا تتكرر المهمة لو فتح تطبيقين معاً
       const { data: claimed, error: ce } = await supabase.from('recurring_tasks').update({ last_run: today }).eq('id', r.id).or('last_run.is.null,last_run.neq.' + today).select('id');
       if (ce || !claimed || !claimed.length) continue;
       const d = new Date(now); d.setUTCDate(d.getUTCDate() + (r.due_after_days || 0));
-      const base = { title: r.title, notes: r.notes, due_on: d.toISOString().slice(0, 10), status: 'todo', created_by: r.created_by, for_all: false };
+      const coMatch = String(r.notes || '').match(/\[شركة:\s*([^\]]+)\]/);
+      const ruleCo = coMatch ? coMatch[1].trim() : 'متجرك';
+      const base = { title: r.title, notes: r.notes || ('[شركة: ' + ruleCo + ']'), due_on: d.toISOString().slice(0, 10), status: 'todo', created_by: r.created_by, for_all: false };
       const gid = randomUUID();
-      const seen = new Set(), uniq = (members || []).filter(m => { const k = String(m.email).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+      const seen = new Set(), uniq = (members || []).filter(m => {
+        if (ruleCo && getMemCo(m).toLowerCase() !== ruleCo.toLowerCase()) return false;
+        const k = String(m.email).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true;
+      });
+      if (r.for_all && !uniq.length) continue;
       const rows = r.for_all ? uniq.map(m => ({ ...base, id: randomUUID(), assignee_email: m.email, group_id: gid })) : [{ ...base, id: randomUUID(), assignee_email: r.assignee_email }];
       const { error: e1 } = await supabase.from('tasks').insert(rows);
       if (e1) { console.error(e1.message); await supabase.from('recurring_tasks').update({ last_run: r.last_run }).eq('id', r.id); continue; }
