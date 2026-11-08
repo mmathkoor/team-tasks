@@ -62,9 +62,7 @@ function repMsg(o) {
     '',
     '📋 *قائمة التجهيز:*'
   ].concat((o.items || []).map(i => {
-    const rawPath = i.image || i.image_path;
-    const u = rawPath ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath) : '') || repImgUrl(rawPath)) : '';
-    return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') + (u ? '\n    📷 صورة المنتج: ' + u : '');
+    return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '');
   }))
   .concat(cn ? ['', '⚠️ *ملاحظات هامة:* ' + cn] : [])
   .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
@@ -596,7 +594,8 @@ function repPreview(o) {
 
   dlg.innerHTML = '<h2>👁 معاينة الطلب #' + o.order_no + '</h2>' + gal +
     '<pre class="msgp">' + esc(repMsg(o)) + '</pre>' +
-    '<div class="row dact" style="gap:6px">' +
+    '<div class="row dact" style="gap:6px;flex-wrap:wrap">' +
+      (imgItems.length ? '<button class="p s" id="rv_sh" type="button">📤 مشاركة الصور مع النص</button>' : '') +
       '<button class="p s" id="rv_inv" type="button">🧾 فاتورة للعميل</button>' +
       '<button class="s" id="rv_cp" type="button">📋 نسخ</button>' +
       '<button class="s" id="rv_x" type="button">إغلاق</button>' +
@@ -604,6 +603,32 @@ function repPreview(o) {
 
   $('rv_x').onclick = () => dlg.close();
   $('rv_inv').onclick = () => { dlg.close(); repInvoiceDialog(o); };
+  if ($('rv_sh')) {
+    $('rv_sh').onclick = async () => {
+      const msg = repMsg(o);
+      try { await navigator.clipboard.writeText(msg); } catch (e) {}
+      const files = [];
+      for (let idx = 0; idx < imgItems.length; idx++) {
+        const it = imgItems[idx];
+        const u = repImgUrl(it.image || it.image_path);
+        if (!u) continue;
+        try {
+          const r = await fetch(u);
+          if (r.ok) {
+            const b = await r.blob();
+            files.push(new File([b], 'طلب-' + o.order_no + '-' + (idx + 1) + '.jpg', { type: b.type || 'image/jpeg' }));
+          }
+        } catch (e) {}
+      }
+      if (files.length && navigator.share && navigator.canShare && navigator.canShare({ files })) {
+        try {
+          await navigator.share({ title: 'طلب #' + o.order_no, text: msg, files });
+          return;
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      if (typeof toast === 'function') toast('تم نسخ النص ✓');
+    };
+  }
   $('rv_cp').onclick = async () => {
     try {
       await navigator.clipboard.writeText(repMsg(o));

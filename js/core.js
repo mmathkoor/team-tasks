@@ -1128,10 +1128,21 @@ function bioRemove() {
   if (typeof idbSet === 'function') idbSet(BIO_KEY, null);
 }
 
-// اختصار رابط صورة الصنف لإرساله للمندوب
+// اختصار رابط صورة الصنف (إن استُخدم كرابط احتياطي) بترميز معرّف الطلب والصنف في كود قصير يعمل بدون استعلام قاعدة بيانات
 function shortImgUrl(itemId, imagePath) {
   if (!imagePath) return '';
   const origin = location.origin;
+  const m = String(imagePath).match(/^([0-9a-f-]{36})\/([0-9a-f-]{36})\.\w+$/i);
+  if (m) {
+    try {
+      const hex = (m[1] + m[2]).replace(/-/g, '');
+      if (hex.length === 64) {
+        const bytes = new Uint8Array(32);
+        for (let i = 0; i < 32; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+        return origin + '/i/' + bufToB64u(bytes.buffer);
+      }
+    } catch (e) {}
+  }
   if (itemId && String(itemId).length >= 8) {
     return origin + '/i/' + String(itemId).slice(0, 8);
   }
@@ -1142,4 +1153,5 @@ function shortImgUrl(itemId, imagePath) {
     return '';
   }
 }
+
 

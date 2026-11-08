@@ -42,17 +42,14 @@ function waPhone(p) {      // رقم يمني محلي ← صيغة دولية �
   if (d.length === 9 && d[0] === '7') d = BRAND.waCountry + d; else if (d.length === 10 && d[0] === '0') d = BRAND.waCountry + d.slice(1);
   return d;
 }
-function orderMsg(o, imgMap) {
-  const cur = bcurr(o), stName = bn(o), map = imgMap || {};
+function orderMsg(o) {
+  const cur = bcurr(o), stName = bn(o);
   const catKey = orderCatOf(o), catM = orderCatMeta(o);
   const L = oItems(o.id).map(i => {
-    const u = i.image_path ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, i.image_path) : '') || map[i.image_path] || '') : '';
     return '▫️ *' + i.name + '* × ' + (+i.qty) +
-      (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') +
-      (u ? '\n    📷 صورة المنتج: ' + u : '');
+      (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '');
   }).join('\n') || '—';
   const cleanNotes = stripOrderMetaNotes(o.notes);
-  const hasImgs = oItems(o.id).some(i => i.image_path);
   return ['مرحباً كابتن *' + (o.rep_email ? repName(o.rep_email) : '...') + '* 🛵',
     '📦 معك طلب جديد من *' + stName + '* (#' + o.order_no + ')' + (catKey !== 'normal' ? ' — *[' + catM.badge + ']*' : ''),
     '',
@@ -61,8 +58,69 @@ function orderMsg(o, imgMap) {
     '💵 المطلوب تحصيله: *' + money(o.balance) + ' ' + cur + '*', '', '----------------', '📋 *قائمة التجهيز:*', L, '----------------']
     .filter(x => x !== '')
     .concat(cleanNotes ? ['⚠️ *ملاحظات هامة:* ' + cleanNotes] : [])
-    .concat(hasImgs ? ['🖼️ *ملاحظة:* صور المنتجات مرفقة لك أيضاً في حساب المندوب بالمنصة للتأكد عند الاستلام والتسليم.'] : [])
     .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
+}
+
+// مشاركة الطلب للمندوب (الصورة الفعلية للمنتج مع النص معاً بنفس آلية تبويب النشر)
+async function shareOrderToRep(o, btnEl, opts) {
+  if (!o) return;
+  const options = opts || {};
+  const msg = orderMsg(o);
+  try { await navigator.clipboard.writeText(msg); } catch (e) {}
+
+  const itsWithImg = oItems(o.id).filter(i => i.image_path);
+  const rPhone = repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '';
+  const origTxt = btnEl ? btnEl.textContent : '';
+
+  if (itsWithImg.length) {
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ تجهيز الصور…'; }
+    if (typeof toast === 'function') toast('⏳ جارٍ تجهيز صور المنتجات مع نص الطلب للمشاركة…');
+    const paths = itsWithImg.map(i => i.image_path);
+    const map = await imgSign(paths);
+    const files = [];
+    for (let idx = 0; idx < itsWithImg.length; idx++) {
+      const it = itsWithImg[idx];
+      const u = map[it.image_path];
+      if (!u) continue;
+      try {
+        const r = await fetch(u);
+        if (!r.ok) continue;
+        const b = await r.blob();
+        const cleanName = String(it.name || ('منتج-' + (idx + 1))).replace(/[^\u0600-\u06FFa-zA-Z0-9_-]/g, '_');
+        files.push(new File([b], 'طلب-' + o.order_no + '-' + cleanName + '.jpg', { type: b.type || 'image/jpeg' }));
+      } catch (e) {}
+    }
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = origTxt; }
+
+    // 1) المشاركة الأصلية للصورة مع النص معاً (نفس آلية تبويب النشر)
+    if (!options.directWa && files.length && navigator.share && navigator.canShare && navigator.canShare({ files })) {
+      try {
+        await navigator.share({
+          title: 'طلب #' + o.order_no + ' — ' + o.customer_name,
+          text: msg,
+          files
+        });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+
+    // 2) بديل عند عدم دعم المتصفح لمشاركة الملفات أو عند اختيار فتح محادثة المندوب مباشرة: تنزيل الصور تلقائياً + فتح واتساب المندوب بالنص
+    for (const f of files) {
+      try {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(f);
+        a.download = f.name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      } catch (e) {}
+    }
+    if (typeof toast === 'function') toast('📥 تم تنزيل صورة المنتج ونسخ النص — أرفق الصورة في محادثة المندوب ✓');
+  }
+
+  window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 // فاتورة العميل: أسعار البيع فقط — بدون التاجر وبدون سعر الشراء — مع هوية وشعار الشركة الخاصة بالطلب
 const bProf = o => typeof getCompanyProfile === 'function' ? getCompanyProfile(o ? orderCompany(o) : activeCompanyFilter() || 'متجرك') : { displayName: BRAND.name, phone: BRAND.phone, address: BRAND.address, currency: BRAND.currency, footer: 'شكراً لتعاملكم معنا 🌹', logo: '', staffCanCost: !!(S.ordSet && S.ordSet.staff_can_cost) };
@@ -357,9 +415,7 @@ async function oUpdate(id, patch) {
 async function oAction(a, id, btnEl) {
   const o = oOf(id); if (!o) return;
   if (a === 'wa') {
-    const paths = oItems(o.id).map(i => i.image_path).filter(Boolean);
-    const map = paths.length ? await imgSign(paths) : {};
-    window.open('https://wa.me/' + (repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '') + '?text=' + encodeURIComponent(orderMsg(o, map)), '_blank');
+    await shareOrderToRep(o, btnEl);
   }
   else if (a === 'pdf') await sendOrderInvoicePdf(o, btnEl);
   else if (a === 'eye') previewDialog(o);
@@ -373,10 +429,10 @@ async function oAction(a, id, btnEl) {
 async function previewDialog(o) {
   const its = oItems(o.id), paths = its.map(i => i.image_path).filter(Boolean);
   const map = paths.length ? await imgSign(paths) : {};
-  const msg = orderMsg(o, map);
+  const msg = orderMsg(o);
   const imgsHtml = paths.length ? (
     '<div class="obox" style="margin-bottom:10px">' +
-      '<div class="bar" style="margin-bottom:6px"><b>📷 صور المنتجات المرفقة للمندوب (' + paths.length + ')</b><span class="chip ok">تظهر للمندوب في حسابه وفي الروابط</span></div>' +
+      '<div class="bar" style="margin-bottom:6px"><b>📷 صور المنتجات المرفقة للمندوب (' + paths.length + ')</b><span class="chip ok">تُرسل كصورة فعلية مع النص</span></div>' +
       '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
         its.filter(i => i.image_path && map[i.image_path]).map(i =>
           '<a href="' + esc(map[i.image_path]) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-decoration:none;color:var(--ink)">' +
@@ -386,12 +442,19 @@ async function previewDialog(o) {
         ).join('') +
       '</div>' +
     '</div>'
-  ) : '<div class="m" style="margin-bottom:8px">💡 لا توجد صور مرفقة للأصناف في هذا الطلب (يمكنك إرفاق صورة لكل صنف من نافذة تعديل الطلب لتظهر للمندوب).</div>';
+  ) : '<div class="m" style="margin-bottom:8px">💡 لا توجد صور مرفقة للأصناف في هذا الطلب (يمكنك إرفاق صورة لكل صنف من نافذة تعديل الطلب لتُرسل مع النص للمندوب).</div>';
 
-  dlg.innerHTML = '<h2>👁 معاينة رسالة وصور المندوب</h2>' + imgsHtml + '<pre class="msgp">' + esc(msg) + '</pre><div class="row dact"><button class="s" id="pv_cp">📋 نسخ الرسالة</button><button class="p s" id="pv_wa">📲 إرسال عبر واتساب</button><button class="s" id="pv_x">إغلاق</button></div>';
+  dlg.innerHTML = '<h2>👁 معاينة رسالة وصور المندوب</h2>' + imgsHtml + '<pre class="msgp">' + esc(msg) + '</pre>' +
+    '<div class="row dact" style="flex-wrap:wrap;gap:6px">' +
+      '<button class="p s" id="pv_wa">📤 إرسال الصورة مع النص للمندوب</button>' +
+      (paths.length ? '<button class="s" id="pv_wa_direct">💬 واتساب المندوب (نص + تنزيل الصورة)</button>' : '') +
+      '<button class="s" id="pv_cp">📋 نسخ الرسالة</button>' +
+      '<button class="s" id="pv_x">إغلاق</button>' +
+    '</div>';
   $('pv_x').onclick = () => dlg.close();
   $('pv_cp').onclick = async () => { try { await navigator.clipboard.writeText(msg); $('pv_cp').textContent = 'تم النسخ ✓'; if (typeof toast === 'function') toast('تم نسخ رسالة المندوب ✓'); } catch (e) { alert('تعذّر النسخ'); } };
-  $('pv_wa').onclick = () => window.open('https://wa.me/' + (repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '') + '?text=' + encodeURIComponent(msg), '_blank');
+  $('pv_wa').onclick = () => shareOrderToRep(o, $('pv_wa'));
+  if ($('pv_wa_direct')) $('pv_wa_direct').onclick = () => shareOrderToRep(o, $('pv_wa_direct'), { directWa: true });
   dlg.showModal();
 }
 function assignDialog(o) {

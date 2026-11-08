@@ -698,15 +698,17 @@ async function plSharePostWithMedia(p, postRow) {
   // جلب صور التصميم (أو صور الاستلام إن لم توجد صور تصميم) لمشاركتها مباشرة مع النص
   const imgs = plImgsOf(p.id, 'design').length ? plImgsOf(p.id, 'design') : plImgsOf(p.id, 'source');
   const files = [];
-  if (imgs.length && navigator.canShare) {
+  if (imgs.length) {
     toast('⏳ جارٍ تجهيز الصور والنص للمشاركة الفورية…');
     for (let i = 0; i < Math.min(imgs.length, 4); i++) {
       try {
         const u = await plSignOne(imgs[i].path);
         if (u) {
           const r = await fetch(u);
-          const b = await r.blob();
-          files.push(new File([b], (p.title || 'product') + '-' + (i + 1) + '.jpg', { type: b.type || 'image/jpeg' }));
+          if (r.ok) {
+            const b = await r.blob();
+            files.push(new File([b], (p.title || 'product') + '-' + (i + 1) + '.jpg', { type: b.type || 'image/jpeg' }));
+          }
         }
       } catch (e) {}
     }
@@ -718,10 +720,26 @@ async function plSharePostWithMedia(p, postRow) {
         await navigator.share({ title: p.content_title || p.title, text: cap, files });
         return;
       }
-      await navigator.share({ title: p.content_title || p.title, text: cap });
-      return;
+      if (!files.length) {
+        await navigator.share({ title: p.content_title || p.title, text: cap });
+        return;
+      }
     } catch (e) {
       if (e && e.name === 'AbortError') return;
+    }
+  }
+
+  // عند عدم دعم المتصفح لمشاركة الملفات مباشرة: تنزيل الصور تلقائياً + فتح المنصة مع نسخ النص
+  if (files.length) {
+    for (const f of files) {
+      try {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(f);
+        a.download = f.name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      } catch (e) {}
     }
   }
 
@@ -732,7 +750,7 @@ async function plSharePostWithMedia(p, postRow) {
   else if (plat === 'telegram') window.open('https://t.me/share/url?url=' + encodeURIComponent(p.supplier_url || location.origin) + '&text=' + enc, '_blank');
   else if (plat === 'facebook') window.open('https://www.facebook.com/sharer/sharer.php?quote=' + enc + (p.supplier_url ? '&u=' + encodeURIComponent(p.supplier_url) : ''), '_blank');
   else if (plat === 'x') window.open('https://twitter.com/intent/tweet?text=' + enc, '_blank');
-  else toast('📋 تم نسخ نص المنشور — الصقه مباشرة في المنصة');
+  else toast(files.length ? '📥 تم تنزيل الصور ونسخ النص — الصقه مباشرة في المنصة' : '📋 تم نسخ نص المنشور — الصقه مباشرة في المنصة');
 }
 
 async function plQuickShareProduct(p) {
