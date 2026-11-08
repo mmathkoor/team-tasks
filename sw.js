@@ -1,5 +1,6 @@
-// Build version: 6.1.0 (timestamp: 2026-11-08)
-const SW_BUILD_VERSION = '6.1.0';
+// Build version: 6.2.0 (timestamp: 2026-11-08)
+const SW_BUILD_VERSION = '6.2.0';
+
 
 
 try { importScripts('/js/version.js'); } catch (e) {}

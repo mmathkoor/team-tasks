@@ -947,29 +947,42 @@ function applyCompanyScope() {
 }
 
 const IMG_BUCKET = 'order-images';
+window._imgSignCache = window._imgSignCache || {};
 async function imgSign(paths) {
   paths = [...new Set((paths || []).filter(Boolean))];
   const out = {};
   if (!paths.length) return out;
-  try {
-    const r = await fetch(API + '/storage/v1/object/sign/' + IMG_BUCKET, {
-      method: 'POST',
-      headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 86400, paths })
-    });
-    const j = await r.json();
-    if (r.ok && Array.isArray(j)) {
-      j.forEach(x => {
-        const u = x.signedURL || x.signedUrl;
-        if (u) {
-          if (u.startsWith('http://') || u.startsWith('https://')) out[x.path] = u;
-          else if (u.startsWith('/storage/v1/')) out[x.path] = API + u;
-          else if (u.startsWith('/')) out[x.path] = API + '/storage/v1' + u;
-          else out[x.path] = API + '/storage/v1/' + u;
-        }
+  const now = Date.now();
+  const need = [];
+  paths.forEach(p => {
+    const c = window._imgSignCache[p];
+    if (c && c.t > now && c.u) out[p] = c.u;
+    else need.push(p);
+  });
+  if (need.length) {
+    try {
+      const r = await fetch(API + '/storage/v1/object/sign/' + IMG_BUCKET, {
+        method: 'POST',
+        headers: { apikey: KEY, Authorization: 'Bearer ' + await tok(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: 604800, paths: need })
       });
-    }
-  } catch (e) {}
+      const j = await r.json();
+      if (r.ok && Array.isArray(j)) {
+        j.forEach(x => {
+          const u = x.signedURL || x.signedUrl;
+          if (u) {
+            let full = u;
+            if (u.startsWith('http://') || u.startsWith('https://')) full = u;
+            else if (u.startsWith('/storage/v1/')) full = API + u;
+            else if (u.startsWith('/')) full = API + '/storage/v1' + u;
+            else full = API + '/storage/v1/' + u;
+            out[x.path] = full;
+            window._imgSignCache[x.path] = { u: full, t: now + 50 * 60000 };
+          }
+        });
+      }
+    } catch (e) {}
+  }
 
   // ضمان عدم بقاء أي مسار صورة فارغاً: نضع الرابط المباشر حتى تظهر الصور للمستخدم فوراً
   paths.forEach(p => {
@@ -1128,10 +1141,39 @@ function bioRemove() {
   if (typeof idbSet === 'function') idbSet(BIO_KEY, null);
 }
 
-// اختصار رابط صورة الصنف (إن استُخدم كرابط احتياطي) بترميز معرّف الطلب والصنف في كود قصير يعمل بدون استعلام قاعدة بيانات
-function shortImgUrl(itemId, imagePath) {
-  if (!imagePath) return '';
+// اختصار رابط صورة الصنف لإرساله للمندوب عبر حزمة 72 بايت الذاتية التي تحتوي على التوقيع وتفتح فوراً بدون استعلام قاعدة بيانات
+function shortImgUrl(itemId, imagePath, signedUrl) {
+  if (!imagePath && !signedUrl) return '';
   const origin = location.origin;
+  if (signedUrl && signedUrl.includes('?token=')) {
+    try {
+      const tokPart = signedUrl.split('?token=')[1].split('&')[0];
+      const parts = tokPart.split('.');
+      const m = String(imagePath || signedUrl).match(/([0-9a-f-]{36})\/([0-9a-f-]{36})\.jpg/i);
+      if (parts.length === 3 && parts[0] === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' && m) {
+        const u1 = m[1].toLowerCase(), u2 = m[2].toLowerCase();
+        const payB64 = parts[1], sigB64 = parts[2];
+        const b64 = payB64.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+        const payObj = JSON.parse(atob(b64 + pad));
+        const iat = Number(payObj.iat) || 0, exp = Number(payObj.exp) || 0;
+        const expectedJson = '{"url":"order-images/' + u1 + '/' + u2 + '.jpg","iat":' + iat + ',"exp":' + exp + '}';
+        const expectedB64 = btoa(expectedJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const sigBuf = b64uToBuf(sigB64);
+        if (expectedB64 === payB64 && sigBuf.byteLength === 32) {
+          const out = new Uint8Array(72);
+          const hex = (u1 + u2).replace(/-/g, '');
+          for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+          const dv = new DataView(out.buffer);
+          dv.setUint32(32, iat, false);
+          dv.setUint32(36, exp, false);
+          out.set(new Uint8Array(sigBuf), 40);
+          return origin + '/i/' + bufToB64u(out.buffer);
+        }
+      }
+    } catch (e) {}
+    return signedUrl;
+  }
   const m = String(imagePath).match(/^([0-9a-f-]{36})\/([0-9a-f-]{36})\.\w+$/i);
   if (m) {
     try {
@@ -1143,15 +1185,8 @@ function shortImgUrl(itemId, imagePath) {
       }
     } catch (e) {}
   }
-  if (itemId && String(itemId).length >= 8) {
-    return origin + '/i/' + String(itemId).slice(0, 8);
-  }
-  try {
-    const b64 = btoa(unescape(encodeURIComponent(imagePath))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return origin + '/i/' + b64;
-  } catch (e) {
-    return '';
-  }
+  return signedUrl || '';
 }
+
 
 

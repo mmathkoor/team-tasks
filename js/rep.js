@@ -47,9 +47,10 @@ function repCompanyProfile(o) {
   };
 }
 
-function repMsg(o) {
+function repMsg(o, opts) {
   const cn = repCleanNotes(o);
   const cp = repCompanyProfile(o);
+  const noLinks = !!(opts && opts.noLinks);
   return [
     'مرحباً كابتن *' + (S.me ? S.me.name : '') + '* 🛵',
     '📦 طلب مبيعات #' + o.order_no + ' — ' + cp.name,
@@ -62,7 +63,10 @@ function repMsg(o) {
     '',
     '📋 *قائمة التجهيز:*'
   ].concat((o.items || []).map(i => {
-    return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '');
+    const rawPath = i.image || i.image_path;
+    const signed = rawPath ? repImgUrl(rawPath) : '';
+    const u = (!noLinks && rawPath) ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath, signed) : '') || signed) : '';
+    return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') + (u ? '\n    📷 صورة المنتج: ' + u : '');
   }))
   .concat(cn ? ['', '⚠️ *ملاحظات هامة:* ' + cn] : [])
   .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
