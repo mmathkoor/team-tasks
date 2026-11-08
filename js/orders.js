@@ -42,7 +42,7 @@ function waPhone(p) {      // رقم يمني محلي ← صيغة دولية �
   if (d.length === 9 && d[0] === '7') d = BRAND.waCountry + d; else if (d.length === 10 && d[0] === '0') d = BRAND.waCountry + d.slice(1);
   return d;
 }
-// ذاكرة الصور الموقّعة وملفاتها الجاهزة للمشاركة الفورية بدون فقدان نقرة المستخدم (User Gesture)
+// ذاكرة الصور وملفاتها الجاهزة للمشاركة الفورية مع النص بدون فقدان نقرة المستخدم (User Gesture)
 const ORD_IMG_MEM = { urls: {}, files: {}, busy: {} };
 
 async function preloadOrderFiles(o) {
@@ -54,21 +54,37 @@ async function preloadOrderFiles(o) {
   }
   if (ORD_IMG_MEM.busy[o.id]) return ORD_IMG_MEM.busy[o.id];
   ORD_IMG_MEM.busy[o.id] = (async () => {
-    const paths = itsWithImg.map(i => i.image_path);
-    const map = await imgSign(paths);
-    Object.assign(ORD_IMG_MEM.urls, map);
     const files = [];
     for (let idx = 0; idx < itsWithImg.length; idx++) {
       const it = itsWithImg[idx];
-      const u = map[it.image_path];
-      if (!u) continue;
+      const shortU = typeof shortImgUrl === 'function' ? shortImgUrl(it.id, it.image_path) : (location.origin + '/api/i?c=' + encodeURIComponent(it.image_path));
+      let blob = null;
+      // 1) الجلب المباشر من نفس النطاق (/i/xxxxxxxx) لتفادي أي مشاكل صلاحيات أو CORS
       try {
-        const r = await fetch(u);
-        if (!r.ok) continue;
-        const b = await r.blob();
-        const cleanName = String(it.name || ('منتج-' + (idx + 1))).replace(/[^\u0600-\u06FFa-zA-Z0-9_-]/g, '_');
-        files.push(new File([b], 'طلب-' + o.order_no + '-' + cleanName + '.jpg', { type: b.type || 'image/jpeg' }));
+        const r = await fetch(shortU);
+        if (r.ok) {
+          const b = await r.blob();
+          if (b && b.size > 100) blob = b;
+        }
       } catch (e) {}
+      // 2) احتياطي عبر التوقيع المباشر إن لزم
+      if (!blob) {
+        try {
+          const map = await imgSign([it.image_path]);
+          const u = map[it.image_path];
+          if (u) {
+            const r2 = await fetch(u);
+            if (r2.ok) {
+              const b2 = await r2.blob();
+              if (b2 && b2.size > 100) blob = b2;
+            }
+          }
+        } catch (e) {}
+      }
+      if (blob) {
+        ORD_IMG_MEM.urls[it.image_path] = shortU;
+        files.push(new File([blob], 'order-' + o.order_no + '-' + (idx + 1) + '.jpg', { type: 'image/jpeg' }));
+      }
     }
     if (files.length) ORD_IMG_MEM.files[o.id] = files;
     delete ORD_IMG_MEM.busy[o.id];
@@ -78,27 +94,19 @@ async function preloadOrderFiles(o) {
 }
 
 async function hydrateOrdersMedia() {
-  const activeOrders = (S.orders || []).filter(o => o.status === 'new' || o.status === 'preparing').slice(0, 30);
-  const allPaths = activeOrders.flatMap(o => oItems(o.id).map(i => i.image_path).filter(Boolean));
-  if (!allPaths.length) return;
-  const map = await imgSign(allPaths);
-  Object.assign(ORD_IMG_MEM.urls, map);
-  // تجهيز ملفات الصور في الخلفية لكي تعمل مشاركة الصورة مع النص بضغطة واحدة فوراً
-  for (const o of activeOrders.slice(0, 12)) {
+  const activeOrders = (S.orders || []).filter(o => o.status === 'new' || o.status === 'preparing').slice(0, 15);
+  for (const o of activeOrders) {
     if (oItems(o.id).some(i => i.image_path)) {
       preloadOrderFiles(o).catch(() => {});
     }
   }
 }
 
-function orderMsg(o, imgMap, opts) {
+function orderMsg(o) {
   const cur = bcurr(o), stName = bn(o);
-  const map = Object.assign({}, ORD_IMG_MEM.urls, window._imgSignCache ? Object.fromEntries(Object.entries(window._imgSignCache).map(([k, v]) => [k, v.u])) : {}, imgMap || {});
-  const noLinks = !!(opts && opts.noLinks);
   const catKey = orderCatOf(o), catM = orderCatMeta(o);
   const L = oItems(o.id).map(i => {
-    const signed = i.image_path ? (map[i.image_path] || '') : '';
-    const link = (!noLinks && i.image_path) ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, i.image_path, signed) : '') || signed) : '';
+    const link = i.image_path ? (typeof shortImgUrl === 'function' ? shortImgUrl(i.id, i.image_path) : '') : '';
     return '▫️ *' + i.name + '* × ' + (+i.qty) +
       (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') +
       (link ? '\n    📷 صورة المنتج: ' + link : '');
@@ -115,22 +123,21 @@ function orderMsg(o, imgMap, opts) {
     .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
 
-// مشاركة الطلب للمندوب (إرسال الصورة الفعلية مع النص في رسالة واحدة مثل تبويب النشر + رابط صالح 100%)
+// مشاركة الطلب للمندوب: إرسال الرسالة مع الصور معاً (نفس آلية تبويب النشر) + رابط مختصر شغال 100%
 async function shareOrderToRep(o, btnEl, opts) {
   if (!o) return;
   const options = opts || {};
+  const msg = orderMsg(o);
   const itsWithImg = oItems(o.id).filter(i => i.image_path);
   const rPhone = repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '';
 
   // 1) إذا كانت ملفات الصور جاهزة في الذاكرة، نطلق navigator.share في نفس اللحظة المتزامنة للنقرة (قبل أي await!)
   const readyFiles = ORD_IMG_MEM.files[o.id];
-  if (!options.directWa && itsWithImg.length && readyFiles && readyFiles.length && navigator.share && navigator.canShare && navigator.canShare({ files: readyFiles })) {
-    const cleanMsg = orderMsg(o, ORD_IMG_MEM.urls, { noLinks: true });
-    try { navigator.clipboard.writeText(cleanMsg).catch(() => {}); } catch (e) {}
+  if (!options.directWa && itsWithImg.length && readyFiles && readyFiles.length && navigator.share) {
+    try { navigator.clipboard.writeText(msg).catch(() => {}); } catch (e) {}
     try {
       await navigator.share({
-        title: 'طلب #' + o.order_no + ' — ' + o.customer_name,
-        text: cleanMsg,
+        text: msg,
         files: readyFiles
       });
       return;
@@ -139,54 +146,50 @@ async function shareOrderToRep(o, btnEl, opts) {
     }
   }
 
-  // 2) إذا لم تكن الصور محمّلة بعد في الذاكرة، نجهزها الآن
+  // 2) إذا لم تكن الصور محمّلة بعد في الذاكرة عند النقرة الأولى، نحمّلها الآن من /i/xxxxxxxx
   const origTxt = btnEl ? btnEl.textContent : '';
   let files = readyFiles || [];
   if (itsWithImg.length && !files.length) {
     if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ تجهيز الصور…'; }
-    if (typeof toast === 'function') toast('⏳ جارٍ تجهيز صور المنتجات مع نص الطلب…');
+    if (typeof toast === 'function') toast('⏳ جارٍ تجهيز صور المنتجات مع الرسالة…');
     files = await preloadOrderFiles(o);
     if (btnEl) { btnEl.disabled = false; btnEl.textContent = origTxt; }
-  } else if (itsWithImg.length) {
-    const map = await imgSign(itsWithImg.map(i => i.image_path));
-    Object.assign(ORD_IMG_MEM.urls, map);
   }
 
-  const msgWithLinks = orderMsg(o, ORD_IMG_MEM.urls);
-  const msgNoLinks = orderMsg(o, ORD_IMG_MEM.urls, { noLinks: true });
-  try { await navigator.clipboard.writeText(msgWithLinks); } catch (e) {}
+  try { await navigator.clipboard.writeText(msg); } catch (e) {}
 
-  if (!options.directWa && files.length && navigator.share && navigator.canShare && navigator.canShare({ files })) {
+  if (!options.directWa && files.length && navigator.share) {
     try {
       await navigator.share({
-        title: 'طلب #' + o.order_no + ' — ' + o.customer_name,
-        text: msgNoLinks,
+        text: msg,
         files
       });
       return;
     } catch (e) {
       if (e && e.name === 'AbortError') return;
-      // إذا انتهت مهلة النقرة في المتصفح بسبب التحميل الأولي، نفتح زر إرسال فوري بضغطة واحدة (الصور الآن جاهزة في الذاكرة!)
-      if (e && e.name === 'NotAllowedError' && typeof dlg !== 'undefined') {
-        dlg.innerHTML = '<h2>📤 الصور والنص جاهزة للإرسال</h2>' +
-          '<p class="m">تم تجهيز صور المنتجات (' + files.length + ') مع نص الطلب #' + o.order_no + '. اضغط الزر أدناه لإرسال الصورة مع النص للمندوب فوراً:</p>' +
+      // إذا رفض المتصفح فتح المشاركة بسبب انتظار التحميل الأولي، نفتح زر تأكيد فوري بضغطة واحدة (الصور الآن في الذاكرة 100%)
+      if (typeof dlg !== 'undefined') {
+        dlg.innerHTML = '<h2>📤 إرسال الرسالة مع الصور للمندوب</h2>' +
+          '<p class="m">تم تجهيز صور المنتجات (' + files.length + ') مع رسالة الطلب #' + o.order_no + '. اضغط الزر الأخضر لإرسال الرسالة مع الصور معاً:</p>' +
           '<div class="row dact" style="gap:8px;flex-wrap:wrap">' +
-            '<button class="p" id="sh_now_btn">📤 إرسال الصورة مع النص الآن</button>' +
-            '<button class="s" id="sh_wa_btn">💬 فتح محادثة المندوب بالرابط</button>' +
+            '<button class="p" id="sh_now_btn" style="background:#15803d;border-color:#15803d;color:#fff">📤 إرسال الرسالة مع الصور الآن</button>' +
+            '<button class="s" id="sh_wa_btn">💬 فتح واتساب المندوب بالرابط المختصر</button>' +
             '<button class="s" id="sh_x_btn">إغلاق</button>' +
           '</div>';
         $('sh_x_btn').onclick = () => dlg.close();
         $('sh_now_btn').onclick = async () => {
-          dlg.close();
           try {
-            await navigator.share({ title: 'طلب #' + o.order_no + ' — ' + o.customer_name, text: msgNoLinks, files });
-          } catch (_) {
-            window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msgWithLinks), '_blank');
+            await navigator.share({ text: msg, files });
+            dlg.close();
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            dlg.close();
+            window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msg), '_blank');
           }
         };
         $('sh_wa_btn').onclick = () => {
           dlg.close();
-          window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msgWithLinks), '_blank');
+          window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msg), '_blank');
         };
         if (!dlg.open) dlg.showModal();
         return;
@@ -194,7 +197,7 @@ async function shareOrderToRep(o, btnEl, opts) {
     }
   }
 
-  // 3) في حال عدم دعم الجهاز لمشاركة الملفات (أو اختيار فتح واتساب المندوب مباشرة): تنزيل الصور + فتح محادثة المندوب مع الرابط الصالح 100%
+  // 3) للأجهزة التي لا تدعم مشاركة الملفات (أو عند اختيار فتح واتساب المندوب مباشرة): تنزيل الصور + فتح محادثة المندوب بالرسالة والرابط المختصر الشغال
   if (files.length) {
     for (const f of files) {
       try {
@@ -206,10 +209,9 @@ async function shareOrderToRep(o, btnEl, opts) {
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
       } catch (e) {}
     }
-    if (typeof toast === 'function') toast('📥 تم تنزيل صورة المنتج وفتح واتساب المندوب مع رابط الصورة الصالح ✓');
   }
 
-  window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msgWithLinks), '_blank');
+  window.open('https://wa.me/' + rPhone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 // فاتورة العميل: أسعار البيع فقط — بدون التاجر وبدون سعر الشراء — مع هوية وشعار الشركة الخاصة بالطلب
 const bProf = o => typeof getCompanyProfile === 'function' ? getCompanyProfile(o ? orderCompany(o) : activeCompanyFilter() || 'متجرك') : { displayName: BRAND.name, phone: BRAND.phone, address: BRAND.address, currency: BRAND.currency, footer: 'شكراً لتعاملكم معنا 🌹', logo: '', staffCanCost: !!(S.ordSet && S.ordSet.staff_can_cost) };

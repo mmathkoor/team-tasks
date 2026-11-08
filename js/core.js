@@ -984,13 +984,13 @@ async function imgSign(paths) {
     } catch (e) {}
   }
 
-  // ضمان عدم بقاء أي مسار صورة فارغاً: نضع الرابط المباشر حتى تظهر الصور للمستخدم فوراً
+  // ضمان عدم بقاء أي مسار صورة فارغاً: نستخدم مسار /api/i المحلي الذي يجلب الصورة بمفتاح الخادم دائماً
   paths.forEach(p => {
     if (!out[p]) {
       if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:')) {
         out[p] = p;
       } else {
-        out[p] = API + '/storage/v1/object/public/' + IMG_BUCKET + '/' + p;
+        out[p] = location.origin + '/api/i?c=' + encodeURIComponent(p);
       }
     }
   });
@@ -1141,52 +1141,20 @@ function bioRemove() {
   if (typeof idbSet === 'function') idbSet(BIO_KEY, null);
 }
 
-// اختصار رابط صورة الصنف لإرساله للمندوب عبر حزمة 72 بايت الذاتية التي تحتوي على التوقيع وتفتح فوراً بدون استعلام قاعدة بيانات
-function shortImgUrl(itemId, imagePath, signedUrl) {
-  if (!imagePath && !signedUrl) return '';
+// اختصار رابط صورة الصنف لإرساله للمندوب: دائماً 8 محارف فقط مثل /i/bc69f541
+function shortImgUrl(itemId, imagePath) {
+  if (!itemId && !imagePath) return '';
   const origin = location.origin;
-  if (signedUrl && signedUrl.includes('?token=')) {
-    try {
-      const tokPart = signedUrl.split('?token=')[1].split('&')[0];
-      const parts = tokPart.split('.');
-      const m = String(imagePath || signedUrl).match(/([0-9a-f-]{36})\/([0-9a-f-]{36})\.jpg/i);
-      if (parts.length === 3 && parts[0] === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' && m) {
-        const u1 = m[1].toLowerCase(), u2 = m[2].toLowerCase();
-        const payB64 = parts[1], sigB64 = parts[2];
-        const b64 = payB64.replace(/-/g, '+').replace(/_/g, '/');
-        const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
-        const payObj = JSON.parse(atob(b64 + pad));
-        const iat = Number(payObj.iat) || 0, exp = Number(payObj.exp) || 0;
-        const expectedJson = '{"url":"order-images/' + u1 + '/' + u2 + '.jpg","iat":' + iat + ',"exp":' + exp + '}';
-        const expectedB64 = btoa(expectedJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        const sigBuf = b64uToBuf(sigB64);
-        if (expectedB64 === payB64 && sigBuf.byteLength === 32) {
-          const out = new Uint8Array(72);
-          const hex = (u1 + u2).replace(/-/g, '');
-          for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-          const dv = new DataView(out.buffer);
-          dv.setUint32(32, iat, false);
-          dv.setUint32(36, exp, false);
-          out.set(new Uint8Array(sigBuf), 40);
-          return origin + '/i/' + bufToB64u(out.buffer);
-        }
-      }
-    } catch (e) {}
-    return signedUrl;
+  if (itemId && String(itemId).length >= 8) {
+    return origin + '/i/' + String(itemId).slice(0, 8);
   }
-  const m = String(imagePath).match(/^([0-9a-f-]{36})\/([0-9a-f-]{36})\.\w+$/i);
+  const m = String(imagePath || '').match(/\/([0-9a-f]{8})[0-9a-f-]*\.\w+$/i);
   if (m) {
-    try {
-      const hex = (m[1] + m[2]).replace(/-/g, '');
-      if (hex.length === 64) {
-        const bytes = new Uint8Array(32);
-        for (let i = 0; i < 32; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-        return origin + '/i/' + bufToB64u(bytes.buffer);
-      }
-    } catch (e) {}
+    return origin + '/i/' + m[1].toLowerCase();
   }
-  return signedUrl || '';
+  return origin + '/api/i?c=' + encodeURIComponent(imagePath);
 }
+
 
 
 

@@ -1,5 +1,6 @@
 // رقم النسخة: عدّله هنا فقط عند كل إصدار (تقرؤه الصفحة وعامل الخدمة)
-const VERSION = '6.2.0';
+const VERSION = '6.3.0';
 window.VERSION = VERSION;
+
 
 
