@@ -1,5 +1,5 @@
-// Build version: 6.3.0 (timestamp: 2026-11-08)
-const SW_BUILD_VERSION = '6.3.0';
+// Build version: 6.4.0 (timestamp: 2026-11-08)
+const SW_BUILD_VERSION = '6.4.0';
 
 
 

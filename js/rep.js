@@ -4,6 +4,9 @@ let REP_STATE = {
   filter: { q: '', status: '', period: '' }
 };
 
+// ذاكرة الصور المحلية (Blob / File) في واجهة المندوب لإرفاق الصور مباشرة مع الرسالة النصية في تطبيق المراسلة
+const REP_IMG_MEM = { files: {}, blobUrls: {}, busy: {} };
+
 async function repLoad() {
   const [r, nt] = await Promise.all([
     sb.rpc('rep_orders'),
@@ -17,15 +20,165 @@ async function repLoad() {
   }
   if (!nt.error) S.notes = nt.data || [];
   repRender();
+  repHydrateMedia().catch(() => {});
   if (typeof rtStart === 'function') rtStart();
   inboxAfterLoad();
 }
 
-const repImgUrl = p => {
+const repImgUrl = (p, itemId) => {
   if (!p) return '';
-  if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:')) return p;
-  return ((S.rimg || {})[p]) || (API + '/storage/v1/object/public/' + IMG_BUCKET + '/' + p);
+  if (REP_IMG_MEM.blobUrls[p]) return REP_IMG_MEM.blobUrls[p];
+  if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:') || p.startsWith('/i/') || p.startsWith('/api/i')) return p;
+  if (typeof shortImgUrl === 'function') return shortImgUrl(itemId, p);
+  return ((S.rimg || {})[p]) || (location.origin + '/api/i?c=' + encodeURIComponent(p));
 };
+
+async function repPreloadOrderFiles(o) {
+  if (!o || !o.id) return [];
+  const imgItems = (o.items || []).filter(i => i.image || i.image_path);
+  if (!imgItems.length) return [];
+  if (REP_IMG_MEM.files[o.id] && REP_IMG_MEM.files[o.id].length === imgItems.length) {
+    return REP_IMG_MEM.files[o.id];
+  }
+  if (REP_IMG_MEM.busy[o.id]) return REP_IMG_MEM.busy[o.id];
+  REP_IMG_MEM.busy[o.id] = (async () => {
+    const files = [];
+    for (let idx = 0; idx < imgItems.length; idx++) {
+      const it = imgItems[idx];
+      const rawPath = it.image || it.image_path;
+      const localUrl = typeof shortImgUrl === 'function' ? shortImgUrl(it.id, rawPath) : (location.origin + '/api/i?c=' + encodeURIComponent(rawPath));
+      let blob = null;
+      // 1) جلب الصورة عبر المسار المحلي المختصر (/i/xxxxxxxx) كـ Blob مباشرة
+      try {
+        const r = await fetch(localUrl);
+        if (r.ok) {
+          const b = await r.blob();
+          if (b && b.size > 100) blob = b;
+        }
+      } catch (e) {}
+      // 2) احتياطي من الرابط الموقع في حال عدم توفر المسار الأول
+      if (!blob && S.rimg && S.rimg[rawPath]) {
+        try {
+          const r2 = await fetch(S.rimg[rawPath]);
+          if (r2.ok) {
+            const b2 = await r2.blob();
+            if (b2 && b2.size > 100) blob = b2;
+          }
+        } catch (e) {}
+      }
+      if (blob) {
+        if (!REP_IMG_MEM.blobUrls[rawPath]) {
+          try { REP_IMG_MEM.blobUrls[rawPath] = URL.createObjectURL(blob); } catch (e) {}
+        }
+        files.push(new File([blob], 'order-' + o.order_no + '-' + (idx + 1) + '.jpg', { type: 'image/jpeg' }));
+      }
+    }
+    if (files.length) REP_IMG_MEM.files[o.id] = files;
+    delete REP_IMG_MEM.busy[o.id];
+    return files;
+  })();
+  return REP_IMG_MEM.busy[o.id];
+}
+
+async function repHydrateMedia() {
+  const active = rOpen().slice(0, 15);
+  for (const o of active) {
+    if ((o.items || []).some(i => i.image || i.image_path)) {
+      repPreloadOrderFiles(o).catch(() => {});
+    }
+  }
+}
+
+async function repShareOrderWithImages(o, btnEl, opts) {
+  if (!o) return;
+  const options = opts || {};
+  const msg = repMsg(o);
+  const imgItems = (o.items || []).filter(i => i.image || i.image_path);
+  const targetPhone = options.phone ? waPhone(options.phone) : '';
+
+  // نسخ النص فوراً للحافظة مع نقرة المستخدم
+  try { navigator.clipboard.writeText(msg).catch(() => {}); } catch (e) {}
+
+  // 1) إذا كانت ملفات الصور (Blobs/Files) محضّرة مسبقاً في الذاكرة، نفتح مشاركة النظام فوراً مع الصور والنص
+  const readyFiles = REP_IMG_MEM.files[o.id];
+  if (!options.directWa && imgItems.length && readyFiles && readyFiles.length && navigator.share && (!navigator.canShare || navigator.canShare({ files: readyFiles }))) {
+    try {
+      await navigator.share({
+        title: 'طلب #' + o.order_no,
+        text: msg,
+        files: readyFiles
+      });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+
+  // 2) تحميل الصور كـ Blob إذا لم تكن محمّلة بعد
+  const origTxt = btnEl ? btnEl.textContent : '';
+  let files = readyFiles || [];
+  if (imgItems.length && !files.length) {
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ تجهيز الصور…'; }
+    if (typeof toast === 'function') toast('⏳ جارٍ تجهيز صور المنتجات مع الرسالة…');
+    files = await repPreloadOrderFiles(o);
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = origTxt; }
+  }
+
+  if (!options.directWa && files.length && navigator.share && (!navigator.canShare || navigator.canShare({ files }))) {
+    try {
+      await navigator.share({
+        title: 'طلب #' + o.order_no,
+        text: msg,
+        files
+      });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      if (typeof dlg !== 'undefined') {
+        dlg.innerHTML = '<h2>📤 إرسال الرسالة مع صور المنتجات</h2>' +
+          '<p class="m">تم تجهيز صور المنتجات (' + files.length + ') كملفات مرفقة مع رسالة الطلب #' + o.order_no + '. اضغط الزر الأخضر لإرسال الصور مع النص مباشرة:</p>' +
+          '<div class="row dact" style="gap:8px;flex-wrap:wrap">' +
+            '<button class="p" id="rsh_now_btn" style="background:#15803d;border-color:#15803d;color:#fff">📤 مشاركة الصور مع النص الآن</button>' +
+            '<button class="s" id="rsh_wa_btn">💬 فتح واتساب بالرسالة والرابط المختصر</button>' +
+            '<button class="s" id="rsh_x_btn">إغلاق</button>' +
+          '</div>';
+        $('rsh_x_btn').onclick = () => dlg.close();
+        $('rsh_now_btn').onclick = async () => {
+          try {
+            await navigator.share({ title: 'طلب #' + o.order_no, text: msg, files });
+            dlg.close();
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            dlg.close();
+            window.open('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(msg), '_blank');
+          }
+        };
+        $('rsh_wa_btn').onclick = () => {
+          dlg.close();
+          window.open('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(msg), '_blank');
+        };
+        if (!dlg.open) dlg.showModal();
+        return;
+      }
+    }
+  }
+
+  // 3) في حال عدم دعم المتصفح لمشاركة الملفات: تنزيل الصور محلياً عبر Blob URL + فتح تطبيق المراسلة (واتساب)
+  if (files.length) {
+    for (const f of files) {
+      try {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(f);
+        a.download = f.name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      } catch (e) {}
+    }
+  }
+  window.open('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
 const rOpen = () => (S.rorders || []).filter(o => o.status === 'preparing').sort((a, b) => {
   const ra = typeof orderCatMeta === 'function' ? orderCatMeta(a).rank : 5;
   const rb = typeof orderCatMeta === 'function' ? orderCatMeta(b).rank : 5;
@@ -64,8 +217,7 @@ function repMsg(o, opts) {
     '📋 *قائمة التجهيز:*'
   ].concat((o.items || []).map(i => {
     const rawPath = i.image || i.image_path;
-    const signed = rawPath ? repImgUrl(rawPath) : '';
-    const u = (!noLinks && rawPath) ? ((typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath, signed) : '') || signed) : '';
+    const u = (!noLinks && rawPath) ? (typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath) : repImgUrl(rawPath, i.id)) : '';
     return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') + (u ? '\n    📷 صورة المنتج: ' + u : '');
   }))
   .concat(cn ? ['', '⚠️ *ملاحظات هامة:* ' + cn] : [])
@@ -352,7 +504,7 @@ function repCard(o) {
   const ph = o.phone ? digits(o.phone) : '';
   const cn = repCleanNotes(o);
   const its = o.items || [];
-  const imgItems = its.filter(i => repImgUrl(i.image || i.image_path));
+  const imgItems = its.filter(i => repImgUrl(i.image || i.image_path, i.id));
   const cp = repCompanyProfile(o);
   const collAmount = o.collect != null ? +o.collect : (+o.balance || 0);
   const catKey = typeof orderCatOf === 'function' ? orderCatOf(o) : 'normal';
@@ -369,31 +521,35 @@ function repCard(o) {
       '<span class="m">' + esc(o.order_date || '') + '</span>' +
     '</div>' +
     '<div class="rn" style="font-size:16px;font-weight:800;margin:6px 0 4px">' + esc(o.customer_name) + '</div>' +
-    (o.phone ? '<div class="rcall" style="margin-bottom:8px"><a class="btnl" href="tel:' + esc(ph) + '">📞 اتصال</a><a class="btnl" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب</a><span class="m" dir="ltr">' + esc(o.phone) + '</span></div>' : '') +
+    (o.phone ? '<div class="rcall" style="margin-bottom:8px"><a class="btnl" href="tel:' + esc(ph) + '">📞 اتصال</a><a class="btnl" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب العميل</a><span class="m" dir="ltr">' + esc(o.phone) + '</span></div>' : '') +
     (o.address ? '<div class="ra" style="margin-bottom:10px">📍 ' + esc(o.address) + ' <a class="btnl" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '">🗺 الخريطة</a></div>' : '') +
-    '<div class="rlist"><div class="bar" style="margin-bottom:6px"><b>📋 قائمة التجهيز (' + its.length + ' أصناف)</b>' + (imgItems.length ? '<span class="chip ok">📷 ' + imgItems.length + ' صور</span>' : '') + '</div>' +
+    '<div class="rlist"><div class="bar" style="margin-bottom:6px"><b>📋 قائمة التجهيز (' + its.length + ' أصناف)</b>' + (imgItems.length ? '<span class="chip ok">📷 ' + imgItems.length + ' صور مرفقة</span>' : '') + '</div>' +
     its.map(i => {
-      const u = repImgUrl(i.image || i.image_path);
+      const rawPath = i.image || i.image_path;
+      const u = repImgUrl(rawPath, i.id);
+      const shortLink = rawPath && typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath) : u;
       return '<div class="ritem" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)">' +
         (u ? '<img class="thumb" src="' + esc(u) + '" alt="' + esc(i.name) + '" data-zoom="' + esc(u) + '" title="اضغط لتكبير الصورة" style="width:60px;height:60px;object-fit:cover;border-radius:10px;border:2px solid var(--acc);cursor:zoom-in;flex:none">' : '') +
         '<div style="flex:1;min-width:0">' +
           '<b style="display:block;font-size:13.5px">' + esc(i.name) + '</b>' +
           (i.price ? '<span style="font-size:12px;color:var(--mute)">السعر: ' + money(i.price) + ' ' + cp.currency + '</span>' : '') +
           (i.supplier ? '<span class="rsup" style="display:block;font-size:11.5px;color:var(--acc)">🏪 التاجر: ' + esc(i.supplier) + '</span>' : '') +
+          (shortLink ? '<a href="' + esc(shortLink) + '" target="_blank" rel="noopener" style="display:inline-block;font-size:11px;margin-top:2px;color:var(--acc);text-decoration:none" dir="ltr">🔗 ' + esc(shortLink) + '</a>' : '') +
         '</div>' +
         '<b style="font-size:15px;flex:none">× ' + (+i.qty) + '</b>' +
       '</div>';
     }).join('') + '</div>' +
-    (imgItems.length ? '<div style="margin:8px 0;padding:10px;border-radius:12px;background:var(--bg);border:1px solid var(--line)"><div style="font-size:12px;font-weight:700;margin-bottom:6px">🖼️ معرض صور الأصناف (اضغط للتكبير والمطابقة):</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path); return '<div style="text-align:center;cursor:zoom-in" data-zoom="' + esc(u) + '"><img src="' + esc(u) + '" alt="" style="width:68px;height:68px;object-fit:cover;border-radius:10px;border:1.5px solid var(--line);display:block"><span style="font-size:10.5px;display:block;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">' + esc(i.name) + '</span></div>'; }).join('') + '</div></div>' : '') +
+    (imgItems.length ? '<div style="margin:8px 0;padding:10px;border-radius:12px;background:var(--bg);border:1px solid var(--line)"><div style="font-size:12px;font-weight:700;margin-bottom:6px">🖼️ معرض صور الأصناف (اضغط للتكبير والمطابقة):</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path, i.id); return '<div style="text-align:center;cursor:zoom-in" data-zoom="' + esc(u) + '"><img src="' + esc(u) + '" alt="" style="width:68px;height:68px;object-fit:cover;border-radius:10px;border:1.5px solid var(--line);display:block"><span style="font-size:10.5px;display:block;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">' + esc(i.name) + '</span></div>'; }).join('') + '</div></div>' : '') +
     (cn ? '<div class="dnote" style="background:var(--soonsoft);color:var(--soon);margin:8px 0">⚠️ ' + esc(cn) + '</div>' : '') +
     (collAmount > 0 ? '<div class="rcol" style="background:var(--goldsoft);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;margin:10px 0;font-size:16px;display:flex;justify-content:space-between;align-items:center"><span>💵 المطلوب تحصيله نقداً:</span><b style="font-size:18px;color:var(--ink)">' + money(collAmount) + ' ' + cp.currency + '</b></div>' : '<div class="m" style="margin:8px 0;color:var(--ok)">✅ مدفوع بالكامل مسبقاً (لا تحصيل نقدي)</div>') +
     '<div class="m" style="margin:6px 0;font-size:12px">مسجل الطلب: ' + esc(o.created_by_name || '—') + '</div>' +
     '<div class="acts ract" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">' +
       '<button class="p" data-rd="' + o.id + '" style="flex:2 1 110px">✅ تم التوصيل</button>' +
+      '<button class="s" data-rsh="' + o.id + '" style="flex:2 1 120px;font-weight:700;background:#0d9488;color:#fff;border-color:#0d9488" title="إرسال ومشاركة رسالة الطلب مع صور المنتجات المرفقة مباشرة في تطبيق المراسلة (واتساب)">📲 الرسالة مع الصور</button>' +
       '<button class="s" data-rpdf="' + o.id + '" style="flex:2 1 110px;font-weight:700;background:#15803d;color:#fff;border-color:#15803d" title="إرسال الفاتورة بصيغة PDF مباشرة للعميل">📄 إرسال PDF</button>' +
       '<button class="s" data-rinv="' + o.id + '" style="flex:1 1 90px;font-weight:700" title="طباعة فاتورة أو إيصال حراري للعميل">🧾 إيصال</button>' +
       '<button class="dng s" data-rc="' + o.id + '" style="flex:1 1 70px">❌ إلغاء</button>' +
-      '<button class="s" data-re="' + o.id + '" aria-label="معاينة الرسالة" style="flex:0 0 42px">👁</button>' +
+      '<button class="s" data-re="' + o.id + '" aria-label="معاينة الرسالة والصور" style="flex:0 0 42px">👁</button>' +
     '</div></div>';
 }
 
@@ -403,6 +559,7 @@ function repHistoryCard(o) {
   const collAmount = o.collect != null ? +o.collect : (+o.balance || 0);
   const delTime = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' }) : '';
   const delDate = o.delivered_at ? String(o.delivered_at).slice(0, 10) : o.order_date;
+  const imgItems = (o.items || []).filter(i => repImgUrl(i.image || i.image_path, i.id));
 
   return '<div class="card rcard" style="padding:12px 14px;margin-bottom:10px;border-right:4px solid ' + (isDelivered ? 'var(--ok)' : 'var(--late)') + '">' +
     '<div class="bar" style="margin-bottom:6px">' +
@@ -418,9 +575,11 @@ function repHistoryCard(o) {
     (o.cancel_reason ? '<div class="dnote" style="background:var(--latesoft);color:var(--late);margin:6px 0;font-size:12.5px">سبب الإلغاء: ' + esc(o.cancel_reason) + '</div>' : '') +
     (isDelivered && collAmount > 0 ? '<div style="font-size:13.5px;margin:6px 0;color:var(--ok)">💵 تم تحصيل: <b>' + money(collAmount) + ' ' + cp.currency + '</b></div>' : '') +
     '<div class="m" style="font-size:12px;margin:4px 0">' + (o.items || []).length + ' أصناف: ' + esc((o.items || []).map(i => i.name + ' (' + i.qty + ')').join('، ')) + '</div>' +
-    '<div class="row s" style="margin-top:8px;gap:6px;justify-content:flex-start">' +
+    (imgItems.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path, i.id); return '<img src="' + esc(u) + '" alt="' + esc(i.name) + '" data-zoom="' + esc(u) + '" style="width:46px;height:46px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">'; }).join('') + '</div>' : '') +
+    '<div class="row s" style="margin-top:8px;gap:6px;justify-content:flex-start;flex-wrap:wrap">' +
       '<button class="s" data-rinv="' + o.id + '" style="font-weight:700">🧾 فاتورة / إيصال حراري</button>' +
-      (o.phone ? '<a class="btnl s" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب</a>' : '') +
+      '<button class="s" data-rsh="' + o.id + '">📲 الرسالة مع الصور</button>' +
+      (o.phone ? '<a class="btnl s" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب العميل</a>' : '') +
       '<button class="s" data-re="' + o.id + '">👁 تفاصيل الطلب</button>' +
     '</div></div>';
 }
@@ -561,6 +720,10 @@ function repRender() {
   // أحداث الطلبات
   document.querySelectorAll('[data-rd]').forEach(b => b.onclick = () => repDeliver(b.dataset.rd));
   document.querySelectorAll('[data-rc]').forEach(b => b.onclick = () => repCancel(b.dataset.rc));
+  document.querySelectorAll('[data-rsh]').forEach(b => b.onclick = () => {
+    const o = (S.rorders || []).find(x => x.id === b.dataset.rsh);
+    if (o) repShareOrderWithImages(o, b);
+  });
   document.querySelectorAll('[data-rpdf]').forEach(b => b.onclick = () => {
     const o = (S.rorders || []).find(x => x.id === b.dataset.rpdf);
     if (o) sendRepInvoicePdf(o, b);
@@ -590,16 +753,22 @@ function repFocus(id) {
 
 function repPreview(o) {
   if (!o) return;
-  const imgItems = (o.items || []).filter(i => repImgUrl(i.image || i.image_path));
+  const imgItems = (o.items || []).filter(i => repImgUrl(i.image || i.image_path, i.id));
+  if (imgItems.length) repPreloadOrderFiles(o).catch(() => {});
   const gal = imgItems.length ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' + imgItems.map(i => {
-    const u = repImgUrl(i.image || i.image_path);
-    return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></a>';
+    const rawPath = i.image || i.image_path;
+    const u = repImgUrl(rawPath, i.id);
+    const shortLink = typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath) : u;
+    return '<a href="' + esc(shortLink) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-decoration:none;color:var(--ink)">' +
+      '<img src="' + esc(u) + '" alt="" style="width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">' +
+      '<div><b style="font-size:12.5px;display:block">' + esc(i.name) + '</b><span class="m" style="font-size:11px" dir="ltr">' + esc(shortLink) + '</span></div>' +
+    '</a>';
   }).join('') + '</div>' : '';
 
   dlg.innerHTML = '<h2>👁 معاينة الطلب #' + o.order_no + '</h2>' + gal +
     '<pre class="msgp">' + esc(repMsg(o)) + '</pre>' +
     '<div class="row dact" style="gap:6px;flex-wrap:wrap">' +
-      (imgItems.length ? '<button class="p s" id="rv_sh" type="button">📤 مشاركة الصور مع النص</button>' : '') +
+      '<button class="p s" id="rv_sh" type="button">📤 إرسال الرسالة مع الصور (واتساب)</button>' +
       '<button class="p s" id="rv_inv" type="button">🧾 فاتورة للعميل</button>' +
       '<button class="s" id="rv_cp" type="button">📋 نسخ</button>' +
       '<button class="s" id="rv_x" type="button">إغلاق</button>' +
@@ -608,30 +777,7 @@ function repPreview(o) {
   $('rv_x').onclick = () => dlg.close();
   $('rv_inv').onclick = () => { dlg.close(); repInvoiceDialog(o); };
   if ($('rv_sh')) {
-    $('rv_sh').onclick = async () => {
-      const msg = repMsg(o);
-      try { await navigator.clipboard.writeText(msg); } catch (e) {}
-      const files = [];
-      for (let idx = 0; idx < imgItems.length; idx++) {
-        const it = imgItems[idx];
-        const u = repImgUrl(it.image || it.image_path);
-        if (!u) continue;
-        try {
-          const r = await fetch(u);
-          if (r.ok) {
-            const b = await r.blob();
-            files.push(new File([b], 'طلب-' + o.order_no + '-' + (idx + 1) + '.jpg', { type: b.type || 'image/jpeg' }));
-          }
-        } catch (e) {}
-      }
-      if (files.length && navigator.share && navigator.canShare && navigator.canShare({ files })) {
-        try {
-          await navigator.share({ title: 'طلب #' + o.order_no, text: msg, files });
-          return;
-        } catch (e) { if (e && e.name === 'AbortError') return; }
-      }
-      if (typeof toast === 'function') toast('تم نسخ النص ✓');
-    };
+    $('rv_sh').onclick = () => repShareOrderWithImages(o, $('rv_sh'));
   }
   $('rv_cp').onclick = async () => {
     try {

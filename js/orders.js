@@ -131,12 +131,15 @@ async function shareOrderToRep(o, btnEl, opts) {
   const itsWithImg = oItems(o.id).filter(i => i.image_path);
   const rPhone = repPhone(o.rep_email) ? waPhone(repPhone(o.rep_email)) : '';
 
-  // 1) إذا كانت ملفات الصور جاهزة في الذاكرة، نطلق navigator.share في نفس اللحظة المتزامنة للنقرة (قبل أي await!)
+  // نسخ النص فوراً للحافظة عند نقرة المستخدم (قبل أي await للحفاظ على User Activation)
+  try { navigator.clipboard.writeText(msg).catch(() => {}); } catch (e) {}
+
+  // 1) إذا كانت ملفات الصور (Blobs/Files) جاهزة في الذاكرة، نطلق navigator.share في نفس اللحظة المتزامنة للنقرة
   const readyFiles = ORD_IMG_MEM.files[o.id];
-  if (!options.directWa && itsWithImg.length && readyFiles && readyFiles.length && navigator.share) {
-    try { navigator.clipboard.writeText(msg).catch(() => {}); } catch (e) {}
+  if (!options.directWa && itsWithImg.length && readyFiles && readyFiles.length && navigator.share && (!navigator.canShare || navigator.canShare({ files: readyFiles }))) {
     try {
       await navigator.share({
+        title: 'طلب #' + o.order_no,
         text: msg,
         files: readyFiles
       });
@@ -146,7 +149,7 @@ async function shareOrderToRep(o, btnEl, opts) {
     }
   }
 
-  // 2) إذا لم تكن الصور محمّلة بعد في الذاكرة عند النقرة الأولى، نحمّلها الآن من /i/xxxxxxxx
+  // 2) إذا لم تكن الصور محمّلة بعد في الذاكرة عند النقرة الأولى، نحمّلها الآن من /i/xxxxxxxx كـ Blob
   const origTxt = btnEl ? btnEl.textContent : '';
   let files = readyFiles || [];
   if (itsWithImg.length && !files.length) {
@@ -156,11 +159,10 @@ async function shareOrderToRep(o, btnEl, opts) {
     if (btnEl) { btnEl.disabled = false; btnEl.textContent = origTxt; }
   }
 
-  try { await navigator.clipboard.writeText(msg); } catch (e) {}
-
-  if (!options.directWa && files.length && navigator.share) {
+  if (!options.directWa && files.length && navigator.share && (!navigator.canShare || navigator.canShare({ files }))) {
     try {
       await navigator.share({
+        title: 'طلب #' + o.order_no,
         text: msg,
         files
       });
@@ -179,7 +181,7 @@ async function shareOrderToRep(o, btnEl, opts) {
         $('sh_x_btn').onclick = () => dlg.close();
         $('sh_now_btn').onclick = async () => {
           try {
-            await navigator.share({ text: msg, files });
+            await navigator.share({ title: 'طلب #' + o.order_no, text: msg, files });
             dlg.close();
           } catch (err) {
             if (err && err.name === 'AbortError') return;
@@ -519,21 +521,20 @@ async function oAction(a, id, btnEl) {
   else if (a === 'reopen') { if (confirm('إعادة الطلب #' + o.order_no + ' إلى «جديد»؟')) oUpdate(id, { status: 'new' }); }
 }
 async function previewDialog(o) {
-  const its = oItems(o.id), paths = its.map(i => i.image_path).filter(Boolean);
-  const map = paths.length ? await imgSign(paths) : {};
-  Object.assign(ORD_IMG_MEM.urls, map);
-  if (paths.length) preloadOrderFiles(o).catch(() => {});
-  const msg = orderMsg(o, map);
-  const imgsHtml = paths.length ? (
+  const its = oItems(o.id), imgItems = its.filter(i => i.image_path);
+  if (imgItems.length) preloadOrderFiles(o).catch(() => {});
+  const msg = orderMsg(o);
+  const imgsHtml = imgItems.length ? (
     '<div class="obox" style="margin-bottom:10px">' +
-      '<div class="bar" style="margin-bottom:6px"><b>📷 صور المنتجات المرفقة للمندوب (' + paths.length + ')</b><span class="chip ok">تُرسل كصورة فعلية مع النص</span></div>' +
+      '<div class="bar" style="margin-bottom:6px"><b>📷 صور المنتجات المرفقة للمندوب (' + imgItems.length + ')</b><span class="chip ok">تُرسل كصورة فعلية مع النص</span></div>' +
       '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-        its.filter(i => i.image_path && map[i.image_path]).map(i =>
-          '<a href="' + esc(map[i.image_path]) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-decoration:none;color:var(--ink)">' +
-            '<img src="' + esc(map[i.image_path]) + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">' +
-            '<div><b style="font-size:12.5px;display:block">' + esc(i.name) + '</b><span class="m" style="font-size:11px">↗ فتح الصورة</span></div>' +
-          '</a>'
-        ).join('') +
+        imgItems.map(i => {
+          const shortU = typeof shortImgUrl === 'function' ? shortImgUrl(i.id, i.image_path) : (location.origin + '/api/i?c=' + encodeURIComponent(i.image_path));
+          return '<a href="' + esc(shortU) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-decoration:none;color:var(--ink)">' +
+            '<img src="' + esc(shortU) + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">' +
+            '<div><b style="font-size:12.5px;display:block">' + esc(i.name) + '</b><span class="m" style="font-size:11px" dir="ltr">' + esc(shortU) + '</span></div>' +
+          '</a>';
+        }).join('') +
       '</div>' +
     '</div>'
   ) : '<div class="m" style="margin-bottom:8px">💡 لا توجد صور مرفقة للأصناف في هذا الطلب (يمكنك إرفاق صورة لكل صنف من نافذة تعديل الطلب لتُرسل مع النص للمندوب).</div>';
@@ -541,7 +542,7 @@ async function previewDialog(o) {
   dlg.innerHTML = '<h2>👁 معاينة رسالة وصور المندوب</h2>' + imgsHtml + '<pre class="msgp">' + esc(msg) + '</pre>' +
     '<div class="row dact" style="flex-wrap:wrap;gap:6px">' +
       '<button class="p s" id="pv_wa">📤 إرسال الصورة مع النص للمندوب</button>' +
-      (paths.length ? '<button class="s" id="pv_wa_direct">💬 واتساب المندوب (نص + رابط + تنزيل الصورة)</button>' : '') +
+      (imgItems.length ? '<button class="s" id="pv_wa_direct">💬 واتساب المندوب (نص + رابط + تنزيل الصورة)</button>' : '') +
       '<button class="s" id="pv_cp">📋 نسخ الرسالة</button>' +
       '<button class="s" id="pv_x">إغلاق</button>' +
     '</div>';
@@ -553,12 +554,26 @@ async function previewDialog(o) {
 }
 function assignDialog(o) {
   const reps = S.reps || [];
+  if (oItems(o.id).some(i => i.image_path)) preloadOrderFiles(o).catch(() => {});
   dlg.innerHTML = '<h2>🛵 إسناد الطلب #' + o.order_no + '</h2><div class="m" style="margin-bottom:10px">' + esc(o.customer_name) + (o.address ? ' — ' + esc(o.address) : '') + '</div>' +
     (reps.length ? '<label>المندوب<select id="as_r">' + reps.map(r => '<option value="' + esc(r.email) + '"' + (same(o.rep_email, r.email) ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select></label><p class="m">سيصل المندوب إشعار فوراً، ويتحول الطلب إلى «قيد التجهيز».</p>' :
       '<div class="empty">لا يوجد مندوبون بعد.<br>أضف مندوباً من الإعدادات ← إدارة الأعضاء (الدور: مندوب توصيل).</div>') +
-    '<div class="row dact">' + (reps.length ? '<button class="p s" id="as_ok">إسناد وتجهيز</button>' : '') + '<button class="s" id="as_x">إلغاء</button></div>';
+    '<div class="row dact" style="flex-wrap:wrap;gap:6px">' +
+      (reps.length ? '<button class="p s" id="as_ok">إسناد وتجهيز</button><button class="s" id="as_wa" style="background:#0d9488;color:#fff;border-color:#0d9488;font-weight:700">📲 إسناد وإرسال الرسالة مع الصور للمندوب</button>' : '') +
+      '<button class="s" id="as_x">إلغاء</button>' +
+    '</div>';
   $('as_x').onclick = () => dlg.close();
-  if (reps.length) $('as_ok').onclick = async () => { const r = $('as_r').value; dlg.close(); await oUpdate(o.id, { rep_email: r, status: 'preparing' }); };
+  if (reps.length) {
+    $('as_ok').onclick = async () => { const r = $('as_r').value; dlg.close(); await oUpdate(o.id, { rep_email: r, status: 'preparing' }); };
+    $('as_wa').onclick = async () => {
+      const r = $('as_r').value;
+      o.rep_email = r;
+      o.status = 'preparing';
+      dlg.close();
+      oUpdate(o.id, { rep_email: r, status: 'preparing' });
+      await shareOrderToRep(o, null);
+    };
+  }
   dlg.showModal();
 }
 function deliverDialog(o) {
