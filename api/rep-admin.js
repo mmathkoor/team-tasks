@@ -107,13 +107,38 @@ async function ensureSetPassword(email, password) {
   return r;
 }
 
+async function canAccessItemCosts(me) {
+  if (!me || !me.email) return false;
+  if (me.role === 'admin') return true;
+  if (me.role === 'rep') return false;
+  try {
+    const [{ data: mem }, { data: ordSet }, { data: cos }] = await Promise.all([
+      supabase.from('members').select('email,role,company,permissions,telegram_chat_id').ilike('email', me.email).maybeSingle(),
+      supabase.from('ord_settings').select('staff_can_cost').limit(1).maybeSingle(),
+      supabase.from('companies').select('id,staff_can_cost')
+    ]);
+    if (mem && mem.role === 'admin') return true;
+    if (mem && mem.permissions && typeof mem.permissions === 'object' && mem.permissions.canCost) return true;
+    if (ordSet && ordSet.staff_can_cost) return true;
+    let memCo = (mem && mem.company) || '';
+    if (!memCo && mem && mem.telegram_chat_id && String(mem.telegram_chat_id).startsWith('{')) {
+      try { memCo = JSON.parse(mem.telegram_chat_id).co || ''; } catch (e) {}
+    }
+    const targetCo = String(memCo || 'متجرك').trim().toLowerCase();
+    if (Array.isArray(cos) && cos.some(c => String(c.id || '').trim().toLowerCase() === targetCo && c.staff_can_cost)) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
   const me = await member(req);
   if (!me) return res.status(401).json({ error: 'غير مسجّل الدخول' });
 
   try {
-    const { action, name, phone, password, email, company, department, title, role, permissions, order_id } = req.body || {};
+    const { action, name, phone, password, email, company, department, title, role, permissions, order_id, items } = req.body || {};
 
     // استرجاع تفاصيل الفاتورة كاملة مع أسعار البيع لمندوب الطلب أو أعضاء الفريق
     if (action === 'get_order_invoice') {
@@ -124,7 +149,7 @@ module.exports = async (req, res) => {
       if (me.role === 'rep' && String(ord.rep_email || '').toLowerCase() !== String(me.email || '').toLowerCase()) {
         return res.status(403).json({ error: 'غير مصرّح لك بعرض هذا الطلب' });
       }
-      const { data: items } = await supabase.from('ord_items')
+      const { data: ordItems } = await supabase.from('ord_items')
         .select('id,pos,name,qty,price,line_total,image_path,supplier')
         .eq('order_id', order_id)
         .order('pos');
@@ -132,9 +157,54 @@ module.exports = async (req, res) => {
         ok: true,
         order: {
           ...ord,
-          items: items || []
+          items: ordItems || []
         }
       });
+    }
+
+    // قراءة أسعار الشراء لجميع المستخدمين المخولين (يتجاوز تعارضات RLS بين المدير والموظفين)
+    if (action === 'get_item_costs') {
+      const allowed = await canAccessItemCosts(me);
+      if (!allowed) return res.status(403).json({ error: 'ليس لديك صلاحية الاطلاع على أسعار الشراء' });
+      const db = (process.env.SUPABASE_SERVICE_ROLE_KEY ? supabase : (req.sb || supabase));
+      const costMap = {};
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await db
+          .from('ord_item_costs')
+          .select('item_id,cost')
+          .order('item_id', { ascending: true })
+          .range(from, from + step - 1);
+        if (error) return res.status(500).json({ error: error.message });
+        if (!data || !data.length) break;
+        for (const r of data) {
+          if (r && r.item_id) costMap[r.item_id] = Number(r.cost) || 0;
+        }
+        if (data.length < step) break;
+        from += step;
+      }
+      return res.json({ ok: true, costs: costMap });
+    }
+
+    // حفظ وتحديث أسعار الشراء بشكل دائم في قاعدة البيانات للجميع
+    if (action === 'save_item_costs') {
+      const allowed = await canAccessItemCosts(me);
+      if (!allowed) return res.status(403).json({ error: 'ليس لديك صلاحية تعديل أسعار الشراء' });
+      if (!Array.isArray(items) || !items.length) {
+        return res.json({ ok: true, saved: 0 });
+      }
+      const rows = items
+        .filter(x => x && x.item_id)
+        .map(x => ({
+          item_id: String(x.item_id).trim(),
+          cost: Math.max(0, Number(x.cost) || 0)
+        }));
+      if (!rows.length) return res.json({ ok: true, saved: 0 });
+      const db = (process.env.SUPABASE_SERVICE_ROLE_KEY ? supabase : (req.sb || supabase));
+      const { error } = await db.from('ord_item_costs').upsert(rows, { onConflict: 'item_id' });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true, saved: rows.length });
     }
 
     // بقية العمليات الإدارية للمدير فقط

@@ -202,8 +202,8 @@ function repCompanyProfile(o) {
 
 function repMsg(o, opts) {
   const cn = repCleanNotes(o);
-  const cp = repCompanyProfile(o);
   const noLinks = !!(opts && opts.noLinks);
+  const { cp, items, sub, dFee, disc, tot, bal, paid } = normalizeInvoiceData(o);
   return [
     'مرحباً كابتن *' + (S.me ? S.me.name : '') + '* 🛵',
     '📦 طلب مبيعات #' + o.order_no + ' — ' + cp.name,
@@ -212,10 +212,15 @@ function repMsg(o, opts) {
     '🙍 العميل: ' + o.customer_name,
     '📞 الهاتف: ' + (o.phone || '—'),
     '📍 العنوان: ' + (o.address || '—'),
-    '💵 المطلوب تحصيله: ' + money(o.collect != null ? o.collect : o.balance) + ' ' + cp.currency,
+    '📦 سعر الأصناف (بدون التوصيل): ' + money(sub) + ' ' + cp.currency,
+    '🚚 رسوم التوصيل: ' + (dFee > 0 ? '+' + money(dFee) + ' ' + cp.currency : '0 ' + cp.currency),
+    disc > 0 ? '🏷️ الخصم: -' + money(disc) + ' ' + cp.currency : '',
+    '💰 *إجمالي السعر (شامل التوصيل): ' + money(tot) + ' ' + cp.currency + '*',
+    paid > 0 ? '✅ المدفوع مسبقاً: ' + money(paid) + ' ' + cp.currency : '',
+    '💵 *المطلوب تحصيله: ' + money(bal) + ' ' + cp.currency + '*',
     '',
     '📋 *قائمة التجهيز:*'
-  ].concat((o.items || []).map(i => {
+  ].filter(Boolean).concat(items.map(i => {
     const rawPath = i.image || i.image_path;
     const u = (!noLinks && rawPath) ? (typeof shortImgUrl === 'function' ? shortImgUrl(i.id, rawPath) : repImgUrl(rawPath, i.id)) : '';
     return '▫️ ' + i.name + ' × ' + (+i.qty) + (i.price ? ' (' + money(i.price) + ' ' + cp.currency + ')' : '') + (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') + (u ? '\n    📷 صورة المنتج: ' + u : '');
@@ -224,7 +229,7 @@ function repMsg(o, opts) {
   .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
 }
 
-// استخلاص وحساب مبالغ الفاتورة بدقة وضمان عدم ظهور الأسعار 0
+// استخلاص وحساب مبالغ الفاتورة بدقة وضمان عدم ظهور الأسعار 0 أو سقوط رسوم التوصيل
 function normalizeInvoiceData(o) {
   const cp = repCompanyProfile(o);
   let items = Array.isArray(o.items) ? o.items.map(it => ({ ...it })) : [];
@@ -232,7 +237,7 @@ function normalizeInvoiceData(o) {
   const dFee = +(o.delivery_fee || 0);
   const disc = +(o.discount || 0);
   let tot = o.total != null ? +o.total : (sub + dFee - disc);
-  let bal = o.balance != null ? +o.balance : (+o.collect || tot);
+  let bal = o.balance != null ? +o.balance : (o.collect != null ? +o.collect : tot);
 
   // إذا لم يكن الإجمالي مسجلاً أو كان 0 وكان هناك مبلغ مطلوب تحصيله (collect / balance)
   const knownPayable = +o.collect || +o.balance || 0;
@@ -259,7 +264,16 @@ function normalizeInvoiceData(o) {
     }
   } else if (sub <= 0 && itemsSum > 0) {
     sub = itemsSum;
-    if (tot <= 0) tot = sub + dFee - disc;
+  }
+
+  // ضمان أن الإجمالي الكلي يشمل رسوم التوصيل دائماً
+  if (sub > 0 && dFee > 0 && tot < (sub + dFee - disc)) {
+    tot = Math.max(0, sub + dFee - disc);
+    const paidKnown = o.paid != null ? +o.paid : 0;
+    bal = Math.max(0, tot - paidKnown);
+  } else if (tot <= 0 && (sub > 0 || dFee > 0)) {
+    tot = Math.max(0, sub + dFee - disc);
+    bal = Math.max(0, tot - (+o.paid || 0));
   }
 
   const paid = o.paid != null ? +o.paid : Math.max(0, tot - bal);
@@ -388,19 +402,10 @@ function printThermalReceipt(o) {
   doc.close();
 }
 
-async function sendRepInvoicePdf(o, btnEl) {
-  if (!o || typeof shareOrSendInvoicePdf !== 'function') return;
-  const needsFetch = !o.subtotal || !(o.items && o.items.some(i => +i.price > 0));
-  if (needsFetch && o.id) {
-    try {
-      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'get_order_invoice', order_id: o.id }));
-      const j = await rr.json().catch(() => ({}));
-      if (rr.ok && j && j.order) Object.assign(o, j.order);
-    } catch (e) {}
-  }
+function repBuildPdfData(o) {
   const { cp, items, sub, dFee, disc, tot, paid, bal } = normalizeInvoiceData(o);
   const catM = typeof orderCatMeta === 'function' ? orderCatMeta(o) : { badge: 'عادي', bg: '#f1f5f9', fg: '#475569' };
-  await shareOrSendInvoicePdf({
+  return {
     storeName: cp.name,
     storePhone: cp.phone || '',
     storeAddress: cp.address || '',
@@ -422,13 +427,100 @@ async function sendRepInvoicePdf(o, btnEl) {
     total: tot,
     paid: paid,
     balance: bal
-  }, o.phone, btnEl);
+  };
+}
+
+async function sendRepInvoicePdf(o, btnEl, pdfOpts) {
+  if (!o || typeof shareOrSendInvoicePdf !== 'function') return;
+  const needsFetch = !o.subtotal || !(o.items && o.items.some(i => +i.price > 0));
+  if (needsFetch && o.id && !(pdfOpts && pdfOpts.prebuiltFile)) {
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'get_order_invoice', order_id: o.id }));
+      const j = await rr.json().catch(() => ({}));
+      if (rr.ok && j && j.order) Object.assign(o, j.order);
+    } catch (e) {}
+  }
+  await shareOrSendInvoicePdf(repBuildPdfData(o), o.phone, btnEl, pdfOpts);
+}
+
+async function repInvoiceSendChoiceDialog(o) {
+  if (!o) return;
+  let prebuiltPdf = null;
+
+  const paint = () => {
+    const { cp, tot, bal } = normalizeInvoiceData(o);
+    const rawText = receiptPlainText(o);
+    const waHref = typeof waTextUrl === 'function' ? waTextUrl(o.phone, rawText) : ('https://wa.me/' + (o.phone ? waPhone(o.phone) : '') + '?text=' + encodeURIComponent(rawText));
+
+    dlg.innerHTML = '<h2>📤 إرسال الفاتورة للعميل #' + o.order_no + '</h2>' +
+      '<div style="padding:10px 12px;border-radius:10px;background:var(--col);border:1px solid var(--line);margin-bottom:12px">' +
+        '<div style="font-weight:700;font-size:15px">👤 ' + esc(o.customer_name) + (o.phone ? ' · <span dir="ltr">' + esc(o.phone) + '</span>' : '') + '</div>' +
+        '<div class="m" style="margin-top:4px">💰 الإجمالي (شامل التوصيل): <b>' + money(tot) + ' ' + esc(cp.currency) + '</b> · المطلوب: <b>' + money(bal) + ' ' + esc(cp.currency) + '</b></div>' +
+        '<div id="rch_st" class="m" style="margin-top:6px;font-size:12px">' + (prebuiltPdf ? '✅ ملف PDF جاهز الآن للإرسال المباشر بضغطة واحدة' : '⏳ جارٍ تجهيز ملف PDF عالي الدقة للإرسال المباشر…') + '</div>' +
+      '</div>' +
+      '<div style="display:grid;gap:8px">' +
+        '<button type="button" class="p" id="rch_pdf" style="background:#15803d;border-color:#15803d;color:#fff;padding:12px;font-size:14.5px">📄 إرسال فاتورة PDF مباشرة (ملف مرفق)</button>' +
+        '<button type="button" class="p" id="rch_txt" style="background:#0d9488;border-color:#0d9488;color:#fff;padding:12px;font-size:14.5px">💬 إرسال فاتورة نصية (واتساب)</button>' +
+        '<button type="button" class="s" id="rch_dl" style="padding:10px">⬇️ تنزيل ملف PDF + فتح واتساب العميل</button>' +
+        '<div class="row" style="gap:6px">' +
+          '<button type="button" class="s" id="rch_inv" style="flex:1">🧾 معاينة وطباعة الإيصال</button>' +
+          '<button type="button" class="s" id="rch_cp" style="flex:1">📋 نسخ النص</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="row dact"><button type="button" class="s" id="rch_x">إغلاق</button></div>';
+
+    if (prebuiltPdf && $('rch_st')) $('rch_st').style.color = 'var(--ok)';
+    $('rch_x').onclick = () => dlg.close();
+    $('rch_txt').onclick = () => {
+      dlg.close();
+      window.open(waHref, '_blank');
+    };
+    $('rch_pdf').onclick = () => sendRepInvoicePdf(o, $('rch_pdf'), { prebuiltFile: prebuiltPdf });
+    $('rch_dl').onclick = () => sendRepInvoicePdf(o, $('rch_dl'), { prebuiltFile: prebuiltPdf, mode: 'download_wa' });
+    $('rch_inv').onclick = () => repInvoiceDialog(o);
+    $('rch_cp').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(rawText);
+        $('rch_cp').textContent = 'تم النسخ ✓';
+        if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓');
+      } catch (e) { alert('تعذّر النسخ'); }
+    };
+  };
+
+  paint();
+  if (!dlg.open) dlg.showModal();
+
+  const needsFetch = !o.subtotal || !(o.items && o.items.some(i => +i.price > 0));
+  if (needsFetch && o.id) {
+    try {
+      const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'get_order_invoice', order_id: o.id }));
+      const j = await rr.json().catch(() => ({}));
+      if (rr.ok && j && j.order) {
+        Object.assign(o, j.order);
+        if (dlg.open && $('rch_st')) paint();
+      }
+    } catch (e) {}
+  }
+
+  if (typeof buildInvoicePdfFile === 'function') {
+    buildInvoicePdfFile(repBuildPdfData(o)).then(f => {
+      prebuiltPdf = f;
+      if ($('rch_st')) {
+        $('rch_st').textContent = '✅ ملف PDF جاهز الآن للإرسال المباشر بضغطة واحدة';
+        $('rch_st').style.color = 'var(--ok)';
+      }
+    }).catch(() => {
+      if ($('rch_st')) $('rch_st').textContent = '💡 يمكنك اختيار الإرسال بصيغة PDF أو فاتورة نصية.';
+    });
+  }
 }
 
 async function repInvoiceDialog(o) {
   if (!o) return;
+  let prebuiltPdf = null;
 
   const renderContent = () => {
+    prebuiltPdf = null;
     const rawText = receiptPlainText(o);
     const cp = repCompanyProfile(o);
 
@@ -440,17 +532,19 @@ async function repInvoiceDialog(o) {
       thermalReceiptHtml(o) +
     '</div>' +
     '<div class="row dact" style="gap:6px;flex-wrap:wrap">' +
-      '<button class="p s" id="riv_pdf" type="button" style="background:#15803d;color:#fff;border-color:#15803d">📄 إرسال فاتورة PDF للعميل مباشرة</button>' +
+      '<button class="p s" id="riv_pdf" type="button" style="background:#15803d;color:#fff;border-color:#15803d">📄 إرسال فاتورة PDF مباشرة</button>' +
+      '<button class="p s" id="riv_wa" type="button" style="background:#0d9488;color:#fff;border-color:#0d9488">💬 إرسال فاتورة نصية (واتساب)</button>' +
+      '<button class="s" id="riv_pdf_dl" type="button">⬇️ تنزيل PDF</button>' +
       '<button class="p s" id="riv_th" type="button" style="background:#0b1426;color:#f6e3a8">🖨 طباعة إيصال حراري (بلوتوث)</button>' +
       '<button class="s" id="riv_a4" type="button">📄 طباعة A4 / حفظ PDF</button>' +
-      (o.phone ? '<button class="s" id="riv_wa" type="button">💬 إرسال نص واتساب</button>' : '') +
       '<button class="s" id="riv_bt" type="button" title="إرسال لتطبيق طابعة البلوتوث RawBT">📱 تطبيق البلوتوث (RawBT)</button>' +
       '<button class="s" id="riv_cp" type="button">📋 نسخ النص</button>' +
       '<button class="s" id="riv_x" type="button">إغلاق</button>' +
     '</div>';
 
     if ($('riv_x')) $('riv_x').onclick = () => dlg.close();
-    if ($('riv_pdf')) $('riv_pdf').onclick = () => sendRepInvoicePdf(o, $('riv_pdf'));
+    if ($('riv_pdf')) $('riv_pdf').onclick = () => sendRepInvoicePdf(o, $('riv_pdf'), { prebuiltFile: prebuiltPdf });
+    if ($('riv_pdf_dl')) $('riv_pdf_dl').onclick = () => sendRepInvoicePdf(o, $('riv_pdf_dl'), { prebuiltFile: prebuiltPdf, mode: 'download_wa' });
     if ($('riv_th')) $('riv_th').onclick = () => printThermalReceipt(o);
     if ($('riv_a4')) $('riv_a4').onclick = () => {
       if (typeof printInvoice === 'function') printInvoice(o);
@@ -458,8 +552,8 @@ async function repInvoiceDialog(o) {
     };
     if ($('riv_wa')) {
       $('riv_wa').onclick = () => {
-        const ph = typeof waPhone === 'function' ? waPhone(o.phone) : o.phone;
-        window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(rawText), '_blank');
+        const u = typeof waTextUrl === 'function' ? waTextUrl(o.phone, rawText) : ('https://wa.me/' + (o.phone ? waPhone(o.phone) : '') + '?text=' + encodeURIComponent(rawText));
+        window.open(u, '_blank');
       };
     }
     if ($('riv_bt')) {
@@ -478,6 +572,9 @@ async function repInvoiceDialog(o) {
           if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓');
         } catch (e) { alert('تعذّر النسخ'); }
       };
+    }
+    if (typeof buildInvoicePdfFile === 'function') {
+      buildInvoicePdfFile(repBuildPdfData(o)).then(f => { prebuiltPdf = f; }).catch(() => {});
     }
   };
 
@@ -541,12 +638,25 @@ function repCard(o) {
     }).join('') + '</div>' +
     (imgItems.length ? '<div style="margin:8px 0;padding:10px;border-radius:12px;background:var(--bg);border:1px solid var(--line)"><div style="font-size:12px;font-weight:700;margin-bottom:6px">🖼️ معرض صور الأصناف (اضغط للتكبير والمطابقة):</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path, i.id); return '<div style="text-align:center;cursor:zoom-in" data-zoom="' + esc(u) + '"><img src="' + esc(u) + '" alt="" style="width:68px;height:68px;object-fit:cover;border-radius:10px;border:1.5px solid var(--line);display:block"><span style="font-size:10.5px;display:block;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">' + esc(i.name) + '</span></div>'; }).join('') + '</div></div>' : '') +
     (cn ? '<div class="dnote" style="background:var(--soonsoft);color:var(--soon);margin:8px 0">⚠️ ' + esc(cn) + '</div>' : '') +
+    (() => {
+      const n = normalizeInvoiceData(o);
+      const hasBreakdown = n.tot > 0 || n.sub > 0 || n.dFee > 0;
+      return (hasBreakdown
+        ? '<div style="margin:8px 0;padding:8px 12px;border-radius:10px;background:var(--col);border:1px solid var(--line);font-size:13px;display:grid;gap:4px">' +
+            '<div style="display:flex;justify-content:space-between"><span>📦 سعر الأصناف:</span><b>' + money(n.sub) + ' ' + esc(cp.currency) + '</b></div>' +
+            '<div style="display:flex;justify-content:space-between"><span>🚚 رسوم التوصيل:</span><b>' + (n.dFee > 0 ? '+' + money(n.dFee) : '0') + ' ' + esc(cp.currency) + '</b></div>' +
+            (n.disc > 0 ? '<div style="display:flex;justify-content:space-between;color:var(--late)"><span>🏷️ الخصم:</span><b>-' + money(n.disc) + ' ' + esc(cp.currency) + '</b></div>' : '') +
+            '<div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px dashed var(--line);font-size:14px"><span>💰 الإجمالي (شامل التوصيل):</span><b>' + money(n.tot) + ' ' + esc(cp.currency) + '</b></div>' +
+            (n.paid > 0 ? '<div style="display:flex;justify-content:space-between;color:var(--ok)"><span>✅ المدفوع مسبقاً:</span><b>' + money(n.paid) + ' ' + esc(cp.currency) + '</b></div>' : '') +
+          '</div>'
+        : '');
+    })() +
     (collAmount > 0 ? '<div class="rcol" style="background:var(--goldsoft);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;margin:10px 0;font-size:16px;display:flex;justify-content:space-between;align-items:center"><span>💵 المطلوب تحصيله نقداً:</span><b style="font-size:18px;color:var(--ink)">' + money(collAmount) + ' ' + cp.currency + '</b></div>' : '<div class="m" style="margin:8px 0;color:var(--ok)">✅ مدفوع بالكامل مسبقاً (لا تحصيل نقدي)</div>') +
     '<div class="m" style="margin:6px 0;font-size:12px">مسجل الطلب: ' + esc(o.created_by_name || '—') + '</div>' +
     '<div class="acts ract" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">' +
       '<button class="p" data-rd="' + o.id + '" style="flex:2 1 110px">✅ تم التوصيل</button>' +
       '<button class="s" data-rsh="' + o.id + '" style="flex:2 1 120px;font-weight:700;background:#0d9488;color:#fff;border-color:#0d9488" title="إرسال ومشاركة رسالة الطلب مع صور المنتجات المرفقة مباشرة في تطبيق المراسلة (واتساب)">📲 الرسالة مع الصور</button>' +
-      '<button class="s" data-rpdf="' + o.id + '" style="flex:2 1 110px;font-weight:700;background:#15803d;color:#fff;border-color:#15803d" title="إرسال الفاتورة بصيغة PDF مباشرة للعميل">📄 إرسال PDF</button>' +
+      '<button class="s" data-rpdf="' + o.id + '" style="flex:2 1 125px;font-weight:700;background:#15803d;color:#fff;border-color:#15803d" title="اختر إرسال فاتورة نصية أو ملف PDF مباشرة للعميل">📤 فاتورة (نص / PDF)</button>' +
       '<button class="s" data-rinv="' + o.id + '" style="flex:1 1 90px;font-weight:700" title="طباعة فاتورة أو إيصال حراري للعميل">🧾 إيصال</button>' +
       '<button class="dng s" data-rc="' + o.id + '" style="flex:1 1 70px">❌ إلغاء</button>' +
       '<button class="s" data-re="' + o.id + '" aria-label="معاينة الرسالة والصور" style="flex:0 0 42px">👁</button>' +
@@ -577,6 +687,7 @@ function repHistoryCard(o) {
     '<div class="m" style="font-size:12px;margin:4px 0">' + (o.items || []).length + ' أصناف: ' + esc((o.items || []).map(i => i.name + ' (' + i.qty + ')').join('، ')) + '</div>' +
     (imgItems.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">' + imgItems.map(i => { const u = repImgUrl(i.image || i.image_path, i.id); return '<img src="' + esc(u) + '" alt="' + esc(i.name) + '" data-zoom="' + esc(u) + '" style="width:46px;height:46px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">'; }).join('') + '</div>' : '') +
     '<div class="row s" style="margin-top:8px;gap:6px;justify-content:flex-start;flex-wrap:wrap">' +
+      '<button class="s" data-rpdf="' + o.id + '" style="font-weight:700;background:#15803d;color:#fff;border-color:#15803d">📤 فاتورة (نص / PDF)</button>' +
       '<button class="s" data-rinv="' + o.id + '" style="font-weight:700">🧾 فاتورة / إيصال حراري</button>' +
       '<button class="s" data-rsh="' + o.id + '">📲 الرسالة مع الصور</button>' +
       (o.phone ? '<a class="btnl s" target="_blank" rel="noopener" href="https://wa.me/' + waPhone(o.phone) + '">💬 واتساب العميل</a>' : '') +
@@ -726,7 +837,7 @@ function repRender() {
   });
   document.querySelectorAll('[data-rpdf]').forEach(b => b.onclick = () => {
     const o = (S.rorders || []).find(x => x.id === b.dataset.rpdf);
-    if (o) sendRepInvoicePdf(o, b);
+    if (o) repInvoiceSendChoiceDialog(o);
   });
   document.querySelectorAll('[data-rinv]').forEach(b => b.onclick = () => {
     const o = (S.rorders || []).find(x => x.id === b.dataset.rinv);

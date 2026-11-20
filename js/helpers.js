@@ -99,7 +99,7 @@ function jpegBytesToPdfBlob(jpegBytes, imgW, imgH) {
   startObj(5);
   pushStr('<< /Length ' + contentBytes.byteLength + ' >>\nstream\n');
   pushBytes(contentBytes);
-  pushStr('endstream');
+  pushStr('\nendstream');
   endObj();
 
   // XRef Table
@@ -150,7 +150,7 @@ async function generateInvoicePdfBlob(data) {
   const innerW = W - pad * 2;
   const items = Array.isArray(data.items) && data.items.length ? data.items : [{ name: 'إجمالي الطلب', qty: 1, price: data.total || 0, line_total: data.total || 0 }];
   const rowH = 54;
-  const H = Math.max(960, 620 + items.length * rowH + (data.notes ? 90 : 0));
+  const H = Math.max(960, 740 + items.length * rowH + (data.notes ? 90 : 0));
 
   const c = document.createElement('canvas');
   c.width = W;
@@ -451,38 +451,124 @@ async function generateInvoicePdfBlob(data) {
   return jpegBytesToPdfBlob(jpegBytes, W, H);
 }
 
-// تحميل ملف الفاتورة PDF تلقائياً ثم فتح محادثة واتساب للعميل مباشرة
-async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl) {
+function waTextUrl(phone, text) {
+  const ph = phone ? (typeof waPhone === 'function' ? waPhone(phone) : String(phone).replace(/\D/g, '')) : '';
+  return 'https://wa.me/' + ph + '?text=' + encodeURIComponent(String(text || ''));
+}
+
+function safeInvoicePdfName(orderNo) {
+  const clean = String(orderNo || 'order').replace(/[^a-zA-Z0-9_-]/g, '');
+  return 'invoice-' + (clean || 'order') + '.pdf';
+}
+
+async function buildInvoicePdfFile(invoiceData) {
+  const pdfBlob = await generateInvoicePdfBlob(invoiceData);
+  const fileName = safeInvoicePdfName(invoiceData.orderNo);
+  return new File([pdfBlob], fileName, { type: 'application/pdf' });
+}
+
+function downloadFileBlob(fileOrBlob, fileName) {
+  const url = URL.createObjectURL(fileOrBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 25000);
+}
+
+// إرسال فاتورة PDF مباشرة (مرفق فعلي عبر مشاركة النظام / واتساب) مع بديل ذكي للتنزيل + واتساب
+async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl, opts) {
+  const options = opts || {};
+  const fileName = safeInvoicePdfName(invoiceData.orderNo);
+  const caption = '🧾 فاتورة مبيعات #' + (invoiceData.orderNo || '') + ' — ' + (invoiceData.storeName || '') + '\n👤 العميل: ' + (invoiceData.customerName || '') + '\n💰 الإجمالي: ' + Number(invoiceData.total || 0).toLocaleString('en-US') + ' ' + (invoiceData.currency || 'ر.ي');
+  const waHref = waTextUrl(customerPhone, caption + '\n📎 مرفق ملف الفاتورة الرسمي PDF (' + fileName + ')');
+
+  // 1) إذا تم تجهيز الملف مسبقاً قبل النقرة، نطلق navigator.share بشكل متزامن تماماً للحفاظ على User Activation
+  let pdfFile = options.prebuiltFile || null;
+  if (pdfFile && options.mode !== 'download_wa' && navigator.share && (!navigator.canShare || navigator.canShare({ files: [pdfFile] }))) {
+    try {
+      await navigator.share({
+        title: 'فاتورة #' + (invoiceData.orderNo || ''),
+        text: caption,
+        files: [pdfFile]
+      });
+      return true;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return false;
+    }
+  }
+
   const origTxt = btnEl ? btnEl.innerHTML : '';
-  if (btnEl) {
+  if (!pdfFile && btnEl) {
     btnEl.disabled = true;
-    btnEl.innerHTML = '⏳ جارٍ تجهيز PDF...';
+    btnEl.innerHTML = '⏳ تجهيز PDF...';
   }
   try {
-    const pdfBlob = await generateInvoicePdfBlob(invoiceData);
-    const fileName = 'فاتورة-' + (invoiceData.orderNo || 'طلب') + '.pdf';
-    const caption = '🧾 فاتورة مبيعات #' + (invoiceData.orderNo || '') + ' — ' + (invoiceData.storeName || '') + '\n👤 العميل: ' + (invoiceData.customerName || '') + '\n💰 الإجمالي: ' + Number(invoiceData.total || 0).toLocaleString('en-US') + ' ' + (invoiceData.currency || 'ر.ي');
-
-    // 1) تنزيل ملف الـ PDF تلقائياً إلى جهاز المستخدم
-    const url = URL.createObjectURL(pdfBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 25000);
-
-    // 2) فتح محادثة واتساب للعميل مباشرة لإرفاق ملف الـ PDF الذي تم تنزيله
-    if (customerPhone) {
-      const ph = typeof waPhone === 'function' ? waPhone(customerPhone) : String(customerPhone).replace(/\D/g, '');
-      setTimeout(() => {
-        window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(caption + '\n📎 (مرفق لكم ملف الفاتورة الرسمي PDF: ' + fileName + ')'), '_blank');
-      }, 350);
-      if (typeof toast === 'function') toast('تم تحميل ملف PDF (' + fileName + ') وفتح محادثة العميل في واتساب ✓');
-    } else {
-      if (typeof toast === 'function') toast('تم تحميل ملف الفاتورة PDF (' + fileName + ') بنجاح ✓');
+    if (!pdfFile) {
+      pdfFile = await buildInvoicePdfFile(invoiceData);
     }
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerHTML = origTxt;
+    }
+
+    // 2) إذا طلب المستخدم صراحة التنزيل + واتساب أو الجهاز لا يدعم مشاركة الملفات
+    const canFileShare = !!(options.mode !== 'download_wa' && navigator.share && (!navigator.canShare || navigator.canShare({ files: [pdfFile] })));
+    if (canFileShare) {
+      try {
+        await navigator.share({
+          title: 'فاتورة #' + (invoiceData.orderNo || ''),
+          text: caption,
+          files: [pdfFile]
+        });
+        return true;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return false;
+        // إذا حظر المتصفح المشاركة بعد await التحميل الأولي، نفتح زر تأكيد بضغطة واحدة والملف الآن جاهز في الذاكرة
+        if (typeof dlg !== 'undefined' && dlg) {
+          dlg.innerHTML = '<h2>📄 إرسال فاتورة PDF مباشرة</h2>' +
+            '<p class="m">تم تجهيز ملف الفاتورة <b>' + esc(fileName) + '</b> للعميل <b>' + esc(invoiceData.customerName || '') + '</b>. اضغط الزر الأخضر لاختيار تطبيق واتساب وإرسال الملف مرفقاً مباشرة:</p>' +
+            '<div class="row dact" style="gap:8px;flex-wrap:wrap">' +
+              '<button type="button" class="p" id="pdf_sh_now" style="background:#15803d;border-color:#15803d;color:#fff">📤 إرسال ملف PDF الآن</button>' +
+              '<button type="button" class="s" id="pdf_dl_wa">⬇️ تنزيل PDF وفتح واتساب</button>' +
+              '<button type="button" class="s" id="pdf_sh_x">إغلاق</button>' +
+            '</div>';
+          $('pdf_sh_x').onclick = () => dlg.close();
+          $('pdf_sh_now').onclick = async () => {
+            try {
+              await navigator.share({
+                title: 'فاتورة #' + (invoiceData.orderNo || ''),
+                text: caption,
+                files: [pdfFile]
+              });
+              dlg.close();
+            } catch (err) {
+              if (err && err.name === 'AbortError') return;
+              downloadFileBlob(pdfFile, fileName);
+              dlg.close();
+              window.open(waHref, '_blank');
+              if (typeof toast === 'function') toast('تم تنزيل PDF وفتح واتساب — أرفق الملف في المحادثة ✓');
+            }
+          };
+          $('pdf_dl_wa').onclick = () => {
+            downloadFileBlob(pdfFile, fileName);
+            dlg.close();
+            window.open(waHref, '_blank');
+            if (typeof toast === 'function') toast('تم تنزيل PDF (' + fileName + ') وفتح واتساب ✓');
+          };
+          if (!dlg.open) dlg.showModal();
+          return true;
+        }
+      }
+    }
+
+    // 3) تنزيل الملف مباشرة وفتح واتساب فوراً بدون تأخير
+    downloadFileBlob(pdfFile, fileName);
+    window.open(waHref, '_blank');
+    if (typeof toast === 'function') toast('تم تنزيل ملف PDF (' + fileName + ') وفتح واتساب لإرفاقه ✓');
+    return true;
   } catch (err) {
     if (err && err.name !== 'AbortError') {
       alert('تعذّر تجهيز ملف الـ PDF: ' + (err.message || err));
@@ -492,5 +578,6 @@ async function shareOrSendInvoicePdf(invoiceData, customerPhone, btnEl) {
     btnEl.disabled = false;
     btnEl.innerHTML = origTxt;
   }
+  return false;
 }
 

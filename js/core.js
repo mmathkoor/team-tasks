@@ -821,7 +821,7 @@ function canViewerSeeAdminInTasks(adminMember, viewerMember, activeCo) {
   return true;
 }
 
-// مزامنة تكاليف الأصناف الاحتياطية عند إضافة موظف غير أدمن لتجنب خطأ RLS في ord_item_costs
+// مزامنة تكاليف الأصناف الاحتياطية عند عدم توفرها في الاستعلام الأساسي
 function syncCloudItemCosts() {
   if (!S.ocost) S.ocost = {};
   const hv = (S.ordSet && Array.isArray(S.ordSet.hidden_views)) ? S.ordSet.hidden_views : [];
@@ -832,7 +832,8 @@ function syncCloudItemCosts() {
         const map = JSON.parse(s.slice(8));
         if (map && typeof map === 'object') {
           Object.keys(map).forEach(id => {
-            if (S.ocost[id] === undefined) S.ocost[id] = +map[id] || 0;
+            const v = +map[id] || 0;
+            if (S.ocost[id] === undefined || (S.ocost[id] === 0 && v > 0)) S.ocost[id] = v;
           });
         }
       } catch (e) {}
@@ -841,7 +842,8 @@ function syncCloudItemCosts() {
   try {
     const localMap = JSON.parse(localStorage.getItem('fallback_item_costs_v1') || '{}');
     Object.keys(localMap).forEach(id => {
-      if (S.ocost[id] === undefined) S.ocost[id] = +localMap[id] || 0;
+      const v = +localMap[id] || 0;
+      if (S.ocost[id] === undefined) S.ocost[id] = v;
     });
   } catch (e) {}
 }
@@ -852,14 +854,15 @@ async function saveCloudItemCostsFallback(itemsList) {
   let localMap = {};
   try { localMap = JSON.parse(localStorage.getItem('fallback_item_costs_v1') || '{}') || {}; } catch (e) {}
   itemsList.forEach(i => {
-    if (i && i.id) {
+    const itemId = i && (i.item_id || i.id);
+    if (itemId) {
       const c = +i.cost || 0;
-      S.ocost[i.id] = c;
-      localMap[i.id] = c;
+      S.ocost[itemId] = c;
+      localMap[itemId] = c;
     }
   });
   try { localStorage.setItem('fallback_item_costs_v1', JSON.stringify(localMap)); } catch (e) {}
-  if (S.ordSet) {
+  if (S.ordSet && isAdmin()) {
     const hv = (S.ordSet.hidden_views || []).slice();
     let merged = {};
     hv.forEach(x => {
@@ -868,7 +871,6 @@ async function saveCloudItemCostsFallback(itemsList) {
       }
     });
     Object.assign(merged, localMap);
-    // الاحتفاظ بآخر 350 صنف حتى لا يتضخم الحقل
     const keys = Object.keys(merged);
     if (keys.length > 350) {
       const trimmed = {};
@@ -877,7 +879,7 @@ async function saveCloudItemCostsFallback(itemsList) {
     }
     const nextHidden = hv.filter(x => !String(x || '').startsWith('__icost:')).concat(['__icost:' + JSON.stringify(merged)]);
     S.ordSet.hidden_views = nextHidden;
-    await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true).catch(() => {});
+    try { await sb.from('ord_settings').update({ hidden_views: nextHidden }).eq('id', true); } catch (e) {}
   }
 }
 

@@ -105,9 +105,20 @@ async function hydrateOrdersMedia() {
 function orderMsg(o) {
   const cur = bcurr(o), stName = bn(o);
   const catKey = orderCatOf(o), catM = orderCatMeta(o);
-  const L = oItems(o.id).map(i => {
+  const its = oItems(o.id);
+  const itemsSum = its.reduce((s, i) => s + ((+i.qty || 1) * (+i.price || 0)), 0);
+  const sub = +o.subtotal > 0 ? +o.subtotal : itemsSum;
+  const fee = +o.delivery_fee || 0;
+  const disc = +o.discount || 0;
+  const calcTot = Math.max(0, sub + fee - disc);
+  const tot = (sub > 0 || fee > 0) ? calcTot : (+o.total || 0);
+  const paid = +o.paid || oPays(o.id).reduce((s, p) => s + (+p.amount || 0), 0);
+  const bal = (sub > 0 || fee > 0) ? Math.max(0, tot - paid) : Math.max(0, +o.balance || 0);
+  const L = its.map(i => {
     const link = i.image_path ? (typeof shortImgUrl === 'function' ? shortImgUrl(i.id, i.image_path) : '') : '';
+    const lineTot = (+i.qty || 1) * (+i.price || 0);
     return '▫️ *' + i.name + '* × ' + (+i.qty) +
+      (lineTot > 0 ? ' (' + money(lineTot) + ' ' + cur + ')' : '') +
       (i.supplier ? '\n    🏪 التاجر: ' + i.supplier : '') +
       (link ? '\n    📷 صورة المنتج: ' + link : '');
   }).join('\n') || '—';
@@ -117,7 +128,13 @@ function orderMsg(o) {
     '',
     catKey !== 'normal' ? '⚡ *تصنيف الطلب:* ' + catM.badge : '',
     '🧑‍💼 مسجل الطلب: ' + creatorName(o.created_by), '🙍 العميل: ' + o.customer_name, '📞 الهاتف: ' + (o.phone || '—'), '📍 العنوان: ' + (o.address || '—'),
-    '💵 المطلوب تحصيله: *' + money(o.balance) + ' ' + cur + '*', '', '----------------', '📋 *قائمة التجهيز:*', L, '----------------']
+    '📦 سعر الأصناف (بدون التوصيل): ' + money(sub) + ' ' + cur,
+    '🚚 رسوم التوصيل: ' + (fee > 0 ? '+' + money(fee) + ' ' + cur : '0 ' + cur),
+    disc > 0 ? '🏷️ الخصم: -' + money(disc) + ' ' + cur : '',
+    '💰 *إجمالي السعر (شامل التوصيل): ' + money(tot) + ' ' + cur + '*',
+    paid > 0 ? '✅ المدفوع مسبقاً: ' + money(paid) + ' ' + cur : '',
+    '💵 *المطلوب تحصيله من العميل: ' + money(bal) + ' ' + cur + '*',
+    '', '----------------', '📋 *قائمة التجهيز:*', L, '----------------']
     .filter(x => x !== '')
     .concat(cleanNotes ? ['⚠️ *ملاحظات هامة:* ' + cleanNotes] : [])
     .concat(['', '🌹 قل تم وشد الهمة']).join('\n');
@@ -269,9 +286,63 @@ function buildOrderPdfData(o, tplOpt) {
     balance: +o.balance || 0
   };
 }
-async function sendOrderInvoicePdf(o, btnEl, tplOpt) {
+async function sendOrderInvoicePdf(o, btnEl, tplOpt, pdfOpts) {
   if (!o || typeof shareOrSendInvoicePdf !== 'function') return;
-  await shareOrSendInvoicePdf(buildOrderPdfData(o, tplOpt), o.phone, btnEl);
+  await shareOrSendInvoicePdf(buildOrderPdfData(o, tplOpt), o.phone, btnEl, pdfOpts);
+}
+function invoiceSendChoiceDialog(o, tplOpt) {
+  if (!o) return;
+  const cur = bcurr(o);
+  const pdfData = buildOrderPdfData(o, tplOpt);
+  const txtInv = invoiceText(o);
+  const waHref = typeof waTextUrl === 'function' ? waTextUrl(o.phone, txtInv) : ('https://wa.me/' + (o.phone ? waPhone(o.phone) : '') + '?text=' + encodeURIComponent(txtInv));
+  let prebuiltPdf = null;
+
+  dlg.innerHTML = '<h2>📤 إرسال الفاتورة للعميل #' + o.order_no + '</h2>' +
+    '<div style="padding:10px 12px;border-radius:10px;background:var(--col);border:1px solid var(--line);margin-bottom:12px">' +
+      '<div style="font-weight:700;font-size:15px">👤 ' + esc(o.customer_name) + (o.phone ? ' · <span dir="ltr">' + esc(o.phone) + '</span>' : '') + '</div>' +
+      '<div class="m" style="margin-top:4px">💰 الإجمالي: <b>' + money(o.total) + ' ' + esc(cur) + '</b> · المتبقي: <b>' + money(o.balance) + ' ' + esc(cur) + '</b></div>' +
+      '<div id="ich_st" class="m" style="margin-top:6px;font-size:12px">⏳ جارٍ تجهيز ملف PDF عالي الدقة للإرسال المباشر…</div>' +
+    '</div>' +
+    '<div style="display:grid;gap:8px">' +
+      '<button type="button" class="p" id="ich_pdf" style="background:#15803d;border-color:#15803d;color:#fff;padding:12px;font-size:14.5px">📄 إرسال فاتورة PDF مباشرة (ملف مرفق)</button>' +
+      '<button type="button" class="p" id="ich_txt" style="background:#0d9488;border-color:#0d9488;color:#fff;padding:12px;font-size:14.5px">💬 إرسال فاتورة نصية (واتساب)</button>' +
+      '<button type="button" class="s" id="ich_dl" style="padding:10px">⬇️ تنزيل ملف PDF + فتح واتساب العميل</button>' +
+      '<div class="row" style="gap:6px">' +
+        '<button type="button" class="s" id="ich_prev" style="flex:1">🧾 معاينة وطباعة الفاتورة</button>' +
+        '<button type="button" class="s" id="ich_cp" style="flex:1">📋 نسخ النص</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="row dact"><button type="button" class="s" id="ich_x">إغلاق</button></div>';
+
+  $('ich_x').onclick = () => dlg.close();
+  $('ich_txt').onclick = () => {
+    dlg.close();
+    window.open(waHref, '_blank');
+  };
+  $('ich_pdf').onclick = () => sendOrderInvoicePdf(o, $('ich_pdf'), tplOpt, { prebuiltFile: prebuiltPdf });
+  $('ich_dl').onclick = () => sendOrderInvoicePdf(o, $('ich_dl'), tplOpt, { prebuiltFile: prebuiltPdf, mode: 'download_wa' });
+  $('ich_prev').onclick = () => invoiceDialog(o);
+  $('ich_cp').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(txtInv);
+      $('ich_cp').textContent = 'تم النسخ ✓';
+      if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓');
+    } catch (e) { alert('تعذّر النسخ'); }
+  };
+  if (!dlg.open) dlg.showModal();
+
+  if (typeof buildInvoicePdfFile === 'function') {
+    buildInvoicePdfFile(pdfData).then(f => {
+      prebuiltPdf = f;
+      if ($('ich_st')) {
+        $('ich_st').textContent = '✅ ملف PDF جاهز الآن للإرسال المباشر بضغطة واحدة';
+        $('ich_st').style.color = 'var(--ok)';
+      }
+    }).catch(() => {
+      if ($('ich_st')) $('ich_st').textContent = '💡 يمكنك اختيار الإرسال بصيغة PDF أو فاتورة نصية.';
+    });
+  }
 }
 function invoiceText(o) {
   const its = oItems(o.id), p = bProf(o), cur = bcurr(o), catKey = orderCatOf(o), catM = orderCatMeta(o);
@@ -322,9 +393,9 @@ function ocard(o) {
   const oCo = orderCompany(o);
   const catKey = orderCatOf(o), catM = orderCatMeta(o);
   const A = {
-    new: [['assign', '🛵 إسناد وتجهيز', 'p'], ['pdf', '📄 PDF للعميل', ''], ['inv', '🧾']],
-    preparing: [['wa', '📲 للمندوب'], ['pdf', '📄 PDF للعميل', ''], ['eye', '👁'], ['deliver', '✅ تم التوصيل'], ['inv', '🧾'], ['cancel', '❌']],
-    delivered: (bal > 0 ? [['pay', '💰 دفعة']] : []).concat([['pdf', '📄 إرسال PDF', 'p'], ['inv', '🧾 فاتورة']]),
+    new: [['assign', '🛵 إسناد وتجهيز', 'p'], ['sendinv', '📤 فاتورة (نص / PDF)', ''], ['inv', '🧾']],
+    preparing: [['wa', '📲 للمندوب'], ['sendinv', '📤 فاتورة (نص / PDF)', ''], ['eye', '👁'], ['deliver', '✅ تم التوصيل'], ['inv', '🧾'], ['cancel', '❌']],
+    delivered: (bal > 0 ? [['pay', '💰 دفعة']] : []).concat([['sendinv', '📤 إرسال فاتورة (نص / PDF)', 'p'], ['inv', '🧾 فاتورة']]),
     cancelled: [['reopen', '↩ إعادة فتح']],
     returned: [['reopen', '↩ إعادة فتح']]
   }[o.status] || [];
@@ -511,6 +582,7 @@ async function oAction(a, id, btnEl) {
   if (a === 'wa') {
     await shareOrderToRep(o, btnEl);
   }
+  else if (a === 'sendinv') invoiceSendChoiceDialog(o);
   else if (a === 'pdf') await sendOrderInvoicePdf(o, btnEl);
   else if (a === 'eye') previewDialog(o);
   else if (a === 'assign') assignDialog(o);
@@ -943,7 +1015,9 @@ function openInvoice(o, tplOpt) {   // بديل: صفحة فاتورة في نا
 }
 function invoiceDialog(o) {
   let activeTpl = currentInvoiceTemplate(o);
+  let prebuiltPdf = null;
   const renderDlg = () => {
+    prebuiltPdf = null;
     const tplBar = '<div class="no-print" style="margin-bottom:12px;padding:10px 12px;background:var(--col);border:1px solid var(--line);border-radius:12px">' +
       '<div class="bar" style="margin-bottom:6px;gap:8px"><b style="font-size:13px">🎨 اختر تصميم وتنسيق الفاتورة (٤ قوالب احترافية):</b><span class="m" style="font-size:11.5px">يُحفظ اختيارك تلقائياً للمتجر</span></div>' +
       '<div class="row s" style="gap:6px;flex-wrap:wrap">' +
@@ -956,10 +1030,11 @@ function invoiceDialog(o) {
     dlg.innerHTML = tplBar +
       '<div id="iv_preview_wrap" style="overflow-x:auto">' + invoiceInner(o, activeTpl) + '</div>' +
       '<div class="row dact no-print" style="flex-wrap:wrap;gap:6px">' +
-        '<button class="p s" id="iv_pdf_wa" style="background:#15803d;border-color:#15803d;color:#fff">📄 إرسال فاتورة PDF للعميل مباشرة</button>' +
-        '<button class="p s" id="iv_p">🖨 طباعة / حفظ PDF</button>' +
+        '<button class="p s" id="iv_pdf_wa" style="background:#15803d;border-color:#15803d;color:#fff">📄 إرسال فاتورة PDF مباشرة</button>' +
+        '<button class="p s" id="iv_w" style="background:#0d9488;border-color:#0d9488;color:#fff">💬 إرسال فاتورة نصية (واتساب)</button>' +
+        '<button class="s" id="iv_pdf_dl">⬇️ تنزيل PDF</button>' +
+        '<button class="s" id="iv_p">🖨 طباعة / حفظ PDF</button>' +
         '<button class="s" id="iv_o">↗ فتح في نافذة</button>' +
-        (o.phone ? '<button class="s" id="iv_w">💬 إرسال نص واتساب</button>' : '') +
         '<button class="s" id="iv_cp">📋 نسخ النص</button>' +
         '<button class="s" id="iv_x">إغلاق</button>' +
       '</div>';
@@ -976,11 +1051,19 @@ function invoiceDialog(o) {
       };
     });
     $('iv_x').onclick = () => dlg.close();
-    $('iv_pdf_wa').onclick = () => sendOrderInvoicePdf(o, $('iv_pdf_wa'), activeTpl);
+    $('iv_pdf_wa').onclick = () => sendOrderInvoicePdf(o, $('iv_pdf_wa'), activeTpl, { prebuiltFile: prebuiltPdf });
+    $('iv_pdf_dl').onclick = () => sendOrderInvoicePdf(o, $('iv_pdf_dl'), activeTpl, { prebuiltFile: prebuiltPdf, mode: 'download_wa' });
     $('iv_p').onclick = () => printInvoice(o, activeTpl);
     $('iv_o').onclick = () => openInvoice(o, activeTpl);
     $('iv_cp').onclick = async () => { try { await navigator.clipboard.writeText(invoiceText(o)); $('iv_cp').textContent = 'تم النسخ ✓'; if (typeof toast === 'function') toast('تم نسخ نص الفاتورة ✓'); } catch (e) { alert('تعذّر النسخ'); } };
-    if ($('iv_w')) $('iv_w').onclick = () => window.open('https://wa.me/' + waPhone(o.phone) + '?text=' + encodeURIComponent(invoiceText(o)), '_blank');
+    $('iv_w').onclick = () => {
+      const txt = invoiceText(o);
+      const u = typeof waTextUrl === 'function' ? waTextUrl(o.phone, txt) : ('https://wa.me/' + (o.phone ? waPhone(o.phone) : '') + '?text=' + encodeURIComponent(txt));
+      window.open(u, '_blank');
+    };
+    if (typeof buildInvoicePdfFile === 'function') {
+      buildInvoicePdfFile(buildOrderPdfData(o, activeTpl)).then(f => { prebuiltPdf = f; }).catch(() => {});
+    }
   };
   renderDlg();
   dlg.showModal();
@@ -998,8 +1081,12 @@ function orderDialog(o) {
   const initCo = edit ? orderCompany(o) : (activeCompanyFilter() || 'متجرك');
   const cur = getCompanyProfile(initCo).currency || BRAND.currency || 'ر.ي';
   let selCat = edit ? orderCatOf(o) : 'normal';
-  const blank = () => ({ id: crypto.randomUUID(), name: '', supplier: '', qty: 1, price: '', cost: '', img: '', blob: null, url: '', rmImg: false });
-  let items = edit ? oItems(o.id).map(i => ({ id: i.id, name: i.name, supplier: i.supplier || '', qty: +i.qty, price: +i.price, cost: cc ? (costOf(i.id) || '') : '', img: i.image_path || '', blob: null, url: '', rmImg: false })) : [blank()];
+  const blank = () => ({ id: crypto.randomUUID(), name: '', supplier: '', qty: 1, price: '', cost: '', costTouched: false, hadCost: false, img: '', blob: null, url: '', rmImg: false });
+  let items = edit ? oItems(o.id).map(i => {
+    const cRaw = S.ocost && Object.prototype.hasOwnProperty.call(S.ocost, i.id) ? +S.ocost[i.id] : null;
+    const hasC = cc && cRaw !== null && cRaw > 0;
+    return { id: i.id, name: i.name, supplier: i.supplier || '', qty: +i.qty, price: +i.price, cost: hasC ? cRaw : '', costTouched: false, hadCost: hasC, img: i.image_path || '', blob: null, url: '', rmImg: false };
+  }) : [blank()];
   const origIds = items.map(i => i.id), origImgs = items.map(i => i.img).filter(Boolean);
   let urls = {};
   const names = [...new Set((S.orders || []).map(r => r.customer_name))].slice(0, 80), pnames = [...new Set((S.oitems || []).map(i => i.name))].slice(0, 120), sups = [...new Set((S.oitems || []).map(i => i.supplier).filter(Boolean))].slice(0, 80);
@@ -1032,7 +1119,7 @@ function orderDialog(o) {
     '<label id="o_rsw" style="margin-top:8px;display:none">سبب الإلغاء (إجباري)<input id="o_rs" value="' + esc(x.cancel_reason || '') + '"></label>' +
     '<label style="margin-top:8px">ملاحظات (تصل للمندوب)<textarea id="o_nt" rows="2">' + esc(cleanNotesVal) + '</textarea></label>' +
     (edit ? '<div id="o_pays" class="obox"></div><div id="o_ev" class="obox m"></div>' : '') +
-    '<div class="row dact" style="flex-wrap:wrap"><button class="p" id="o_sv">حفظ</button>' + (edit ? '<button class="s" id="o_pdf_btn" style="background:#15803d;color:#fff;border-color:#15803d">📄 إرسال PDF للعميل</button><button class="s" id="o_iv">🧾 فاتورة</button>' : '') + (edit && isAdmin() ? '<button class="dng s" id="o_dl">حذف</button>' : '') + '<button class="s" id="o_cx">إلغاء</button></div>';
+    '<div class="row dact" style="flex-wrap:wrap"><button class="p" id="o_sv">حفظ</button>' + (edit ? '<button class="s" id="o_pdf_btn" style="background:#15803d;color:#fff;border-color:#15803d">📤 إرسال الفاتورة (نص / PDF)</button><button class="s" id="o_iv">🧾 فاتورة</button>' : '') + (edit && isAdmin() ? '<button class="dng s" id="o_dl">حذف</button>' : '') + '<button class="s" id="o_cx">إلغاء</button></div>';
 
   dlg.querySelectorAll('[data-ocat-pick]').forEach(b => {
     b.onclick = () => {
@@ -1067,11 +1154,21 @@ function orderDialog(o) {
         '<div class="ir-img">' + (src ? '<img class="thumb" src="' + esc(src) + '" alt="صورة الصنف" data-big="' + k + '">' : '') + '<label class="imgbtn">📷 ' + (src ? 'تغيير الصورة' : 'صورة توضيحية للمندوب') + '<input class="ifile" data-k="' + k + '" type="file" accept="image/*" hidden></label>' + (src ? '<button class="s" type="button" data-rmi="' + k + '">حذف الصورة</button>' : '') + '</div></div>';
     }).join('');
     const E = q => $('o_items').querySelectorAll(q);
-    E('.in').forEach(e => { e.oninput = () => { items[e.dataset.k].name = e.value; }; e.onchange = () => { const it = items[e.dataset.k], l = lastOf(e.value); if (l) { let ch = false; if (it.price === '') { it.price = +l.price; ch = true; } if (!it.supplier && l.supplier) { it.supplier = l.supplier; ch = true; } if (cc && it.cost === '' && costOf(l.id)) { it.cost = costOf(l.id); ch = true; } if (ch) { drawItems(); calc(); } } }; });
+    E('.in').forEach(e => { e.oninput = () => { items[e.dataset.k].name = e.value; }; e.onchange = () => { const it = items[e.dataset.k], l = lastOf(e.value); if (l) { let ch = false; if (it.price === '') { it.price = +l.price; ch = true; } if (!it.supplier && l.supplier) { it.supplier = l.supplier; ch = true; } if (cc && it.cost === '' && costOf(l.id)) { it.cost = costOf(l.id); it.costTouched = true; ch = true; } if (ch) { drawItems(); calc(); } } }; });
     E('.isup').forEach(e => e.oninput = () => { items[e.dataset.k].supplier = e.value; });
     E('.iq').forEach(e => e.oninput = () => { items[e.dataset.k].qty = e.value; calc(); });
     E('.ip').forEach(e => e.oninput = () => { items[e.dataset.k].price = e.value; calc(); });
-    E('.ic').forEach(e => e.oninput = () => { items[e.dataset.k].cost = e.value; calc(); });
+    E('.ic').forEach(e => {
+      const syncC = () => {
+        const it = items[e.dataset.k];
+        if (!it) return;
+        it.cost = e.value;
+        it.costTouched = true;
+        calc();
+      };
+      e.oninput = syncC;
+      e.onchange = syncC;
+    });
     E('[data-rm]').forEach(b => b.onclick = () => { items.splice(+b.dataset.rm, 1); if (!items.length) items.push(blank()); drawItems(); calc(); });
     E('[data-rmi]').forEach(b => b.onclick = () => { const it = items[b.dataset.rmi]; it.blob = null; it.url = ''; if (it.img) it.rmImg = true; drawItems(); });
     E('[data-big]').forEach(im => im.onclick = () => window.open(im.src, '_blank'));
@@ -1083,6 +1180,22 @@ function orderDialog(o) {
   const syncSt = () => { $('o_rsw').style.display = $('o_st').value === 'cancelled' ? '' : 'none'; };
   drawItems(); calc(); syncSt();
   if (origImgs.length) imgSign(origImgs).then(m => { urls = m; if ($('o_items')) drawItems(); });
+  if (edit && cc && navigator.onLine && typeof apiPost === 'function') {
+    apiPost('/api/rep-admin', JSON.stringify({ action: 'get_item_costs' })).then(r => r.ok ? r.json() : null).then(j => {
+      if (!j || !j.ok || !j.costs || !dlg.open || !$('o_items')) return;
+      let changed = false;
+      Object.keys(j.costs).forEach(k => { if (!S.ocost) S.ocost = {}; S.ocost[k] = +j.costs[k] || 0; });
+      items.forEach(it => {
+        const dbVal = +j.costs[it.id];
+        if (!it.costTouched && it.cost === '' && dbVal > 0) {
+          it.cost = dbVal;
+          it.hadCost = true;
+          changed = true;
+        }
+      });
+      if (changed) { drawItems(); calc(); }
+    }).catch(() => {});
+  }
   $('o_addi').onclick = () => { items.push(blank()); drawItems(); calc(); const r = $('o_items').querySelectorAll('.in'); r[r.length - 1].focus(); };
   $('o_fee').oninput = $('o_dc').oninput = calc;
   $('o_st').onchange = syncSt;
@@ -1133,11 +1246,21 @@ function orderDialog(o) {
   $('o_cx').onclick = () => dlg.close();
   if (edit) {
     $('o_iv').onclick = () => invoiceDialog(oOf(o.id) || o);
-    if ($('o_pdf_btn')) $('o_pdf_btn').onclick = () => sendOrderInvoicePdf(oOf(o.id) || o, $('o_pdf_btn'));
+    if ($('o_pdf_btn')) $('o_pdf_btn').onclick = () => invoiceSendChoiceDialog(oOf(o.id) || o);
   }
   if ($('o_dl')) $('o_dl').onclick = async () => { if (confirm('حذف الطلب #' + o.order_no + ' نهائياً مع أصنافه ودفعاته وصوره؟')) { dlg.close(); await imgRemove(oItems(o.id).map(i => i.image_path)); await sb.from('ord_orders').delete().eq('id', o.id); load(); } };
   $('o_sv').onclick = async () => {
     const name = $('o_nm').value.trim(); if (!name) return $('o_nm').focus();
+    // مزامنة قيم الحقول مباشرة قبل الحفظ لضمان عدم فقدان آخر تعديل في سعر الشراء أو البيع
+    if ($('o_items')) {
+      $('o_items').querySelectorAll('.ic').forEach(inp => {
+        const it = items[inp.dataset.k];
+        if (it && String(inp.value) !== String(it.cost === '' ? '' : it.cost)) {
+          it.cost = inp.value;
+          it.costTouched = true;
+        }
+      });
+    }
     const its = items.filter(i => String(i.name).trim()); if (!its.length) return alert('أضف صنفاً واحداً على الأقل');
     const st = $('o_st').value, rep = $('o_rep').value || null, rs = $('o_rs').value.trim();
     if (st === 'cancelled' && rs.length < 3) { $('o_rsw').style.display = ''; return $('o_rs').focus(); }
@@ -1170,16 +1293,31 @@ function orderDialog(o) {
       if (!error) {
         ({ error } = await sb.from('ord_items').upsert(its.map((i, k) => ({ id: i.id, order_id: id, pos: k, name: String(i.name).trim(), supplier: String(i.supplier).trim() || null, qty: +i.qty > 0 ? +i.qty : 1, price: +i.price || 0, image_path: i.newPath }))));
         if (!error && cc) {
-          // معالجة خطأ RLS لجدول ord_item_costs عند حفظ الطلب من قِبل موظف غير أدمن
-          const costRows = its.map(i => ({ item_id: i.id, cost: +i.cost || 0 }));
-          const costRes = await sb.from('ord_item_costs').upsert(costRows);
-          if (costRes && costRes.error) {
-            // حفظ التكاليف في السحابة الاحتياطية والذاكرة دون إيقاف حفظ الطلب
-            if (typeof saveCloudItemCostsFallback === 'function') {
-              await saveCloudItemCostsFallback(its);
+          // لا نكتب cost=0 أبداً لصنف لم يلمسه المستخدم ولم يكن فارغاً عن قصد — نحفظ فقط البنود المدخلة أو المعدّلة
+          const costItems = its.filter(i => (i.cost !== '' && i.cost !== null && i.cost !== undefined) || (i.costTouched && i.hadCost));
+          if (costItems.length) {
+            const costRows = costItems.map(i => ({ item_id: i.id, cost: Math.max(0, +i.cost || 0) }));
+            let costSaved = false;
+            let costErrMsg = '';
+            if (navigator.onLine && typeof apiPost === 'function') {
+              try {
+                const rr = await apiPost('/api/rep-admin', JSON.stringify({ action: 'save_item_costs', items: costRows }));
+                const j = await rr.json().catch(() => ({}));
+                if (rr.ok && j && j.ok) costSaved = true;
+                else if (j && j.error) costErrMsg = j.error;
+              } catch (e) {}
             }
-          } else {
-            its.forEach(i => { if (S.ocost) S.ocost[i.id] = +i.cost || 0; });
+            if (!costSaved) {
+              const costRes = await sb.from('ord_item_costs').upsert(costRows);
+              if (costRes && !costRes.error) costSaved = true;
+              else if (costRes && costRes.error) costErrMsg = costRes.error.message || costErrMsg;
+            }
+            if (typeof saveCloudItemCostsFallback === 'function') {
+              await saveCloudItemCostsFallback(costRows);
+            }
+            if (!costSaved && navigator.onLine) {
+              if (typeof toast === 'function') toast('⚠️ تم حفظ الطلب، لكن تعذّر مزامنة سعر الشراء سحابياً: ' + (costErrMsg || 'خطأ صلاحيات'));
+            }
           }
         }
       }

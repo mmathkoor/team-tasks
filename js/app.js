@@ -40,7 +40,7 @@ async function init() {
 
 async function load() {
   if (S.me && S.me.role === 'rep') return repLoad();
-  const [m, t, p, v, d, ci, nt, mb, oo, oi, op, os, oc, coTbl, eSup, eRep, eExp] = await Promise.all([
+  const [m, t, p, v, d, ci, nt, mb, oo, oi, op, os, oc, coTbl, eSup, eRep, eExp, srvCostsRes] = await Promise.all([
     sb.from('meetings').select('*').order('held_on', { ascending: false }),
     sb.from('tasks').select('*').order('due_on', { ascending: true, nullsFirst: false }),
     sb.from('proposals').select('*').order('created_at', { ascending: false }),
@@ -57,7 +57,10 @@ async function load() {
     sb.from('companies').select('*'),
     sb.from('erp_supplier_payments').select('*').order('paid_on', { ascending: false }),
     sb.from('erp_rep_handovers').select('*').order('handed_on', { ascending: false }),
-    sb.from('erp_expenses').select('*').order('spent_on', { ascending: false })
+    sb.from('erp_expenses').select('*').order('spent_on', { ascending: false }),
+    (navigator.onLine && typeof apiPost === 'function' && S.me && S.me.role !== 'rep')
+      ? apiPost('/api/rep-admin', JSON.stringify({ action: 'get_item_costs' })).then(r => r.ok ? r.json() : null).catch(() => null)
+      : Promise.resolve(null)
   ]);
   if (!mb.error && mb.data && mb.data.length) {
     S.rawMembers = mb.data; S.allMembers = mb.data; S.members = mb.data.filter(x => x.role !== 'rep'); S.reps = mb.data.filter(x => x.role === 'rep'); S.me = mb.data.find(x => same(x.email, S.me.email)) || S.me;
@@ -68,7 +71,11 @@ async function load() {
   if (!oi.error) { S.rawOitems = oi.data || []; S.oitems = S.rawOitems; }
   if (!op.error) { S.rawOpay = op.data || []; S.opay = S.rawOpay; }
   if (!os.error) S.ordSet = (os.data || [])[0] || null;
-  S.ocost = {}; if (!oc.error) (oc.data || []).forEach(c => { S.ocost[c.item_id] = +c.cost; });
+  S.ocost = {};
+  if (!oc.error) (oc.data || []).forEach(c => { S.ocost[c.item_id] = +c.cost; });
+  if (srvCostsRes && srvCostsRes.ok && srvCostsRes.costs && typeof srvCostsRes.costs === 'object') {
+    Object.keys(srvCostsRes.costs).forEach(id => { S.ocost[id] = +srvCostsRes.costs[id] || 0; });
+  }
 
   S.companiesErr = !!coTbl.error;
   if (!coTbl.error) S.companiesRows = coTbl.data || [];
